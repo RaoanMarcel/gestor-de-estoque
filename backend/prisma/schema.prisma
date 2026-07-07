@@ -1,0 +1,30 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+} 
+
+model Pallet {
+  id          Int             @id @default(autoincrement())
+  numero      String          @unique 
+  rua         String?         
+  estrutura   String?         
+  nivel       String?         
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  produtos    ProdutoPallet[] 
+}
+
+model ProdutoPallet {
+  id         Int      @id @default(autoincrement())
+  codigoItem String   
+  quantidade Int      @default(1)
+  palletId   Int
+  pallet     Pallet   @relation(fields: [palletId], references: [id], onDelete: Cascade)
+  bipadoEm   DateTime @default(now())
+
+  @@unique([palletId, codigoItem]) 
+}
