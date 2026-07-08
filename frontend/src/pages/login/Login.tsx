@@ -54,7 +54,7 @@ export default function Login() {
     setSalvando(true);
     try {
       await api.post('/auth/alterar-senha', { username, novaSenha });
-      alert('Senha atualizada! Agora faça o login com as novas credenciais.');
+      alert('Senha updated! Agora faça o login com as novas credenciais.');
       setFace('login');
       setSenha(''); setSenhaAtual(''); setNovaSenha(''); setConfirmarNovaSenha('');
     } catch (err) {
@@ -70,6 +70,7 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden flex items-center justify-center px-4 py-10">
+      {/* ============ FUNDO LIMPO (Sem as linhas de grade) ============ */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0" style={{
           background:
@@ -82,10 +83,6 @@ export default function Login() {
           style={{ background: 'radial-gradient(closest-side, #3b6fa0, transparent 70%)', animation: 'float 18s ease-in-out infinite' }}/>
         <div className="absolute -bottom-40 -right-24 h-[560px] w-[560px] rounded-full opacity-30 blur-3xl"
           style={{ background: 'radial-gradient(closest-side, #1e3a5f, transparent 70%)', animation: 'float 22s ease-in-out infinite reverse' }}/>
-        <div className="absolute inset-0 opacity-[0.05]" style={{
-          backgroundImage:'linear-gradient(#1e3a5f 1px, transparent 1px), linear-gradient(90deg, #1e3a5f 1px, transparent 1px)',
-          backgroundSize:'48px 48px',
-        }}/>
       </div>
 
       <div className="relative w-full max-w-md" style={{ perspective: '1800px' }}>
@@ -193,7 +190,6 @@ interface PrimaryButtonProps {
   disabled?: boolean;
 }
 
-/* ---------- helpers visuais corrigidos ---------- */
 const inputCls = "w-full h-11 bg-white/90 border-slate-200 focus:border-[#1e3a5f]/60 focus:ring-2 focus:ring-[#1e3a5f]/15";
 
 function CardFace({ children, back = false }: CardFaceProps) {
@@ -248,8 +244,8 @@ function ErrorBox({ children }: ErrorBoxProps) {
 function PrimaryButton({ children, disabled }: PrimaryButtonProps) {
   return (
     <Button type="submit" variant="primary" disabled={disabled}
-      className="w-full h-11 text-sm font-medium tracking-wide text-white shadow-lg shadow-[#1e3a5f]/25 transition-all hover:shadow-[#1e3a5f]/40 disabled:opacity-60"
-      style={{ background:'linear-gradient(135deg, #1e3a5f 0%, #3b6fa0 100%)' }}>
+      className="w-full h-11 text-sm font-medium tracking-wide text-white shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/35 disabled:opacity-60"
+      style={{ background:'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' }}>
       {children}
     </Button>
   );
