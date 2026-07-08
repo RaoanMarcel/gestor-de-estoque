@@ -6,36 +6,127 @@ import Input from './components/ui/Input';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-const imprimirEtiqueta = (numeroPallet: string) => {
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(numeroPallet)}`;
+// ✅ ATUALIZADO: Agora recebe os dados de endereçamento para montar o layout WMS industrial
+const imprimirEtiqueta = (numero: string, rua: string, estrutura: string, nivel: string) => {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(numero)}`;
   const janelaImpressao = window.open('', '_blank', 'width=500,height=750');
   if (!janelaImpressao) return;
 
   janelaImpressao.document.write(`
     <html>
       <head>
-        <title>Etiqueta 10x15 - ${numeroPallet}</title>
+        <title>Etiqueta WMS - ${numero}</title>
         <style>
           @page { size: 100mm 150mm; margin: 0; }
           html, body {
             margin: 0; padding: 0;
             width: 100mm; height: 150mm;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
             background-color: #fff; box-sizing: border-box;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: space-between;
           }
-          body { font-family: 'Arial', sans-serif; }
-          img { width: 75mm; height: 75mm; margin-bottom: 12mm; }
-          h2 {
-            margin: 0; font-size: 34px; font-weight: 900;
-            color: #000; text-transform: uppercase;
-            letter-spacing: 2px; font-family: monospace;
+          body { 
+            font-family: 'Arial', sans-serif; 
+            padding: 8mm;
+          }
+          .header-container {
+            width: 100%;
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 4mm;
+          }
+          .title-sub {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #555;
+            margin: 0 0 2mm 0;
+            font-weight: bold;
+          }
+          h1 {
+            margin: 0; 
+            font-size: 38px; 
+            font-weight: 900;
+            color: #000; 
+            font-family: monospace;
+            letter-spacing: 1px;
+          }
+          .address-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 4mm 0;
+          }
+          .address-table th {
+            background-color: #000;
+            color: #fff;
+            font-size: 10px;
+            text-transform: uppercase;
+            padding: 1.5mm;
+            letter-spacing: 1px;
+            border: 1px solid #000;
+          }
+          .address-table td {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 3mm;
+            font-family: monospace;
+            border: 1px solid #000;
+          }
+          /* ✅ QR CODE MENOR: Reduzido para tamanho empresarial clássico de triagem */
+          .qr-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 2mm 0;
+          }
+          img { 
+            width: 45mm; 
+            height: 45mm; 
+          }
+          .footer-bar {
+            width: 100%;
+            text-align: center;
+            border-top: 1px dashed #000;
+            padding-top: 3mm;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #444;
           }
         </style>
       </head>
       <body>
-        <img src="${qrUrl}" alt="QR Code" />
-        <h2>${numeroPallet}</h2>
+        <div class="header-container">
+          <div class="title-sub">Identificador de Posição</div>
+          <h1>${numero}</h1>
+        </div>
+
+        <table class="address-table">
+          <thead>
+            <tr>
+              <th style="width: 40%;">Rua / Setor</th>
+              <th style="width: 30%;">Estrutura</th>
+              <th style="width: 30%;">Nível</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${rua || 'N/A'}</td>
+              <td>${estrutura || 'N/A'}</td>
+              <td>${nivel || 'N/A'}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="qr-container">
+          <img src="${qrUrl}" alt="QR Code" />
+        </div>
+
+        <div class="footer-bar">
+          Sistema de Controle de Inventário WMS
+        </div>
+
         <script>
           window.onload = function() {
             window.print();
@@ -84,13 +175,12 @@ export default function Home() {
     if (!confirmou) return;
 
     try {
-      // ✅ CORREÇÃO: Pegando o token e enviando no header
       const token = localStorage.getItem('wms_token');
 
       const response = await fetch(`${API_URL}/pallets/${palletId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}` // Injetando a permissão
+          'Authorization': `Bearer ${token}`
         }
       });
 
@@ -102,7 +192,7 @@ export default function Home() {
       }
 
       alert(resultado.mensagem || "Posição removida com sucesso!");
-      window.location.reload(); // Força o refresh rápido para limpar a malha
+      window.location.reload();
     } catch {
       alert("Erro de conexão ao tentar excluir a posição.");
     }
@@ -114,7 +204,6 @@ export default function Home() {
     setCarregandoExcel(true);
     
     try {
-      // ✅ CORREÇÃO: Pegando o token do localStorage
       const token = localStorage.getItem('wms_token');
 
       let urlEndpoint = `${API_URL}/historico/exportar`;
@@ -123,18 +212,17 @@ export default function Home() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // Injetando o token aqui
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(corpoRequisicao)
       };
 
-      // SE A OPÇÃO FOR RMA: Altera o fluxo para fazer um GET simples
       if (palletSelecionado === 'FLUXO_RMA_SISTEMA') {
         urlEndpoint = `${API_URL}/historico/exportar-rma`;
         configuracaoFetch = { 
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}` // Injetando o token no GET também
+            'Authorization': `Bearer ${token}`
           }
         };
       }
@@ -260,14 +348,12 @@ export default function Home() {
               return (
                 <div
                   key={pallet.id} onClick={() => navigate(`/pallet/${pallet.id}`)}
-                  /* 🎨 SE FOR DEFEITO: Fundo rosa industrial sutil para isolamento visual total */
                   className={`relative backdrop-blur-xl rounded-xl p-5 min-h-[110px] flex flex-col justify-between hover:shadow-[0_8px_30px_-12px_rgba(37,99,235,0.25)] cursor-pointer transition-all duration-200 group overflow-hidden border ${
                     pallet.tipo === 'DEFEITO'
                       ? 'bg-rose-50/60 border-rose-200/80 hover:border-rose-400 hover:bg-rose-50/90' 
                       : 'bg-white/80 border-slate-200 hover:border-blue-500/40 hover:bg-white'
                   }`}
                 >
-                  {/* Bordinha indicadora superior */}
                   <div className={`absolute top-0 left-5 h-[2px] w-10 rounded-b-full ${
                     pallet.tipo === 'DEFEITO'
                       ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]' 
@@ -288,7 +374,6 @@ export default function Home() {
                       </div>
                     </div>
                     
-                    {/* Bloco Dinâmico de Info, Impressora e Lixeira */}
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <span className={`text-[10px] font-mono px-1 py-0.5 rounded font-medium ${
                         pallet.tipo === 'DEFEITO'
@@ -300,7 +385,6 @@ export default function Home() {
                         {itensContados} un.
                       </span>
 
-                      {/* 🗑️ BOTÃO ADICIONADO: Excluir posição da malha */}
                       <button
                         onClick={(e) => handleExcluirPalletCard(e, pallet.id, pallet.numero)}
                         className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
@@ -309,10 +393,11 @@ export default function Home() {
                         🗑️
                       </button>
 
+                      {/* ✅ ATUALIZADO: Agora passa rua, estrutura e nível dinamicamente */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation(); 
-                          imprimirEtiqueta(pallet.numero);
+                          imprimirEtiqueta(pallet.numero, pallet.rua, pallet.estrutura, pallet.nivel);
                         }}
                         className="p-1 text-base leading-none text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         title="Imprimir Etiqueta 10x15"
@@ -339,7 +424,6 @@ export default function Home() {
                   <Input label="Nível" placeholder="Ex: 3" value={form.nivel} onChange={(e) => setForm({ ...form, nivel: e.target.value })} />
                 </div>
                 
-                {/* Escolha da finalidade/tipo da posição */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block">
                     Finalidade / Tipo da Posição *
@@ -377,9 +461,7 @@ export default function Home() {
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 h-10 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all"
                   >
                     <option value="">-- Escolha o Relatório --</option>
-                    
                     <option value="FLUXO_RMA_SISTEMA" className="font-semibold text-rose-600">📋 Fluxo de RMA (Estoque Fantasma)</option>
-                    
                     <option value="" disabled>--------------------------------</option>
                     {palletsFiltrados.map((p) => (
                       <option key={p.id} value={p.numero}>{p.numero}</option>
