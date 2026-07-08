@@ -32,5 +32,5 @@ model HistoricoMovimentacao {
   codigoItem String   // O código ou número da triagem
   acao       String   // "ENTRADA" ou "SAIDA"
   palletAlvo String   // Identificador/Nome do Pallet (ex: "Pallet 01", "P32")
-  bipadoEm   DateTime @default(now())
+  bipadoEm   DateTime? @default(now())
 }
