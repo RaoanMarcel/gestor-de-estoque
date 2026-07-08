@@ -4,15 +4,10 @@ import { usePallets } from './hooks/usePallets';
 import Button from './components/ui/Button';
 import Input from './components/ui/Input';
 
-// ====================================================================
-// 🌐 CONSTANTE GLOBAL DE API
-// Puxa a URL do Render no Netlify ou usa o localhost na sua máquina
-// ====================================================================
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// ====================================================================
-// 🖨️ FUNÇÃO DE IMPRESSÃO GLOBAL - CONFIGURADA PARA 10x15 CM (GRANDE)
-// ====================================================================
+
 const imprimirEtiqueta = (numeroPallet: string) => {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(numeroPallet)}`;
   const janelaImpressao = window.open('', '_blank', 'width=500,height=750');
@@ -85,7 +80,7 @@ export default function Home() {
 
   // 🗑️ FUNÇÃO ADICIONADA: Realiza a chamada DELETE para remover a posição
   const handleExcluirPalletCard = async (e: React.MouseEvent, palletId: number, numeroPallet: string) => {
-    e.stopPropagation(); // 🧠 Impede que o clique abra os detalhes do pallet!
+    e.stopPropagation(); 
     
     const confirmou = window.confirm(`Deseja realmente excluir permanentemente a posição "${numeroPallet}" da malha?`);
     if (!confirmou) return;
@@ -188,7 +183,7 @@ export default function Home() {
           
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <Button type="button" variant="secondary" onClick={() => setIsExcelModalOpen(true)} className="w-full sm:w-auto bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
-              📊 Exportar Relatório
+              Exportar Relatório
             </Button>
             <Button variant="primary" onClick={() => setIsModalOpen(true)} className="w-full sm:w-auto">
               + Adicionar Posição
@@ -283,7 +278,7 @@ export default function Home() {
                     
                     {/* Bloco Dinâmico de Info, Impressora e Lixeira */}
                     <div className="flex flex-col items-end gap-2 shrink-0">
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-medium ${
+                      <span className={`text-[10px] font-mono px-1 py-0.5 rounded font-medium ${
                         pallet.tipo === 'DEFEITO'
                           ? 'bg-rose-100/80 text-rose-800 border border-rose-200'
                           : isLotado 
@@ -342,8 +337,8 @@ export default function Home() {
                     onChange={(e) => setForm({ ...form, tipo: e.target.value })}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 h-10 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all"
                   >
-                    <option value="PADRAO">📦 Pallet Padrão (Armazenagem Geral)</option>
-                    <option value="DEFEITO">⚠️ Pallet de Defeito / Avariados</option>
+                    <option value="PADRAO"> Pallet Padrão (Armazenagem Geral)</option>
+                    <option value="DEFEITO"> Pallet de Defeito / Avariados</option>
                   </select>
                 </div>
 

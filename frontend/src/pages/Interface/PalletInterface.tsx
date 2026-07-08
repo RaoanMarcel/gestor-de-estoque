@@ -14,7 +14,7 @@ interface PalletData {
   rua?: string;
   estrutura?: string;
   nivel?: string;
-  tipo: string; // ✨ ADICIONADO: Propriedade mapeada para identificar a finalidade
+  tipo: string; 
   produtos: Produto[];
 }
 
@@ -309,7 +309,7 @@ export default function PalletInterface() {
                 }}
                 className="px-4 h-9 rounded-lg border border-blue-200 bg-white hover:bg-blue-50 text-blue-600 text-xs font-semibold tracking-wider uppercase transition-all"
               >
-                🔄 Transferir Lote
+                 Transferir Lote
               </button>
             ) : (
               <div className="flex items-center gap-2">
@@ -319,7 +319,7 @@ export default function PalletInterface() {
                 >
                   {pallet && itensParaTransferir.length === pallet.produtos.length 
                     ? '🔲 Desmarcar Tudo' 
-                    : '📦 Transferir Tudo'}
+                    : 'Transferir Tudo'}
                 </button>
                 <button
                   onClick={() => {
@@ -428,7 +428,7 @@ export default function PalletInterface() {
                     onClick={handleLancarAoRMA}
                     className="flex-1 py-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs tracking-wider uppercase shadow-[0_10px_30px_-12px_rgba(244,63,94,0.4)] transition-all"
                   >
-                    🚀 Lançar ao RMA ({itensParaTransferir.length} un.)
+                    Lançar ao RMA ({itensParaTransferir.length} un.)
                   </button>
                 )}
               </div>
