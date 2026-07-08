@@ -8,7 +8,11 @@ export interface Pallet {
   rua?: string;
   estrutura?: string;
   nivel?: string;
-  _count?: PalletCount;
+  tipo: string; 
+  _count?: {
+    produtos: number;
+  };
+  produtos?: any[];
 }
 
 export interface CriarPalletInput {
@@ -16,4 +20,5 @@ export interface CriarPalletInput {
   rua: string;
   estrutura: string;
   nivel: string;
+  tipo: string; 
 }

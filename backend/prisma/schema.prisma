@@ -1,30 +1,36 @@
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql" 
   url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
-} 
+}
 
 model Pallet {
-  id          Int             @id @default(autoincrement())
-  numero      String          @unique 
-  rua         String?         
-  estrutura   String?         
-  nivel       String?         
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  produtos    ProdutoPallet[] 
+  id        Int             @id @default(autoincrement())
+  numero    String          @unique 
+  rua       String?         
+  estrutura String?         
+  nivel     String?         
+  tipo      String?         @default("PADRAO") // ✨ ADICIONADO: "PADRAO" ou "DEFEITO"
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  produtos  ProdutoPallet[] 
 }
 
 model ProdutoPallet {
   id         Int      @id @default(autoincrement())
-  codigoItem String   
-  quantidade Int      @default(1)
+  codigoItem String   @unique // ✨ Trava universal: Triagem única no armazém inteiro!
   palletId   Int
   pallet     Pallet   @relation(fields: [palletId], references: [id], onDelete: Cascade)
   bipadoEm   DateTime @default(now())
+}
 
-  @@unique([palletId, codigoItem]) 
+model HistoricoMovimentacao {
+  id         Int      @id @default(autoincrement())
+  codigoItem String   // O código ou número da triagem
+  acao       String   // "ENTRADA" ou "SAIDA"
+  palletAlvo String   // Identificador/Nome do Pallet (ex: "Pallet 01", "P32")
+  bipadoEm   DateTime @default(now())
 }
