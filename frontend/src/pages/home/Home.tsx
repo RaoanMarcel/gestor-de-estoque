@@ -393,17 +393,22 @@ export default function Home() {
                         🗑️
                       </button>
 
-                      {/* ✅ ATUALIZADO: Agora passa rua, estrutura e nível dinamicamente */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation(); 
-                          imprimirEtiqueta(pallet.numero, pallet.rua, pallet.estrutura, pallet.nivel);
-                        }}
-                        className="p-1 text-base leading-none text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title="Imprimir Etiqueta 10x15"
-                      >
-                        🖨️
-                      </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation(); 
+                        // O operador ?? garante que se o valor for undefined, enviará uma string vazia ''
+                        imprimirEtiqueta(
+                          pallet.numero, 
+                          pallet.rua ?? '', 
+                          pallet.estrutura ?? '', 
+                          pallet.nivel ?? ''
+                        );
+                      }}
+                      className="p-1 text-base leading-none text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                      title="Imprimir Etiqueta 10x15"
+                    >
+                      🖨️
+                    </button>
                     </div>
                   </div>
                 </div>
