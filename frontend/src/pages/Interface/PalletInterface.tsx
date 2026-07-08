@@ -1,5 +1,4 @@
 // PalletInterface.tsx
-import React from "react";
 import { usePalletLogic } from "./components/hooks/usePalletLogic";
 
 export interface Produto {
@@ -113,7 +112,6 @@ export const imprimirEtiquetaRetriagem = (codigo: string) => {
 export default function PalletInterface() {
   const {
     pallet,
-    acao,
     setAcao,
     codigoBipado,
     setCodigoBipado,
