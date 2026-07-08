@@ -4,9 +4,7 @@ import ExcelJS from 'exceljs';
 
 const prisma = new PrismaClient();
 
-// ====================================================================
-// 📊 1. EXPORTAR HISTÓRICO FÍSICO DO PALLET (Original)
-// ====================================================================
+
 export const exportarHistoricoExcel = async (req: Request, res: Response) => {
   try {
     // Recebe o identificador do pallet e o nome do arquivo vindos do frontend

@@ -13,7 +13,7 @@ model Pallet {
   rua       String?         
   estrutura String?         
   nivel     String?         
-  tipo      String?         // 🌟 Permitindo nulo puro para os pallets antigos passarem direto
+  tipo      String?         
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   produtos  ProdutoPallet[] 
@@ -32,5 +32,13 @@ model HistoricoMovimentacao {
   codigoItem String   
   acao       String   
   palletAlvo String   
-  bipadoEm   DateTime?      // 🌟 Opcional puro para os logs antigos passarem direto
+  bipadoEm   DateTime?      
+}
+
+model Usuario {
+  id                 Int      @id @default(autoincrement())
+  username           String   @unique
+  senha              String
+  precisaMudarSenha  Boolean  @default(true)
+  createdAt          DateTime @default(now())
 }
