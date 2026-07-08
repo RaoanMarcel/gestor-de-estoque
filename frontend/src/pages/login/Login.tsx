@@ -148,7 +148,6 @@ export default function Login() {
                   className="text-xs text-slate-500 hover:text-[#1e3a5f] transition-colors">
                   ← Voltar para login
                 </button>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">v1.0</span>
               </div>
             </form>
           </CardFace>
