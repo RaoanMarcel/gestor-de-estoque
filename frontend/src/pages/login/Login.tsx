@@ -121,10 +121,8 @@ export default function Login() {
                   className="text-xs text-slate-500 hover:text-[#1e3a5f] transition-colors">
                   Trocar minha senha →
                 </button>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">v1.0</span>
               </div>
             </form>
-            <Footer/>
           </CardFace>
 
           <CardFace back>
@@ -156,7 +154,6 @@ export default function Login() {
                 <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">v1.0</span>
               </div>
             </form>
-            <Footer/>
           </CardFace>
         </div>
       </div>
@@ -255,13 +252,5 @@ function PrimaryButton({ children, disabled }: PrimaryButtonProps) {
       style={{ background:'linear-gradient(135deg, #1e3a5f 0%, #3b6fa0 100%)' }}>
       {children}
     </Button>
-  );
-}
-
-function Footer() {
-  return (
-    <div className="px-8 py-4 border-t border-slate-100 bg-slate-50/60 text-center">
-      <p className="text-[11px] text-slate-500">Ambiente seguro · conexão criptografada</p>
-    </div>
   );
 }
