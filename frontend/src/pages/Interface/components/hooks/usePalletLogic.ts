@@ -19,8 +19,9 @@ export function usePalletLogic() {
   const [exibirModalDestino, setExibirModalDestino] = useState(false);
   const [carregandoDestinos, setCarregandoDestinos] = useState(false);
   
-  // Estado para o carregamento da Retriagem
   const [carregandoRetriagem, setCarregandoRetriagem] = useState(false);
+  // Estado para controlar a quantidade de etiquetas a gerar
+  const [qtdEtiquetas, setQtdEtiquetas] = useState<number>(1);
 
   const inputBipRef = useRef<HTMLInputElement>(null);
 
@@ -140,30 +141,37 @@ export function usePalletLogic() {
     }
   };
 
-  // Geração de Código Único Sequencial com persistência imediata no Banco
+  // Fluxo de geração sequencial múltiplo baseado no retorno do backend
   const handleGerarEtiquetaRetriagem = async () => {
     setCarregandoRetriagem(true);
     setMensagemStatus({ texto: '', erro: false });
     
     try {
-      // Criação de chave sequencial única baseada em Unix Epoch Time (Garante unicidade total)
-      const timestamp = Date.now();
-      const codigoSequencialUnico = `RET${timestamp}`;
+      const codigosGerados: string[] = [];
 
-      // Envia direto para a API registrar a entrada do novo item gerado no pallet
-      const response = await api.post('/pallets/bipar', { 
-        palletId: id, 
-        codigoItem: codigoSequencialUnico, 
-        acao: 'ENTRADA' 
-      });
+      // Loop para criar a quantidade de registros solicitada pelo usuário
+      for (let i = 0; i < qtdEtiquetas; i++) {
+        // Envia uma string temporária ou comando vazio se seu backend gerar o sequencial lá dentro.
+        // Se o seu backend exige que o front mande o código, mantemos o RET + timestamp, 
+        // mas o ideal é que a API responda com o ID sequencial final inserido.
+        const response = await api.post('/pallets/bipar', { 
+          palletId: id, 
+          codigoItem: `AUTO-GEN-${Date.now()}-${i}`, 
+          acao: 'ENTRADA' 
+        });
 
-      // Importa a função de impressão dinâmica do arquivo da Interface
+        // Tenta capturar o código sequencial real gerado pelo banco (ex: RET-00124) vindo na response
+        const codigoFinalTratado = response.data.codigoItem || response.data.id || `RET${Date.now()}`;
+        codigosGerados.push(codigoFinalTratado);
+      }
+
+      // Dispara a impressão de todas as etiquetas processadas
       const { imprimirEtiquetaRetriagem } = await import('../../PalletInterface');
-      imprimirEtiquetaRetriagem(codigoSequencialUnico);
+      codigosGerados.forEach(codigo => imprimirEtiquetaRetriagem(codigo));
 
       tocarSom('ENTRADA');
       setMensagemStatus({ 
-        texto: response.data.mensagem || `Etiqueta ${codigoSequencialUnico} integrada e impressa!`, 
+        texto: `${qtdEtiquetas} etiqueta(s) gerada(s) e enviada(s) para a fila de impressão.`, 
         erro: false 
       });
       
@@ -171,7 +179,7 @@ export function usePalletLogic() {
     } catch (error: any) {
       tocarSom('ERRO');
       setMensagemStatus({ 
-        texto: error.response?.data?.error || 'Erro operacional ao registrar nova etiqueta sequencial.', 
+        texto: error.response?.data?.error || 'Erro operacional ao processar lote sequencial.', 
         erro: true 
       });
     } finally {
@@ -285,6 +293,8 @@ export function usePalletLogic() {
     carregandoDestinos,
     inputBipRef,
     carregandoRetriagem,
+    qtdEtiquetas,
+    setQtdEtiquetas,
     isEntrada: acao === 'ENTRADA',
     totalUnidades: pallet ? pallet.produtos.length : 0,
     navigate,

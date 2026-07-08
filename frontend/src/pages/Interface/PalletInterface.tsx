@@ -1,4 +1,5 @@
 // PalletInterface.tsx
+import React from "react";
 import { usePalletLogic } from "./components/hooks/usePalletLogic";
 
 export interface Produto {
@@ -17,7 +18,6 @@ export interface PalletData {
   produtos: Produto[];
 }
 
-// Handler de Impressão nativa do Navegador (Alvo térmico 40mm x 60mm)
 export const imprimirEtiquetaRetriagem = (codigo: string) => {
   const janelaImpressao = window.open('', '_blank', 'width=450,height=650');
   if (!janelaImpressao) return;
@@ -112,6 +112,7 @@ export const imprimirEtiquetaRetriagem = (codigo: string) => {
 export default function PalletInterface() {
   const {
     pallet,
+    acao,
     setAcao,
     codigoBipado,
     setCodigoBipado,
@@ -126,13 +127,15 @@ export default function PalletInterface() {
     setExibirModalDestino,
     carregandoDestinos,
     inputBipRef,
-    carregandoRetriagem, // Desestruturado direto do Hook
+    carregandoRetriagem,
+    qtdEtiquetas,         // Quantidade do seletor puxado do Hook
+    setQtdEtiquetas,      // Setter da quantidade puxado do Hook
     isEntrada,
     totalUnidades,
     navigate,
     manterFocoNoInput,
     handleBipSubmit,
-    handleGerarEtiquetaRetriagem, // Desestruturado direto do Hook
+    handleGerarEtiquetaRetriagem,
     handleAdicionarTodoOPalletNoLote,
     handleFinalizerColetaTransferencia,
     handleLancarAoRMA,
@@ -268,25 +271,45 @@ export default function PalletInterface() {
               />
             </form>
 
-            {/* SEÇÃO DE RETRIAGEM INTEGRADA COM O SEQUENCIAL ÚNICO DO HOOK */}
+            {/* SEÇÃO DE RETRIAGEM COM SELETOR DE QUANTIDADE ADICIONADO */}
             {pallet.tipo === 'RETRIAGEM' && (
-              <div className="p-5 border border-dashed border-blue-200 bg-blue-50/40 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
+              <div className="p-5 border border-dashed border-blue-200 bg-blue-50/40 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex-1">
                   <h3 className="text-xs font-bold text-blue-950 uppercase tracking-wider m-0">
                     🏷️ Módulo Retriagem
                   </h3>
                   <p className="text-[11px] text-blue-600/90 mt-1 mb-0 leading-relaxed">
-                    Clique abaixo para gerar um código sequencial único direto no banco e disparar a impressão da etiqueta térmica.
+                    Escolha a quantidade de caixas que deseja etiquetar. O sistema registrará os códigos sequenciais automaticamente.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  disabled={carregandoRetriagem}
-                  onClick={handleGerarEtiquetaRetriagem}
-                  className="w-full sm:w-auto shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-5 h-11 text-xs font-semibold rounded-lg shadow-sm transition-all tracking-wider uppercase flex items-center justify-center gap-2"
-                >
-                  {carregandoRetriagem ? 'Processando...' : 'Gerar e Imprimir'}
-                </button>
+                
+                {/* Seletor de Quantidade integrado ao lado do botão */}
+                <div className="flex items-center gap-2 w-full md:w-auto justify-end" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Qtd</span>
+                    <select 
+                      value={qtdEtiquetas}
+                      onChange={(e) => setQtdEtiquetas(Number(e.target.value))}
+                      className="bg-white border border-slate-200 rounded-lg h-11 px-3 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 min-w-[70px]"
+                    >
+                      {[1, 2, 3, 4, 5, 10, 15, 20, 30].map(q => (
+                        <option key={q} value={q}>{q}x</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1 flex-1 md:flex-none">
+                    <span className="text-[9px] font-transparent text-transparent select-none">.</span>
+                    <button
+                      type="button"
+                      disabled={carregandoRetriagem}
+                      onClick={handleGerarEtiquetaRetriagem}
+                      className="w-full md:w-auto shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-5 h-11 text-xs font-semibold rounded-lg shadow-sm transition-all tracking-wider uppercase flex items-center justify-center gap-2"
+                    >
+                      {carregandoRetriagem ? 'Gerando...' : 'Gerar Novas'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -312,7 +335,7 @@ export default function PalletInterface() {
                   type="button"
                   onClick={handleFinalizerColetaTransferencia}
                   disabled={carregandoDestinos}
-                  className="flex-1 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs tracking-wider uppercase shadow-[0_10px_30px_-12px_rgba(16,185,129,0.4)] transition-all"
+                  className="flex-1 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs tracking-wider uppercase shadow-sm transition-all"
                 >
                   {carregandoDestinos ? 'Aguarde...' : `✓ Mover Posição (${itensParaTransferir.length})`}
                 </button>
@@ -321,7 +344,7 @@ export default function PalletInterface() {
                   <button
                     type="button"
                     onClick={handleLancarAoRMA}
-                    className="flex-1 py-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs tracking-wider uppercase shadow-[0_10px_30px_-12px_rgba(244,63,94,0.4)] transition-all"
+                    className="flex-1 py-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs tracking-wider uppercase shadow-sm transition-all"
                   >
                     Lançar ao RMA ({itensParaTransferir.length} un.)
                   </button>
@@ -330,7 +353,7 @@ export default function PalletInterface() {
             )}
           </div>
 
-          {/* PAINEL DIREITO — CONTEÚDO ATUAL */}
+          {/* PAINEL DIREITO — CONTEÚDO ATUAL COM A OPÇÃO DE REIMPRESSÃO DA ETIQUETA */}
           <div className="bg-white/80 backdrop-blur-xl rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col max-h-[600px]">
             <div className="border-b border-slate-200 pb-3 mb-4 flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -363,11 +386,23 @@ export default function PalletInterface() {
                         {new Date(prod.bipadoEm).toLocaleTimeString()}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    
+                    {/* Botões de Ação na Listagem (Exclusão e Reimpressão) */}
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      {pallet.tipo === 'RETRIAGEM' && (
+                        <button
+                          onClick={() => imprimirEtiquetaRetriagem(prod.codigoItem)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors text-xs"
+                          title="Reimprimir Etiqueta"
+                        >
+                          🖨️
+                        </button>
+                      )}
                       {!isModoTransferencia && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleExcluirItemLinha(prod.codigoItem); }}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                          onClick={() => handleExcluirItemLinha(prod.codigoItem)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors text-xs"
+                          title="Remover item"
                         >
                           🗑
                         </button>
