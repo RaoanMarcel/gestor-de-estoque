@@ -440,6 +440,7 @@ export default function Home() {
                   >
                     <option value="PADRAO"> Pallet Padrão (Armazenagem Geral)</option>
                     <option value="DEFEITO"> Pallet de Defeito / Avariados</option>
+                    <option value="RETRIAGEM"> Pallet de Retorno</option>
                   </select>
                 </div>
 

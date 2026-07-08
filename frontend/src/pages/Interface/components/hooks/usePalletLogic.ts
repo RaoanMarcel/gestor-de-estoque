@@ -18,6 +18,9 @@ export function usePalletLogic() {
   const [palletsDestino, setPalletsDestino] = useState<PalletData[]>([]);
   const [exibirModalDestino, setExibirModalDestino] = useState(false);
   const [carregandoDestinos, setCarregandoDestinos] = useState(false);
+  
+  // Estado para o carregamento da Retriagem
+  const [carregandoRetriagem, setCarregandoRetriagem] = useState(false);
 
   const inputBipRef = useRef<HTMLInputElement>(null);
 
@@ -137,6 +140,45 @@ export function usePalletLogic() {
     }
   };
 
+  // Geração de Código Único Sequencial com persistência imediata no Banco
+  const handleGerarEtiquetaRetriagem = async () => {
+    setCarregandoRetriagem(true);
+    setMensagemStatus({ texto: '', erro: false });
+    
+    try {
+      // Criação de chave sequencial única baseada em Unix Epoch Time (Garante unicidade total)
+      const timestamp = Date.now();
+      const codigoSequencialUnico = `RET${timestamp}`;
+
+      // Envia direto para a API registrar a entrada do novo item gerado no pallet
+      const response = await api.post('/pallets/bipar', { 
+        palletId: id, 
+        codigoItem: codigoSequencialUnico, 
+        acao: 'ENTRADA' 
+      });
+
+      // Importa a função de impressão dinâmica do arquivo da Interface
+      const { imprimirEtiquetaRetriagem } = await import('../../PalletInterface');
+      imprimirEtiquetaRetriagem(codigoSequencialUnico);
+
+      tocarSom('ENTRADA');
+      setMensagemStatus({ 
+        texto: response.data.mensagem || `Etiqueta ${codigoSequencialUnico} integrada e impressa!`, 
+        erro: false 
+      });
+      
+      await buscarDadosPallet();
+    } catch (error: any) {
+      tocarSom('ERRO');
+      setMensagemStatus({ 
+        texto: error.response?.data?.error || 'Erro operacional ao registrar nova etiqueta sequencial.', 
+        erro: true 
+      });
+    } finally {
+      setCarregandoRetriagem(false);
+    }
+  };
+
   const handleAdicionarTodoOPalletNoLote = () => {
     if (!pallet || pallet.produtos.length === 0) {
       alert("Este pallet já está vazio!");
@@ -226,7 +268,6 @@ export function usePalletLogic() {
   };
 
   return {
-    // Dados e Estados
     pallet,
     acao,
     setAcao,
@@ -243,13 +284,13 @@ export function usePalletLogic() {
     setExibirModalDestino,
     carregandoDestinos,
     inputBipRef,
-    // Variáveis derivadas
+    carregandoRetriagem,
     isEntrada: acao === 'ENTRADA',
     totalUnidades: pallet ? pallet.produtos.length : 0,
-    // Funções e Handlers
     navigate,
     manterFocoNoInput,
     handleBipSubmit,
+    handleGerarEtiquetaRetriagem,
     handleAdicionarTodoOPalletNoLote,
     handleFinalizerColetaTransferencia,
     handleLancarAoRMA,
