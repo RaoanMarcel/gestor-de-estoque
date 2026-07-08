@@ -4,9 +4,7 @@ import { usePallets } from './hooks/usePallets';
 import Button from './components/ui/Button';
 import Input from './components/ui/Input';
 
-
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-
 
 const imprimirEtiqueta = (numeroPallet: string) => {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(numeroPallet)}`;
@@ -86,9 +84,14 @@ export default function Home() {
     if (!confirmou) return;
 
     try {
-      // ✅ ALTERADO: Usando a constante API_URL dinâmica
+      // ✅ CORREÇÃO: Pegando o token e enviando no header
+      const token = localStorage.getItem('wms_token');
+
       const response = await fetch(`${API_URL}/pallets/${palletId}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}` // Injetando a permissão
+        }
       });
 
       const resultado = await response.json();
@@ -111,20 +114,29 @@ export default function Home() {
     setCarregandoExcel(true);
     
     try {
-      // ✅ ALTERADO: Usando a constante API_URL dinâmica
+      // ✅ CORREÇÃO: Pegando o token do localStorage
+      const token = localStorage.getItem('wms_token');
+
       let urlEndpoint = `${API_URL}/historico/exportar`;
       let corpoRequisicao: any = { palletAlvo: palletSelecionado, nomeArquivo };
       let configuracaoFetch: any = {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Injetando o token aqui
+        },
         body: JSON.stringify(corpoRequisicao)
       };
 
-      // SE A OPÇÃO FOR RMA: Altera o fluxo para fazer um GET simples na rota de estoque fantasma
+      // SE A OPÇÃO FOR RMA: Altera o fluxo para fazer um GET simples
       if (palletSelecionado === 'FLUXO_RMA_SISTEMA') {
-        // ✅ ALTERADO: Usando a constante API_URL dinâmica
         urlEndpoint = `${API_URL}/historico/exportar-rma`;
-        configuracaoFetch = { method: 'GET' };
+        configuracaoFetch = { 
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}` // Injetando o token no GET também
+          }
+        };
       }
 
       const response = await fetch(urlEndpoint, configuracaoFetch);
