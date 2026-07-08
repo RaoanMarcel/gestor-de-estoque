@@ -13,90 +13,110 @@ const imprimirEtiqueta = (numero: string, rua: string, estrutura: string, nivel:
   if (!janelaImpressao) return;
 
   janelaImpressao.document.write(`
-    <html>
-      <head>
-        <title>Etiqueta WMS - ${numero}</title>
-        <style>
-          @page { size: 100mm 150mm; margin: 0; }
-          html, body {
-            margin: 0; padding: 0;
-            width: 100mm; height: 150mm;
-            background-color: #fff; box-sizing: border-box;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: space-between;
-          }
-          body { 
-            font-family: 'Arial', sans-serif; 
-            padding: 8mm;
-          }
-          .header-container {
-            width: 100%;
-            text-align: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 4mm;
-          }
-          .title-sub {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: #555;
-            margin: 0 0 2mm 0;
-            font-weight: bold;
-          }
-          h1 {
-            margin: 0; 
-            font-size: 38px; 
-            font-weight: 900;
-            color: #000; 
-            font-family: monospace;
-            letter-spacing: 1px;
-          }
-          .address-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 4mm 0;
-          }
-          .address-table th {
-            background-color: #000;
-            color: #fff;
-            font-size: 10px;
-            text-transform: uppercase;
-            padding: 1.5mm;
-            letter-spacing: 1px;
-            border: 1px solid #000;
-          }
-          .address-table td {
-            text-align: center;
-            font-size: 20px;
-            font-weight: bold;
-            padding: 3mm;
-            font-family: monospace;
-            border: 1px solid #000;
-          }
-          /* ✅ QR CODE MENOR: Reduzido para tamanho empresarial clássico de triagem */
-          .qr-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 2mm 0;
-          }
-          img { 
-            width: 45mm; 
-            height: 45mm; 
-          }
-          .footer-bar {
-            width: 100%;
-            text-align: center;
-            border-top: 1px dashed #000;
-            padding-top: 3mm;
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #444;
-          }
-        </style>
-      </head>
-      <body>
+  <html>
+    <head>
+      <title>Etiqueta WMS - ${numero}</title>
+      <style>
+        @page { 
+          size: 100mm 150mm; 
+          margin: 0 !important; 
+        }
+        html, body {
+          margin: 0; 
+          padding: 0;
+          width: 100mm; 
+          height: 150mm;
+          background-color: #fff; 
+          box-sizing: border-box;
+        }
+        body { 
+          font-family: 'Arial', sans-serif; 
+          display: flex; 
+          flex-direction: column;
+          align-items: center; 
+          justify-content: space-between;
+          padding: 8mm 0; /* Padding vertical apenas, o horizontal será controlado pelo wrapper */
+        }
+        /* Container centralizador para matar qualquer desalinhamento da impressora */
+        .centering-wrapper {
+          width: 84mm; /* 100mm - 16mm (margens esquerda/direita equivalentes a 8mm) */
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: space-between;
+          height: 100%;
+        }
+        .header-container {
+          width: 100%;
+          text-align: center;
+          border-bottom: 2px solid #000;
+          padding-bottom: 4mm;
+        }
+        .title-sub {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          color: #555;
+          margin: 0 0 2mm 0;
+          font-weight: bold;
+        }
+        h1 {
+          margin: 0; 
+          font-size: 38px; 
+          font-weight: 900;
+          color: #000; 
+          font-family: monospace;
+          letter-spacing: 1px;
+        }
+        .address-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 4mm 0;
+        }
+        .address-table th {
+          background-color: #000;
+          color: #fff;
+          font-size: 10px;
+          text-transform: uppercase;
+          padding: 2mm 1.5mm;
+          letter-spacing: 1px;
+          border: 1px solid #000;
+        }
+        .address-table td {
+          text-align: center;
+          font-size: 22px;
+          font-weight: bold;
+          padding: 4mm 2mm;
+          font-family: monospace;
+          border: 1px solid #000;
+        }
+        .qr-container {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: 100%;
+          margin: 2mm 0;
+        }
+        img { 
+          width: 45mm; 
+          height: 45mm; 
+          display: block;
+        }
+        .footer-bar {
+          width: 100%;
+          text-align: center;
+          border-top: 1px dashed #000;
+          padding-top: 3mm;
+          font-size: 9px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          color: #444;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="centering-wrapper">
         <div class="header-container">
           <div class="title-sub">Identificador de Posição</div>
           <h1>${numero}</h1>
@@ -124,20 +144,20 @@ const imprimirEtiqueta = (numero: string, rua: string, estrutura: string, nivel:
         </div>
 
         <div class="footer-bar">
-          Sistema de Controle de Inventário WMS
+          Pro4ce
         </div>
+      </div>
 
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 300);
-          };
-        </script>
-      </body>
-    </html>
-  `);
-  janelaImpressao.document.close();
-};
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 300);
+        };
+      </script>
+    </body>
+  </html>
+`);
+}
 
 export default function Home() {
   const navigate = useNavigate();
