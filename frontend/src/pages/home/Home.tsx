@@ -176,7 +176,7 @@ export default function Home() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">WMS · Operacional</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Operacional</span>
             </div>
             <h1 className="text-xl font-semibold tracking-tight text-slate-900">Visão Geral do Armazém</h1>
           </div>

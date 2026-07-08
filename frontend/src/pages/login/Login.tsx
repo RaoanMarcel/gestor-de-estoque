@@ -92,7 +92,7 @@ export default function Login() {
 
         {erro && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium text-center">
-            ⚠️ {erro}
+             {erro}
           </div>
         )}
 

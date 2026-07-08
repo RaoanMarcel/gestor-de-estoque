@@ -31,7 +31,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex flex-col leading-tight">
                 <h1 className="text-sm font-semibold tracking-tight text-slate-900">Gestão de Estoque</h1>
-                <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-slate-400">WMS Control</span>
               </div>
             </div>
 
