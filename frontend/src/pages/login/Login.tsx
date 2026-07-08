@@ -79,8 +79,6 @@ export default function Login() {
         
         <div className="space-y-1.5 text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <div className="h-2 w-2 rounded-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">WMS SYSTEM</span>
           </div>
           <h2 className="text-xl font-semibold tracking-tight text-slate-900">
             {!precisaMudarSenha ? 'Acessar o Armazém' : 'Atualizar Senha Padrão'}
@@ -102,7 +100,7 @@ export default function Login() {
           <form onSubmit={handleLogin} className="space-y-4">
             <Input 
               label="Usuário" 
-              placeholder="Ex: operador.joao" 
+              placeholder="Ex: joão.silva" 
               required 
               value={username} 
               onChange={(e) => setUsername(e.target.value)} 
