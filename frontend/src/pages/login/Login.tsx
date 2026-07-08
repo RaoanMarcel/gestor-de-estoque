@@ -32,6 +32,15 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/login', { username, senha });
       
+      // INTERCEPTAÇÃO DE PRIMEIRO ACESSO:
+      // Se o backend retornar que precisa mudar a senha, joga para a face traseira do card
+      if (data.precisaMudarSenha) {
+        setSenhaAtual(senha); // Já preenche a atual com a que ele acabou de digitar
+        setFace('trocar');
+        return;
+      }
+
+      // Se não precisar, segue o fluxo normal salvando os tokens
       localStorage.setItem('wms_token', data.token);
       localStorage.setItem('wms_user', data.username || username);
       
@@ -54,7 +63,9 @@ export default function Login() {
     setSalvando(true);
     try {
       await api.post('/auth/alterar-senha', { username, novaSenha });
-      alert('Senha updated! Agora faça o login com as novas credenciais.');
+      alert('Senha atualizada com sucesso! Agora faça o login com as novas credenciais.');
+      
+      // Reseta os estados e volta para a face de login
       setFace('login');
       setSenha(''); setSenhaAtual(''); setNovaSenha(''); setConfirmarNovaSenha('');
     } catch (err) {
@@ -94,6 +105,7 @@ export default function Login() {
             transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
+          {/* FACE FRONTAL: LOGIN */}
           <CardFace>
             <Header eyebrow="Acesso restrito"
                     title="Entrar na plataforma"
@@ -122,21 +134,22 @@ export default function Login() {
             </form>
           </CardFace>
 
+          {/* FACE TRASEIRA: TROCA DE SENHA OBRIGATÓRIA */}
           <CardFace back>
-            <Header eyebrow="Segurança da conta"
-                    title="Trocar senha"
-                    subtitle="Defina uma nova senha para continuar." />
+            <Header eyebrow="Segurança obrigatória"
+                    title="Definir Nova Senha"
+                    subtitle="Este é seu primeiro acesso. Por favor atualize suas credenciais." />
             <form onSubmit={handleTrocarSenha} className="px-8 py-7 space-y-5">
               <Field label="Senha atual (padrão)">
                 <Input type="password" required value={senhaAtual}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>)=>setSenhaAtual(e.target.value)} className={inputCls}/>
               </Field>
               <Field label="Nova senha">
-                <Input type="password" required value={novaSenha}
+                <Input type="password" placeholder="Mínimo 8 caracteres" required value={novaSenha}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>)=>setNovaSenha(e.target.value)} className={inputCls}/>
               </Field>
               <Field label="Confirmar nova senha">
-                <Input type="password" required value={confirmarNovaSenha}
+                <Input type="password" placeholder="Repita a nova senha" required value={confirmarNovaSenha}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>)=>setConfirmarNovaSenha(e.target.value)} className={inputCls}/>
               </Field>
               {erroTroca && <ErrorBox>{erroTroca}</ErrorBox>}
