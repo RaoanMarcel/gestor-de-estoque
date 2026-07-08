@@ -118,7 +118,7 @@ export default function Login() {
               </PrimaryButton>
               <div className="flex items-center justify-between pt-1">
                 <button type="button" onClick={()=>setFace('trocar')}
-                  className="text-xs text-slate-500 hover:text-[#1e3a5f] transition-colors">
+                  className="text-xs text-slate-500 hover:text-[#21508f] transition-colors">
                   Trocar minha senha →
                 </button>
               </div>
