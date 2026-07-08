@@ -5,6 +5,12 @@ import Button from './components/ui/Button';
 import Input from './components/ui/Input';
 
 // ====================================================================
+// 🌐 CONSTANTE GLOBAL DE API
+// Puxa a URL do Render no Netlify ou usa o localhost na sua máquina
+// ====================================================================
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+// ====================================================================
 // 🖨️ FUNÇÃO DE IMPRESSÃO GLOBAL - CONFIGURADA PARA 10x15 CM (GRANDE)
 // ====================================================================
 const imprimirEtiqueta = (numeroPallet: string) => {
@@ -85,7 +91,8 @@ export default function Home() {
     if (!confirmou) return;
 
     try {
-      const response = await fetch(`http://localhost:3001/api/pallets/${palletId}`, {
+      // ✅ ALTERADO: Usando a constante API_URL dinâmica
+      const response = await fetch(`${API_URL}/pallets/${palletId}`, {
         method: 'DELETE',
       });
 
@@ -109,7 +116,8 @@ export default function Home() {
     setCarregandoExcel(true);
     
     try {
-      let urlEndpoint = 'http://localhost:3001/api/historico/exportar';
+      // ✅ ALTERADO: Usando a constante API_URL dinâmica
+      let urlEndpoint = `${API_URL}/historico/exportar`;
       let corpoRequisicao: any = { palletAlvo: palletSelecionado, nomeArquivo };
       let configuracaoFetch: any = {
         method: 'POST',
@@ -119,7 +127,8 @@ export default function Home() {
 
       // SE A OPÇÃO FOR RMA: Altera o fluxo para fazer um GET simples na rota de estoque fantasma
       if (palletSelecionado === 'FLUXO_RMA_SISTEMA') {
-        urlEndpoint = 'http://localhost:3001/api/historico/exportar-rma';
+        // ✅ ALTERADO: Usando a constante API_URL dinâmica
+        urlEndpoint = `${API_URL}/historico/exportar-rma`;
         configuracaoFetch = { method: 'GET' };
       }
 
