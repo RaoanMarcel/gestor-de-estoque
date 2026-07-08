@@ -13,7 +13,7 @@ model Pallet {
   rua       String?         
   estrutura String?         
   nivel     String?         
-  tipo      String?         @default("PADRAO") // ✨ ADICIONADO: "PADRAO" ou "DEFEITO"
+  tipo      String         @default("PADRAO")
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   produtos  ProdutoPallet[] 
