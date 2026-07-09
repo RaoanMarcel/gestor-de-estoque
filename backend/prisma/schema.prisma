@@ -42,3 +42,10 @@ model Usuario {
   precisaMudarSenha  Boolean  @default(true)
   createdAt          DateTime @default(now())
 }
+
+
+model Contador {
+  id    Int    @id @default(autoincrement())
+  chave String @unique
+  valor Int    @default(0)
+}

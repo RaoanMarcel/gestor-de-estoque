@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma: any = new PrismaClient();
 
+// Prefixo e quantidade de dígitos do código sequencial (ex: P-00001)
+const PREFIXO_SEQUENCIAL = 'P-';
+const DIGITOS_SEQUENCIAL = 5;
+const CHAVE_CONTADOR = 'PRODUTO';
+
 // 1. Criar Novo Pallet
 export const criarPallet = async (req: Request, res: Response) => {
   try {
@@ -59,8 +64,23 @@ export const buscarPalletPorId = async (req: Request, res: Response) => {
   }
 };
 
+// 🔢 Gera o próximo código sequencial (ex: P-00001) de forma atômica.
+// O incremento do contador e a criação do item acontecem na mesma transação,
+// então duas bipagens simultâneas nunca recebem o mesmo número.
+const gerarProximoCodigoSequencial = async (tx: any): Promise<string> => {
+  const contador = await tx.contador.upsert({
+    where: { chave: CHAVE_CONTADOR },
+    update: { valor: { increment: 1 } },
+    create: { chave: CHAVE_CONTADOR, valor: 1 }
+  });
+
+  return `${PREFIXO_SEQUENCIAL}${String(contador.valor).padStart(DIGITOS_SEQUENCIAL, '0')}`;
+};
+
 export const biparItem = async (req: Request, res: Response) => {
-  const { palletId, codigoItem, acao } = req.body; // acao: 'ENTRADA' ou 'SAIDA'
+  // gerarSequencial: quando true, ignora o codigoItem recebido e gera um código
+  // sequencial novo no servidor (usado no módulo de retriagem para emitir etiquetas).
+  const { palletId, codigoItem, acao, gerarSequencial } = req.body; // acao: 'ENTRADA' ou 'SAIDA'
 
   try {
     const pallet = await prisma.pallet.findUnique({ where: { id: Number(palletId) } });
@@ -80,18 +100,33 @@ export const biparItem = async (req: Request, res: Response) => {
         });
       }
 
-      // Se estiver abaixo de 140, realiza o cadastro normalmente
-      const item = await prisma.produtoPallet.create({
-        data: { 
-          palletId: Number(palletId), 
-          codigoItem: String(codigoItem) 
-        }
-      });
+      let item;
+
+      if (gerarSequencial) {
+        // Gera o código sequencial e cria o item dentro da mesma transação
+        item = await prisma.$transaction(async (tx: any) => {
+          const codigoGerado = await gerarProximoCodigoSequencial(tx);
+          return tx.produtoPallet.create({
+            data: {
+              palletId: Number(palletId),
+              codigoItem: codigoGerado
+            }
+          });
+        });
+      } else {
+        // Fluxo normal: item já chega com um código bipado manualmente
+        item = await prisma.produtoPallet.create({
+          data: { 
+            palletId: Number(palletId), 
+            codigoItem: String(codigoItem) 
+          }
+        });
+      }
 
       // ✨ SALVA NO LOG: Registra que a triagem entrou neste pallet
       await prisma.historicoMovimentacao.create({
         data: {
-          codigoItem: String(codigoItem),
+          codigoItem: item.codigoItem,
           acao: 'ENTRADA',
           palletAlvo: pallet.numero || `Pallet #${pallet.id}`
         }

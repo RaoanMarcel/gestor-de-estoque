@@ -149,20 +149,21 @@ export function usePalletLogic() {
     try {
       const codigosGerados: string[] = [];
 
-      // Loop para criar a quantidade de registros solicitada pelo usuário
+      // Loop para criar a quantidade de registros solicitada pelo usuário.
+      // O backend gera o código sequencial (ex: P-00001) de forma atômica;
+      // o front só informa que quer um código novo via "gerarSequencial".
       for (let i = 0; i < qtdEtiquetas; i++) {
-        // Envia uma string temporária ou comando vazio se seu backend gerar o sequencial lá dentro.
-        // Se o seu backend exige que o front mande o código, mantemos o RET + timestamp, 
-        // mas o ideal é que a API responda com o ID sequencial final inserido.
         const response = await api.post('/pallets/bipar', { 
           palletId: id, 
-          codigoItem: `AUTO-GEN-${Date.now()}-${i}`, 
-          acao: 'ENTRADA' 
+          acao: 'ENTRADA',
+          gerarSequencial: true
         });
 
-        // Tenta capturar o código sequencial real gerado pelo banco (ex: RET-00124) vindo na response
-        const codigoFinalTratado = response.data.codigoItem || response.data.id || `RET${Date.now()}`;
-        codigosGerados.push(codigoFinalTratado);
+        const codigoGerado = response.data?.item?.codigoItem;
+        if (!codigoGerado) {
+          throw new Error('O servidor não retornou o código gerado.');
+        }
+        codigosGerados.push(codigoGerado);
       }
 
       // Dispara a impressão de todas as etiquetas processadas em uma única janela
