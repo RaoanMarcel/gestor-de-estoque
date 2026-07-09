@@ -3,7 +3,12 @@
 
 const ESTILOS_ETIQUETA = `
   @page { size: 60mm 40mm; margin: 0; }
-  * { box-sizing: border-box; }
+  * { 
+    box-sizing: border-box; 
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
   html, body {
     margin: 0; padding: 0;
     background-color: #fff;
