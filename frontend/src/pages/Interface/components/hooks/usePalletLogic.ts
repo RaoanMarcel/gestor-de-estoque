@@ -165,9 +165,9 @@ export function usePalletLogic() {
         codigosGerados.push(codigoFinalTratado);
       }
 
-      // Dispara a impressão de todas as etiquetas processadas
-      const { imprimirEtiquetaRetriagem } = await import('../../PalletInterface');
-      codigosGerados.forEach(codigo => imprimirEtiquetaRetriagem(codigo));
+      // Dispara a impressão de todas as etiquetas processadas em uma única janela
+      const { imprimirEtiquetasRetriagemLote } = await import('../utils/imprimirEtiqueta');
+      imprimirEtiquetasRetriagemLote(codigosGerados);
 
       tocarSom('ENTRADA');
       setMensagemStatus({ 

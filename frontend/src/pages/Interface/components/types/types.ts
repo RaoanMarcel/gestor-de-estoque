@@ -1,4 +1,3 @@
-// types.ts
 export interface Produto {
   id: number;
   codigoItem: string;
@@ -11,6 +10,6 @@ export interface PalletData {
   rua?: string;
   estrutura?: string;
   nivel?: string;
-  tipo: string; 
+  tipo: string;
   produtos: Produto[];
 }
