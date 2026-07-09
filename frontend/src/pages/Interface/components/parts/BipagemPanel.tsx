@@ -100,7 +100,7 @@ export default function BipagemPanel({
         <div className="p-5 border border-dashed border-blue-200 bg-blue-50/40 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex-1">
             <h3 className="text-xs font-bold text-blue-950 uppercase tracking-wider m-0">
-              🏷️ Módulo Retriagem
+              CÓDIGO DE IDENTIFICAÇÃO
             </h3>
             <p className="text-[11px] text-blue-600/90 mt-1 mb-0 leading-relaxed">
               Escolha a quantidade de caixas que deseja etiquetar. O sistema registrará os códigos sequenciais automaticamente.

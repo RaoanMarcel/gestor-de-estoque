@@ -1,8 +1,8 @@
 // utils/imprimirEtiqueta.ts
-// Função utilitária de impressão da etiqueta de retriagem (40x60mm).
+// Função utilitária de impressão da etiqueta de retriagem (60x40mm - Horizontal).
 
 const ESTILOS_ETIQUETA = `
-  @page { size: 40mm 60mm; margin: 0; }
+  @page { size: 60mm 40mm; margin: 0; }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
@@ -10,7 +10,7 @@ const ESTILOS_ETIQUETA = `
     font-family: 'Arial', sans-serif;
   }
   .pagina {
-    width: 40mm; height: 60mm;
+    width: 60mm; height: 40mm;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -19,63 +19,79 @@ const ESTILOS_ETIQUETA = `
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 2mm;
+    justify-content: space-between;
     width: 100%;
-    padding: 3mm;
+    height: 100%;
+    padding: 2.5mm;
+  }
+  .header {
+    width: 100%;
+    text-align: center;
+    border-bottom: 1.5px solid #000;
+    padding-bottom: 1mm;
+    margin-bottom: 0.5mm;
   }
   .title {
-    font-size: 8pt;
-    font-weight: bold;
+    font-size: 7.5pt;
+    font-weight: 900;
     letter-spacing: 0.5px;
+    margin: 0;
   }
   .barcode-container {
     display: flex;
     justify-content: center;
     align-items: center;
     width: 100%;
+    flex-grow: 1;
+    margin-top: 1mm;
   }
   .barcode-img {
-    width: 34mm;
-    height: 16mm;
+    width: 52mm;
+    height: 14mm;
     object-fit: contain;
   }
   .code-text {
-    font-size: 12pt;
-    font-weight: bold;
+    font-size: 13pt;
+    font-weight: 900;
     font-family: monospace;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    margin-top: 1mm;
+    margin-bottom: 1mm;
   }
   .footer {
     font-size: 6pt;
-    border-top: 0.5px dashed #000;
-    padding-top: 1mm;
-    width: 80%;
+    font-weight: bold;
+    background-color: #000;
+    color: #fff;
+    width: 100%;
     text-align: center;
-    letter-spacing: 0.5px;
-    margin-top: 1mm;
+    padding: 1.5mm 0;
+    letter-spacing: 1px;
+    border-radius: 2px;
   }
 `;
 
 export const imprimirEtiquetaRetriagem = (codigo: string) => {
-  const janelaImpressao = window.open('', '_blank', 'width=450,height=650');
+  const janelaImpressao = window.open('', '_blank', 'width=500,height=400');
   if (!janelaImpressao) return;
 
   janelaImpressao.document.write(`
     <html>
       <head>
-        <title>Etiqueta Retriagem - ${codigo}</title>
+        <title>Etiqueta CR - ${codigo}</title>
         <style>${ESTILOS_ETIQUETA}</style>
       </head>
       <body>
         <div class="pagina">
           <div class="etiqueta">
-            <div class="title">RETRIAGEM INTERNA</div>
+            <div class="header">
+              <div class="title">CÓDIGO DE RASTREABILIDADE</div>
+            </div>
             <div class="barcode-container">
               <img id="barcode" class="barcode-img" />
             </div>
             <div class="code-text">${codigo}</div>
-            <div class="footer">PRO4CE WMS SYSTEM</div>
+            <div class="footer">PRO4CE WMS</div>
           </div>
         </div>
 
@@ -86,8 +102,9 @@ export const imprimirEtiquetaRetriagem = (codigo: string) => {
               JsBarcode("#barcode", "${codigo}", {
                 format: "CODE128",
                 displayValue: false,
-                height: 50,
-                margin: 0
+                height: 45,
+                margin: 0,
+                width: 2.5
               });
             } catch (e) {
               console.error("Erro ao gerar código de barras:", e);
@@ -105,22 +122,23 @@ export const imprimirEtiquetaRetriagem = (codigo: string) => {
 };
 
 // Imprime várias etiquetas de uma vez, em uma única janela/impressão (uma página por etiqueta).
-// Evita o problema de o navegador bloquear múltiplas janelas de impressão abertas em sequência.
 export const imprimirEtiquetasRetriagemLote = (codigos: string[]) => {
   if (codigos.length === 0) return;
 
-  const janelaImpressao = window.open('', '_blank', 'width=450,height=650');
+  const janelaImpressao = window.open('', '_blank', 'width=500,height=400');
   if (!janelaImpressao) return;
 
   const paginas = codigos.map((codigo, index) => `
     <div class="pagina"${index > 0 ? ' style="page-break-before: always;"' : ''}>
       <div class="etiqueta">
-        <div class="title">RETRIAGEM INTERNA</div>
+        <div class="header">
+          <div class="title">CÓDIGO DE RASTREABILIDADE</div>
+        </div>
         <div class="barcode-container">
           <img class="barcode-img" data-codigo="${codigo}" />
         </div>
         <div class="code-text">${codigo}</div>
-        <div class="footer">PRO4CE WMS SYSTEM</div>
+        <div class="footer">PRO4CE WMS</div>
       </div>
     </div>
   `).join('');
@@ -128,7 +146,7 @@ export const imprimirEtiquetasRetriagemLote = (codigos: string[]) => {
   janelaImpressao.document.write(`
     <html>
       <head>
-        <title>Etiquetas Retriagem</title>
+        <title>Etiquetas CR em Lote</title>
         <style>${ESTILOS_ETIQUETA}</style>
       </head>
       <body>
@@ -142,8 +160,9 @@ export const imprimirEtiquetasRetriagemLote = (codigos: string[]) => {
                 JsBarcode(img, img.getAttribute('data-codigo'), {
                   format: "CODE128",
                   displayValue: false,
-                  height: 50,
-                  margin: 0
+                  height: 45,
+                  margin: 0,
+                  width: 2.5
                 });
               });
             } catch (e) {
