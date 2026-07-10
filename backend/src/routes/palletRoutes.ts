@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { 
   criarPallet, buscarPalletPorId, listarPallets, biparItem, 
-  transferirUm, transferirEmLote, enviarParaRMA, excluirPallet
+  transferirUm, transferirEmLote, enviarParaRMA, excluirPallet, biparItemEmLote
 } from '../controllers/palletController.js';
 import { exportarHistoricoExcel, exportarRelatorioRMA } from '../controllers/excelController.js';
 
@@ -25,5 +25,6 @@ router.post('/pallets/enviar-rma', autenticarToken, enviarParaRMA);
 router.put('/pallets/transferir', autenticarToken, transferirUm);
 router.put('/pallets/transferir-lote', autenticarToken, transferirEmLote);
 router.delete('/pallets/:id', autenticarToken, excluirPallet);
+router.post('/pallets/bipar-lote', autenticarToken, biparItemEmLote);
 
 export default router;

@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma: any = new PrismaClient();
 
-const PREFIXO_SEQUENCIAL = 'P-';
+const PREFIXO_SEQUENCIAL = 'CR-';
 const DIGITOS_SEQUENCIAL = 5;
 const CHAVE_CONTADOR = 'PRODUTO';
 
@@ -377,7 +377,6 @@ export const excluirPallet = async (req: Request, res: Response) => {
 
     // Avisa a malha inteira que uma vaga sumiu do painel principal
     notificarMudanca(req, palletAlvo.id);
-    
     return res.status(200).json({ mensagem: `O pallet "${palletAlvo.numero}" foi removido da malha com sucesso.` });
 
   } catch (error: any) {
