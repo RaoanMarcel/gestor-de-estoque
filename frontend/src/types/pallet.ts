@@ -20,5 +20,6 @@ export interface CriarPalletInput {
   rua: string;
   estrutura: string;
   nivel: string;
-  tipo: string; 
+  tipo: string;
+  descricao: string;
 }

@@ -11,5 +11,6 @@ export interface PalletData {
   estrutura?: string;
   nivel?: string;
   tipo: string;
+  descricao: string;
   produtos: Produto[];
 }

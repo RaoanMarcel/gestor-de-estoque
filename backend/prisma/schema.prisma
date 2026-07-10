@@ -13,10 +13,12 @@ model Pallet {
   rua       String?         
   estrutura String?         
   nivel     String?         
-  tipo      String?         
+  tipo      String? 
+  descricao String?        
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   produtos  ProdutoPallet[] 
+  
 }
 
 model ProdutoPallet {
