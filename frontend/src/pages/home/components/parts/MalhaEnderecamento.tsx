@@ -57,6 +57,9 @@ export default function MalhaEnderecamento({
                   <h3 className="text-sm font-mono font-semibold tracking-tight text-slate-800 group-hover:text-blue-600 transition-colors">
                     {pallet.numero}
                   </h3>
+                  <p>
+                    {pallet.descricao}
+                  </p>
                   <div className="flex items-center gap-1.5 text-[10px] text-slate-600 font-mono bg-slate-50/70 px-2 py-0.5 rounded border border-slate-200/60 w-fit">
                     <span>R:{pallet.rua || '-'}</span><span className="text-slate-300">•</span>
                     <span>E:{pallet.estrutura || '-'}</span><span className="text-slate-300">•</span>
@@ -91,7 +94,7 @@ export default function MalhaEnderecamento({
                       pallet.numero, 
                       pallet.rua ?? '', 
                       pallet.estrutura ?? '', 
-                      pallet.nivel ?? ''
+                      pallet.nivel ?? '',
                     );
                   }}
                   className="p-1 text-base leading-none text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"

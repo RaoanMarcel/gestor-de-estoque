@@ -28,6 +28,7 @@ export default function ModalCriarPallet({
           <Input label="Identificador do Pallet *" placeholder="Ex: PL-1200" required value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} />
           <div className="grid grid-cols-2 gap-3">
           <Input label="Rua / Corredor" placeholder="Ex: Setor A" value={form.rua} onChange={(e) => setForm({ ...form, rua: e.target.value })} />
+          <Input label="Descrição" placeholder="Ex: defeito, triagem, ..." value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} ></Input>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Input label="Estrutura" placeholder="Ex: EST-02" value={form.estrutura} onChange={(e) => setForm({ ...form, estrutura: e.target.value })} />

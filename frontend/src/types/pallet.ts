@@ -3,6 +3,7 @@ export interface PalletCount {
 }
 
 export interface Pallet {
+  descricao: string;
   id: number;
   numero: string;
   rua?: string;
