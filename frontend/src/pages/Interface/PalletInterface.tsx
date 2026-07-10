@@ -126,11 +126,32 @@ export default function PalletInterface() {
               <h3 className="text-base font-bold text-slate-900 uppercase tracking-wider mt-2">
                 Exclusões Pendentes no Cache
               </h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Você possui <span className="font-bold text-rose-600 font-mono text-sm">{exclusoesPendentes.length}</span> item(ns) na lista temporária de exclusão. Deseja confirmar a baixa definitiva no estoque físico antes de fechar este pallet?
-              </p>
-            </div>
+              <div className="mt-3 text-left">
+                <p className="text-xs text-slate-500 mb-3">
+                  Os seguintes códigos estão aguardando confirmação de baixa:
+                </p>
 
+                <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50">
+                  {exclusoesPendentes.map((codigo) => (
+                    <div
+                      key={codigo}
+                      className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 border-slate-200"
+                    >
+                      <span className="font-mono text-sm font-semibold text-slate-800">
+                        {codigo}
+                      </span>
+
+                      <span className="text-[10px] uppercase tracking-wider text-rose-600 font-bold">
+                        EXCLUSÃO
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  Deseja confirmar a baixa definitiva destes itens antes de sair?
+                </p>
+              </div>'
+            </div>
             <div className="flex flex-col gap-2 pt-2">
               <button
                 onClick={handleConfirmarExclusaoEmLote}

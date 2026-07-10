@@ -54,7 +54,7 @@ export default function ConteudoAtualPanel({
               className="p-1.5 text-rose-600 hover:bg-rose-100/70 rounded transition-all text-xs flex items-center gap-1 font-bold"
               title="Voltar item para o pallet"
             >
-              ↩ Mantenha
+               ← Reverter
             </button>
           </div>
         ))}
