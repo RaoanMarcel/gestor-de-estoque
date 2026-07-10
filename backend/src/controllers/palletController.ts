@@ -1,12 +1,26 @@
+// backend\src\controllers\palletController.ts
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 
 const prisma: any = new PrismaClient();
 
-// Prefixo e quantidade de dígitos do código sequencial (ex: P-00001)
 const PREFIXO_SEQUENCIAL = 'P-';
 const DIGITOS_SEQUENCIAL = 5;
 const CHAVE_CONTADOR = 'PRODUTO';
+
+// Helper reutilizável para emitir eventos WebSocket sem duplicar código
+const notificarMudanca = (req: Request, palletId?: number | string) => {
+  const io = req.app.get('io');
+  if (!io) return;
+
+  // Atualiza a tela de listagem geral (Dashboard / Visão Geral)
+  io.emit('global_map_refresh');
+
+  // Se houver um pallet específico modificado, avisa a sala dele
+  if (palletId) {
+    io.to(`pallet_${palletId}`).emit('pallet_updated', { palletId: Number(palletId) });
+  }
+};
 
 // 1. Criar Novo Pallet
 export const criarPallet = async (req: Request, res: Response) => {
@@ -27,19 +41,22 @@ export const criarPallet = async (req: Request, res: Response) => {
       }
     });
 
+    // Notifica o mapa que um novo espaço surgiu
+    notificarMudanca(req);
+
     return res.status(201).json(novoPallet);
   } catch (error: any) {
     return res.status(500).json({ error: 'Erro ao criar pallet.' });
   }
 };
 
-// 2. Listar Todos os Pallets (Para a tela de visão geral)
+// 2. Listar Todos os Pallets
 export const listarPallets = async (_req: Request, res: Response) => {
   try {
     const pallets = await prisma.pallet.findMany({
       include: { 
         _count: { select: { produtos: true } },
-        produtos: { select: { codigoItem: true } } // 🌟 ADICIONADO: Envia as triagens para o GPS do front
+        produtos: { select: { codigoItem: true } }
       }
     });
     return res.status(200).json(pallets);
@@ -48,13 +65,13 @@ export const listarPallets = async (_req: Request, res: Response) => {
   }
 };
 
-// 3. Buscar um Pallet Específico com a sua listagem lateral atualizada
+// 3. Buscar um Pallet Específico
 export const buscarPalletPorId = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const pallet = await prisma.pallet.findUnique({
       where: { id: Number(id) },
-      include: { produtos: { orderBy: { bipadoEm: 'desc' } } } // Traz os itens mais recentes no topo
+      include: { produtos: { orderBy: { bipadoEm: 'desc' } } }
     });
     
     if (!pallet) return res.status(404).json({ error: 'Pallet não encontrado.' });
@@ -64,9 +81,6 @@ export const buscarPalletPorId = async (req: Request, res: Response) => {
   }
 };
 
-// 🔢 Gera o próximo código sequencial (ex: P-00001) de forma atômica.
-// O incremento do contador e a criação do item acontecem na mesma transação,
-// então duas bipagens simultâneas nunca recebem o mesmo número.
 const gerarProximoCodigoSequencial = async (tx: any): Promise<string> => {
   const contador = await tx.contador.upsert({
     where: { chave: CHAVE_CONTADOR },
@@ -77,23 +91,19 @@ const gerarProximoCodigoSequencial = async (tx: any): Promise<string> => {
   return `${PREFIXO_SEQUENCIAL}${String(contador.valor).padStart(DIGITOS_SEQUENCIAL, '0')}`;
 };
 
+// 4. Bipar Item (Entrada / Saída Individual)
 export const biparItem = async (req: Request, res: Response) => {
-  // gerarSequencial: quando true, ignora o codigoItem recebido e gera um código
-  // sequencial novo no servidor (usado no módulo de retriagem para emitir etiquetas).
-  const { palletId, codigoItem, acao, gerarSequencial } = req.body; // acao: 'ENTRADA' ou 'SAIDA'
+  const { palletId, codigoItem, acao, gerarSequencial } = req.body;
 
   try {
     const pallet = await prisma.pallet.findUnique({ where: { id: Number(palletId) } });
     if (!pallet) return res.status(404).json({ error: 'Pallet inexistente.' });
 
-    // --- MODO ENTRADA DE PRODUTOS ---
-      if (acao === 'ENTRADA') {
-      // 1. Conta quantos produtos já estão armazenados neste pallet específico
+    if (acao === 'ENTRADA') {
       const totalAtual = await prisma.produtoPallet.count({
         where: { palletId: Number(palletId) }
       });
 
-      // 2. Se já atingiu ou passou o limite de 140, barra a operação
       if (totalAtual >= 140) {
         return res.status(400).json({ 
           error: 'Alerta de Lotação! Este pallet atingiu o limite máximo de 140 volumes.' 
@@ -103,7 +113,6 @@ export const biparItem = async (req: Request, res: Response) => {
       let item;
 
       if (gerarSequencial) {
-        // Gera o código sequencial e cria o item dentro da mesma transação
         item = await prisma.$transaction(async (tx: any) => {
           const codigoGerado = await gerarProximoCodigoSequencial(tx);
           return tx.produtoPallet.create({
@@ -114,7 +123,6 @@ export const biparItem = async (req: Request, res: Response) => {
           });
         });
       } else {
-        // Fluxo normal: item já chega com um código bipado manualmente
         item = await prisma.produtoPallet.create({
           data: { 
             palletId: Number(palletId), 
@@ -123,7 +131,6 @@ export const biparItem = async (req: Request, res: Response) => {
         });
       }
 
-      // ✨ SALVA NO LOG: Registra que a triagem entrou neste pallet
       await prisma.historicoMovimentacao.create({
         data: {
           codigoItem: item.codigoItem,
@@ -132,10 +139,12 @@ export const biparItem = async (req: Request, res: Response) => {
         }
       });
 
+      // Dispara tempo real para as telas conectadas
+      notificarMudanca(req, palletId);
+
       return res.status(200).json({ mensagem: 'Item adicionado com sucesso!', item });
     } 
     
-    // --- MODO EXCLUSÃO / SAÍDA DE PRODUTOS ---
     if (acao === 'SAIDA') {
       const itemExistente = await prisma.produtoPallet.findUnique({
         where: { codigoItem: String(codigoItem) }
@@ -149,14 +158,16 @@ export const biparItem = async (req: Request, res: Response) => {
         where: { codigoItem: String(codigoItem) }
       });
 
-      // ✨ SALVA NO LOG: Registra que a triagem saiu deste pallet
-        await prisma.historicoMovimentacao.create({
-      data: {
-        codigoItem: String(codigoItem),
-        acao: 'SAIDA',
-        palletAlvo: pallet.numero || `Pallet #${pallet.id}`
-      }
-    });
+      await prisma.historicoMovimentacao.create({
+        data: {
+          codigoItem: String(codigoItem),
+          acao: 'SAIDA',
+          palletAlvo: pallet.numero || `Pallet #${pallet.id}`
+        }
+      });
+
+      // Dispara tempo real para as telas conectadas
+      notificarMudanca(req, palletId);
 
       return res.status(200).json({ mensagem: 'Item removido do pallet com sucesso!' });
     }
@@ -173,9 +184,7 @@ export const biparItem = async (req: Request, res: Response) => {
   }
 };
 
-// ====================================================================
-// 🔄 5. TRANSFERÊNCIA INDIVIDUAL (Mover 1 triagem para outro Pallet)
-// ====================================================================
+// 5. Transferência Individual
 export const transferirUm = async (req: Request, res: Response) => {
   try {
     const { codigoItem, numeroPalletDestino } = req.body;
@@ -184,7 +193,14 @@ export const transferirUm = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Código do item e pallet de destino são obrigatórios.' });
     }
 
-    // 1. Encontra o pallet de destino pelo número (Ex: "56" ou "Defeito")
+    const produtoOrigem = await (prisma as any).produtoPallet.findUnique({
+      where: { codigoItem: String(codigoItem) }
+    });
+
+    if (!produtoOrigem) {
+      return res.status(404).json({ error: 'Produto de origem não encontrado.' });
+    }
+
     const palletDestino = await (prisma as any).pallet.findUnique({
       where: { numero: String(numeroPalletDestino) },
       include: { produtos: true }
@@ -194,20 +210,17 @@ export const transferirUm = async (req: Request, res: Response) => {
       return res.status(404).json({ error: `Pallet de destino "${numeroPalletDestino}" não foi localizado.` });
     }
 
-    // 2. Validação rígida da capacidade máxima de 140 volumes
     if (palletDestino.produtos.length >= 140) {
       return res.status(400).json({ 
         error: `Alerta de Lotação! O pallet destino "${numeroPalletDestino}" já atingiu o limite de 140 volumes.` 
       });
     }
 
-    // 3. Atualiza o endereço da triagem mudando o palletId no banco local
     const produtoAtualizado = await (prisma as any).produtoPallet.update({
       where: { codigoItem: String(codigoItem) },
       data: { palletId: palletDestino.id }
     });
 
-    // 4. 📝 GRAVA NO HISTÓRICO: Registra o log da transferência para auditoria
     await (prisma as any).historicoMovimentacao.create({
       data: {
         codigoItem: String(codigoItem),
@@ -215,6 +228,10 @@ export const transferirUm = async (req: Request, res: Response) => {
         palletAlvo: String(numeroPalletDestino)
       }
     });
+
+    // Atualiza tanto o pallet de onde saiu (origem) quanto o que recebeu (destino)
+    notificarMudanca(req, produtoOrigem.palletId);
+    notificarMudanca(req, palletDestino.id);
 
     return res.status(200).json({ 
       mensagem: 'Produto transferido com sucesso!', 
@@ -227,10 +244,10 @@ export const transferirUm = async (req: Request, res: Response) => {
   }
 };
 
-
+// 6. Transferência em Lote
 export const transferirEmLote = async (req: Request, res: Response) => {
   try {
-    const { codigosItens, numeroPalletDestino } = req.body; // Recebe Array ['381731', '34879131'...]
+    const { codigosItens, numeroPalletDestino } = req.body;
 
     if (!codigosItens || !Array.isArray(codigosItens) || codigosItens.length === 0) {
       return res.status(400).json({ error: 'Nenhum item selecionado para transferência.' });
@@ -240,7 +257,11 @@ export const transferirEmLote = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Pallet de destino não informado.' });
     }
 
-    // 1. Localiza o pallet alvo pelo identificador alfa-numérico
+    // Pega o id do pallet de origem usando o primeiro item como referência antes de atualizar
+    const primeiroItem = await (prisma as any).produtoPallet.findUnique({
+      where: { codigoItem: String(codigosItens[0]) }
+    });
+
     const palletDestino = await (prisma as any).pallet.findUnique({
       where: { numero: String(numeroPalletDestino) },
       include: { produtos: true }
@@ -250,7 +271,6 @@ export const transferirEmLote = async (req: Request, res: Response) => {
       return res.status(404).json({ error: `Pallet de destino "${numeroPalletDestino}" não encontrado.` });
     }
 
-    // 2. Valida se o lote selecionado cabe no espaço restante antes de estourar os 140
     const espacoDisponivel = 140 - palletDestino.produtos.length;
     if (codigosItens.length > espacoDisponivel) {
       return res.status(400).json({ 
@@ -258,26 +278,22 @@ export const transferirEmLote = async (req: Request, res: Response) => {
       });
     }
 
-    // 3. Executa a atualização massiva de endereço no banco (.updateMany)
     await (prisma as any).produtoPallet.updateMany({
-      where: {
-        codigoItem: { in: codigosItens }
-      },
-      data: {
-        palletId: palletDestino.id
-      }
+      where: { codigoItem: { in: codigosItens } },
+      data: { palletId: palletDestino.id }
     });
 
-  
     const logsData = codigosItens.map((codigo: string) => ({
       codigoItem: String(codigo),
       acao: 'TRANSFERENCIA_LOTE',
       palletAlvo: String(numeroPalletDestino)
     }));
 
-    await (prisma as any).historicoMovimentacao.createMany({
-      data: logsData
-    });
+    await (prisma as any).historicoMovimentacao.createMany({ data: logsData });
+
+    // Força atualização em massa dos envolvidos
+    if (primeiroItem) notificarMudanca(req, primeiroItem.palletId);
+    notificarMudanca(req, palletDestino.id);
 
     return res.status(200).json({ 
       mensagem: `${codigosItens.length} produtos transferidos para o pallet "${numeroPalletDestino}" com sucesso!` 
@@ -289,9 +305,7 @@ export const transferirEmLote = async (req: Request, res: Response) => {
   }
 };
 
-// ====================================================================
-// 🚀 7. LANÇAR AO RMA (Exclusivo para Pallets do Tipo DEFEITO)
-// ====================================================================
+// 7. Lançar ao RMA (Exclusivo Pallets Defeito)
 export const enviarParaRMA = async (req: Request, res: Response) => {
   try {
     const { codigosItens, numeroPalletOrigem } = req.body;
@@ -300,24 +314,24 @@ export const enviarParaRMA = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Nenhum item selecionado para o RMA.' });
     }
 
-    // 1. Remove em lote os produtos do pallet físico no banco local (.deleteMany)
-    // Isso esvazia o pallet físico imediatamente na tela
-    await (prisma as any).produtoPallet.deleteMany({
-      where: {
-        codigoItem: { in: codigosItens }
-      }
+    const primeiroItem = await (prisma as any).produtoPallet.findUnique({
+      where: { codigoItem: String(codigosItens[0]) }
     });
 
-    // 2. 📝 GRAVA NO HISTÓRICO COMO RMA: Alimenta a tabela de auditoria para o Relatório Fantasma
+    await (prisma as any).produtoPallet.deleteMany({
+      where: { codigoItem: { in: codigosItens } }
+    });
+
     const logsRMA = codigosItens.map((codigo: string) => ({
       codigoItem: String(codigo),
-      acao: 'ENVIADO_RMA', // Marcador crucial para o relatório
-      palletAlvo: String(numeroPalletOrigem) // Registra de qual pallet de defeito ele saiu
+      acao: 'ENVIADO_RMA',
+      palletAlvo: String(numeroPalletOrigem)
     }));
 
-    await (prisma as any).historicoMovimentacao.createMany({
-      data: logsRMA
-    });
+    await (prisma as any).historicoMovimentacao.createMany({ data: logsRMA });
+
+    // Notifica a saída do pallet de origem
+    if (primeiroItem) notificarMudanca(req, primeiroItem.palletId);
 
     return res.status(200).json({
       mensagem: `Sucesso! ${codigosItens.length} volumes foram despachados para o sistema de RMA e removidos do pallet físico.`
@@ -329,12 +343,11 @@ export const enviarParaRMA = async (req: Request, res: Response) => {
   }
 };
 
-
+// 8. Excluir Pallet da Malha
 export const excluirPallet = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // 1. Busca o pallet incluindo a contagem de produtos associados
     const palletAlvo = await (prisma as any).pallet.findUnique({
       where: { id: Number(id) },
       include: { produtos: true }
@@ -344,19 +357,16 @@ export const excluirPallet = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Pallet não localizado no sistema.' });
     }
 
-    // 2. Trava de Segurança: impede a exclusão se houver itens guardados nele
     if (palletAlvo.produtos && palletAlvo.produtos.length > 0) {
       return res.status(400).json({ 
         error: `Bloqueio de Segurança! O pallet "${palletAlvo.numero}" possui ${palletAlvo.produtos.length} produtos armazenados. Esvazie-o antes de excluir.` 
       });
     }
 
-    // 3. Executa a exclusão definitiva do registro do endereço no banco local
     await (prisma as any).pallet.delete({
       where: { id: Number(id) }
     });
 
-    // 4. Opcional: Registra opcionalmente no histórico geral para auditoria futura
     await (prisma as any).historicoMovimentacao.create({
       data: {
         codigoItem: 'SISTEMA',
@@ -365,10 +375,54 @@ export const excluirPallet = async (req: Request, res: Response) => {
       }
     });
 
+    // Avisa a malha inteira que uma vaga sumiu do painel principal
+    notificarMudanca(req, palletAlvo.id);
+    
     return res.status(200).json({ mensagem: `O pallet "${palletAlvo.numero}" foi removido da malha com sucesso.` });
 
   } catch (error: any) {
     console.error(error);
     return res.status(500).json({ error: 'Erro interno ao tentar excluir a posição do mapa.' });
+  }
+};
+
+// 9. Bipar Item em Lote (Cache do Front-end)
+export const biparItemEmLote = async (req: Request, res: Response) => {
+  const { palletId, codigosItens, acao } = req.body;
+
+  if (!codigosItens || !Array.isArray(codigosItens) || codigosItens.length === 0) {
+    return res.status(400).json({ error: 'Nenhum item enviado para exclusão em lote.' });
+  }
+
+  try {
+    const pallet = await prisma.pallet.findUnique({ where: { id: Number(palletId) } });
+    if (!pallet) return res.status(404).json({ error: 'Pallet inexistente.' });
+
+    if (acao === 'SAIDA') {
+      await prisma.produtoPallet.deleteMany({
+        where: {
+          palletId: Number(palletId),
+          codigoItem: { in: codigosItens.map(String) }
+        }
+      });
+
+      const logsData = codigosItens.map((codigo: string) => ({
+        codigoItem: String(codigo),
+        acao: 'SAIDA',
+        palletAlvo: pallet.numero || `Pallet #${pallet.id}`
+      }));
+
+      await prisma.historicoMovimentacao.createMany({ data: logsData });
+
+      // Atualiza o tempo real para todos na sala correspondente
+      notificarMudanca(req, palletId);
+
+      return res.status(200).json({ mensagem: `${codigosItens.length} itens removidos com sucesso!` });
+    }
+
+    return res.status(400).json({ error: 'Ação inválida para lote temporário.' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Erro operacional ao processar lote de exclusão.' });
   }
 };

@@ -1,6 +1,7 @@
 // usePalletLogic.ts
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { io, Socket } from 'socket.io-client';
 import type { PalletData } from '../types/types';
 import api from '../../../../services/api';
 
@@ -8,11 +9,15 @@ export function usePalletLogic() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  const LOCAL_STORAGE_KEY = `exclusoes_pallet_${id}`;
+
+  // Estados Base
   const [pallet, setPallet] = useState<PalletData | null>(null);
   const [acao, setAcao] = useState<'ENTRADA' | 'SAIDA'>('ENTRADA');
   const [codigoBipado, setCodigoBipado] = useState('');
   const [mensagemStatus, setMensagemStatus] = useState({ texto: '', erro: false });
 
+  // Estados de Transferência e Lote
   const [isModoTransferencia, setIsModoTransferencia] = useState(false);
   const [itensParaTransferir, setItensParaTransferir] = useState<string[]>([]);
   const [palletsDestino, setPalletsDestino] = useState<PalletData[]>([]);
@@ -20,15 +25,50 @@ export function usePalletLogic() {
   const [carregandoDestinos, setCarregandoDestinos] = useState(false);
   
   const [carregandoRetriagem, setCarregandoRetriagem] = useState(false);
-  // Estado para controlar a quantidade de etiquetas a gerar
   const [qtdEtiquetas, setQtdEtiquetas] = useState<number>(1);
+
+  // --- NOVOS ESTADOS (Cache Local & Modal de Confirmação) ---
+  const [exclusoesPendentes, setExclusoesPendentes] = useState<string[]>(() => {
+    const salvo = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return salvo ? JSON.parse(salvo) : [];
+  });
+  const [exibirModalExclusaoLote, setExibirModalExclusaoLote] = useState(false);
+  const [rotaDestinoPendente, setRotaDestinoPendente] = useState<string | null>(null);
 
   const inputBipRef = useRef<HTMLInputElement>(null);
 
   const manterFocoNoInput = () => { inputBipRef.current?.focus(); };
 
+  // Sincronizar exclusões pendentes com o LocalStorage
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(exclusoesPendentes));
+  }, [exclusoesPendentes, LOCAL_STORAGE_KEY]);
+
+  // --- INTEGRAÇÃO WEBSOCKET (Socket.io) ---
+  useEffect(() => {
+    if (!id) return;
+
+    // Substitua pela URL correta do seu backend se necessário
+    const socket: Socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:3000');
+
+    // Entra na sala específica deste pallet
+    socket.emit('join_pallet_room', { palletId: id });
+
+    // Escuta atualizações vindas de outros operadores
+    socket.on('pallet_updated', (data: { palletId: string }) => {
+      if (String(data.palletId) === String(id)) {
+        buscarDadosPallet();
+      }
+    });
+
+    return () => {
+      socket.off('pallet_updated');
+      socket.disconnect();
+    };
+  }, [id]);
+
   useEffect(() => { buscarDadosPallet(); }, [id]);
-  useEffect(() => { manterFocoNoInput(); }, [acao, pallet, isModoTransferencia]);
+  useEffect(() => { manterFocoNoInput(); }, [acao, pallet, isModoTransferencia, exclusoesPendentes]);
 
   const buscarDadosPallet = async () => {
     try {
@@ -64,6 +104,69 @@ export function usePalletLogic() {
     }
   };
 
+  // --- NOVAS FUNÇÕES: CONTROLE DO FLUXO OPERACIONAL DE EXCLUSÃO ---
+  
+  // Função para a "setinha" do front: desfaz a intenção de exclusão local
+  const handleDesfazerExclusaoItem = (codigoItem: string) => {
+    setExclusoesPendentes(prev => prev.filter(c => c !== codigoItem));
+    tocarSom('ENTRADA');
+    setMensagemStatus({ texto: `Exclusão de ${codigoItem} desfeita localmente.`, erro: false });
+  };
+
+  // Envio em lote definitivo para a API
+  const handleConfirmarExclusaoEmLote = async () => {
+    if (exclusoesPendentes.length === 0) return;
+    try {
+      setMensagemStatus({ texto: 'Processando baixa no estoque...', erro: false });
+      
+      // Enviando todos de uma vez para o backend
+      await api.post('/pallets/bipar-lote', { 
+        palletId: id, 
+        codigosItens: exclusoesPendentes, 
+        acao: 'SAIDA' 
+      });
+
+      tocarSom('SAIDA');
+      setMensagemStatus({ texto: `${exclusoesPendentes.length} itens removidos definitivamente!`, erro: false });
+      
+      // Limpa os caches e fecha modal
+      setExclusoesPendentes([]);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      setExibirModalExclusaoLote(false);
+      
+      await buscarDadosPallet();
+
+      // Se o usuário clicou para sair da tela, conclui a navegação após salvar
+      if (rotaDestinoPendente) {
+        navigate(rotaDestinoPendente);
+      }
+    } catch (error: any) {
+      tocarSom('ERRO');
+      setMensagemStatus({ texto: error.response?.data?.error || 'Erro crítico ao salvar lote.', erro: true });
+    }
+  };
+
+  const handleDescartarExclusoesCache = () => {
+    setExclusoesPendentes([]);
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    setExibirModalExclusaoLote(false);
+    setMensagemStatus({ texto: 'Exclusões descartadas. O estoque físico foi mantido intacto.', erro: false });
+    if (rotaDestinoPendente) {
+      navigate(rotaDestinoPendente);
+    }
+  };
+
+  // Interceptador customizado para quando clicar em botões como "Voltar para o Galpão"
+  const handleTentarSairDaTela = (rotaDestino: string) => {
+    if (exclusoesPendentes.length > 0) {
+      setRotaDestinoPendente(rotaDestino);
+      setExibirModalExclusaoLote(true);
+    } else {
+      navigate(rotaDestino);
+    }
+  };
+
+  // --- SUBMIT DE BIPAGEM REFORMULADO ---
   const handleBipSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const codigoLimpo = codigoBipado.trim();
@@ -104,6 +207,15 @@ export function usePalletLogic() {
 
     if (acao === 'SAIDA') {
       const itemExisteNoPallet = pallet?.produtos.some(p => p.codigoItem === codigoLimpo);
+      
+      // Verifica se o item já não está na fila temporária de exclusão
+      if (exclusoesPendentes.includes(codigoLimpo)) {
+        tocarSom('ERRO');
+        setMensagemStatus({ texto: `O item "${codigoLimpo}" já está na fila de exclusão temporária!`, erro: true });
+        setCodigoBipado('');
+        return;
+      }
+
       if (!itemExisteNoPallet) {
         tocarSom('ERRO');
         setMensagemStatus({ texto: `O item "${codigoLimpo}" não consta neste pallet para dar saída!`, erro: true });
@@ -111,47 +223,21 @@ export function usePalletLogic() {
         return;
       }
 
-      const desejaApenasSaida = window.confirm(
-        `Você bipou a SAÍDA da triagem ${codigoLimpo}.\n\n` +
-        `-> Clique em [OK] para REMOVER DE VEZ do estoque.\n` +
-        `-> Clique em [CANCELAR] se quiser TRANSFERIR para outro pallet.`
-      );
-
-      if (!desejaApenasSaida) {
-        setIsModoTransferencia(true);
-        setItensParaTransferir([codigoLimpo]);
-        tocarSom('ENTRADA');
-        setMensagemStatus({ texto: `Modo transferência ativado! Item ${codigoLimpo} reservado para envio.`, erro: false });
-        setCodigoBipado('');
-        return;
-      }
-
-      try {
-        setMensagemStatus({ texto: '', erro: false });
-        const response = await api.post('/pallets/bipar', { palletId: id, codigoItem: codigoLimpo, acao: 'SAIDA' });
-        tocarSom('SAIDA'); 
-        setMensagemStatus({ texto: response.data.mensagem || 'Operação realizada!', erro: false });
-        setCodigoBipado('');
-        buscarDadosPallet();
-      } catch (error: any) {
-        tocarSom('ERRO'); 
-        setMensagemStatus({ texto: error.response?.data?.error || 'Erro ao processar bipagem.', erro: true });
-        setCodigoBipado('');
-      }
+      // --- SUCESSO FLUIDO: Adiciona direto na fila do cache sem travar a UI ---
+      setExclusoesPendentes(prev => [...prev, codigoLimpo]);
+      tocarSom('SAIDA');
+      setMensagemStatus({ texto: `Fila: ${codigoLimpo} pronto para baixa.`, erro: false });
+      setCodigoBipado('');
     }
   };
 
-  // Fluxo de geração sequencial múltiplo baseado no retorno do backend
+  // Fluxo de geração sequencial múltiplo
   const handleGerarEtiquetaRetriagem = async () => {
     setCarregandoRetriagem(true);
     setMensagemStatus({ texto: '', erro: false });
     
     try {
       const codigosGerados: string[] = [];
-
-      // Loop para criar a quantidade de registros solicitada pelo usuário.
-      // O backend gera o código sequencial (ex: P-00001) de forma atômica;
-      // o front só informa que quer um código novo via "gerarSequencial".
       for (let i = 0; i < qtdEtiquetas; i++) {
         const response = await api.post('/pallets/bipar', { 
           palletId: id, 
@@ -160,13 +246,10 @@ export function usePalletLogic() {
         });
 
         const codigoGerado = response.data?.item?.codigoItem;
-        if (!codigoGerado) {
-          throw new Error('O servidor não retornou o código gerado.');
-        }
+        if (!codigoGerado) throw new Error('O servidor não retornou o código gerado.');
         codigosGerados.push(codigoGerado);
       }
 
-      // Dispara a impressão de todas as etiquetas processadas em uma única janela
       const { imprimirEtiquetasRetriagemLote } = await import('../utils/imprimirEtiqueta');
       imprimirEtiquetasRetriagemLote(codigosGerados);
 
@@ -265,6 +348,7 @@ export function usePalletLogic() {
     }
   };
 
+  // Mantido para remoção pontual via clique direto na tabela (se necessário)
   const handleExcluirItemLinha = async (codigoItem: string) => {
     if (!window.confirm(`Deseja remover a triagem ${codigoItem} deste pallet?`)) return;
     try {
@@ -276,8 +360,15 @@ export function usePalletLogic() {
     }
   };
 
+  // Filtragem visual dos produtos ativos (remove os que já estão na fila de exclusão)
+  const produtosFiltradosVisuais = pallet
+    ? pallet.produtos.filter(p => !exclusoesPendentes.includes(p.codigoItem))
+    : [];
+
   return {
-    pallet,
+    pallet: pallet ? { ...pallet, produtos: produtosFiltradosVisuais } : null,
+    exclusoesPendentes,
+    exibirModalExclusaoLote,
     acao,
     setAcao,
     codigoBipado,
@@ -297,7 +388,7 @@ export function usePalletLogic() {
     qtdEtiquetas,
     setQtdEtiquetas,
     isEntrada: acao === 'ENTRADA',
-    totalUnidades: pallet ? pallet.produtos.length : 0,
+    totalUnidades: produtosFiltradosVisuais.length,
     navigate,
     manterFocoNoInput,
     handleBipSubmit,
@@ -306,6 +397,12 @@ export function usePalletLogic() {
     handleFinalizerColetaTransferencia,
     handleLancarAoRMA,
     handleConfirmarDestinoFinal,
-    handleExcluirItemLinha
+    handleExcluirItemLinha,
+    
+    // Novas exportações para a UI mapear
+    handleDesfazerExclusaoItem,
+    handleConfirmarExclusaoEmLote,
+    handleDescartarExclusoesCache,
+    handleTentarSairDaTela
   };
 }

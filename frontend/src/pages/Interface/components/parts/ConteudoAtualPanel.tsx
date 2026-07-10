@@ -8,6 +8,8 @@ interface ConteudoAtualPanelProps {
   itensParaTransferir: string[];
   isModoTransferencia: boolean;
   handleExcluirItemLinha: (codigoItem: string) => void;
+  exclusoesPendentes: string[]; 
+  handleDesfazerExclusaoItem: (codigoItem: string) => void;
 }
 
 export default function ConteudoAtualPanel({
@@ -16,6 +18,8 @@ export default function ConteudoAtualPanel({
   itensParaTransferir,
   isModoTransferencia,
   handleExcluirItemLinha,
+  exclusoesPendentes,
+  handleDesfazerExclusaoItem
 }: ConteudoAtualPanelProps) {
   return (
     <div className="bg-white/80 backdrop-blur-xl rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col max-h-[600px]">
@@ -30,6 +34,32 @@ export default function ConteudoAtualPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        
+        {/* SEÇÃO VISUAL DE ITENS QUE ESTÃO NA FILA DE EXCLUSÃO (Canto Superior do Painel) */}
+        {exclusoesPendentes.map((itemCodigo) => (
+          <div 
+            key={`pendente-${itemCodigo}`}
+            className="rounded-lg border border-rose-200 bg-rose-50/40 p-3 flex justify-between items-center transition-all duration-300 opacity-85"
+          >
+            <div className="font-mono mt-1">
+              <span className="block font-semibold text-sm tracking-tight text-rose-900 line-through decoration-rose-400">
+                {itemCodigo}
+              </span>
+              <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">
+                AGUARDANDO CONFIRMAÇÃO
+              </span>
+            </div>
+            <button
+              onClick={() => handleDesfazerExclusaoItem(itemCodigo)}
+              className="p-1.5 text-rose-600 hover:bg-rose-100/70 rounded transition-all text-xs flex items-center gap-1 font-bold"
+              title="Voltar item para o pallet"
+            >
+              ↩ Mantenha
+            </button>
+          </div>
+        ))}
+
+        {/* PRODUTOS ATIVOS DO PALLET */}
         {pallet.produtos.map((prod) => {
           const isItemCapturadoLote = itensParaTransferir.includes(prod.codigoItem);
 
@@ -51,7 +81,6 @@ export default function ConteudoAtualPanel({
                 </span>
               </div>
 
-              {/* Botões de Ação na Listagem (Exclusão e Reimpressão) */}
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 {pallet.tipo === 'RETRIAGEM' && (
                   <button
@@ -66,7 +95,7 @@ export default function ConteudoAtualPanel({
                   <button
                     onClick={() => handleExcluirItemLinha(prod.codigoItem)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors text-xs"
-                    title="Remover item"
+                    title="Remover item imediatamente"
                   >
                     🗑
                   </button>
@@ -76,7 +105,7 @@ export default function ConteudoAtualPanel({
           );
         })}
 
-        {pallet.produtos.length === 0 && (
+        {pallet.produtos.length === 0 && exclusoesPendentes.length === 0 && (
           <div className="text-center py-16 bg-slate-50/60 rounded-lg border border-dashed border-slate-200 text-slate-400 text-xs font-mono tracking-[0.2em] uppercase">
             Pallet vazio
           </div>
