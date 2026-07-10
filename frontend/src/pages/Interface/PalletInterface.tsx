@@ -124,7 +124,7 @@ export default function PalletInterface() {
             <div className="text-center">
               <span className="text-3xl">⚠️</span>
               <h3 className="text-base font-bold text-slate-900 uppercase tracking-wider mt-2">
-                Exclusões Pendentes no Cache
+                Exclusões Pendentes
               </h3>
               <div className="mt-3 text-left">
                 <p className="text-xs text-slate-500 mb-3">
