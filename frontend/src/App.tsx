@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import Home from './pages/home/Home.js';
 import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
@@ -67,6 +68,19 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <BrowserRouter>
+      <Toaster 
+          position="top-right" 
+          reverseOrder={false}
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#0f172a',
+              color: '#f8fafc',
+              fontSize: '13px',
+              borderRadius: '8px',
+            }
+          }}
+        />
       <LayoutComum>
         <Routes>
           {/* Rota Pública */}

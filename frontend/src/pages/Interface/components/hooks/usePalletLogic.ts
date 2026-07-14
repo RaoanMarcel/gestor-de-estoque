@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import type { PalletData } from '../types/types';
 import api from '../../../../services/api';
+import toast from 'react-hot-toast';
 
 export function usePalletLogic() {
   const { id } = useParams<{ id: string }>();
@@ -273,7 +274,7 @@ export function usePalletLogic() {
 
   const handleAdicionarTodoOPalletNoLote = () => {
     if (!pallet || pallet.produtos.length === 0) {
-      alert("Este pallet já está vazio!");
+      toast.error("Este pallet já está vazio!");
       return;
     }
     if (itensParaTransferir.length === pallet.produtos.length) {
@@ -288,7 +289,7 @@ export function usePalletLogic() {
 
   const handleFinalizerColetaTransferencia = async () => {
     if (itensParaTransferir.length === 0) {
-      alert("Nenhuma triagem foi selecionada para transferência.");
+      toast.error("Nenhuma triagem foi selecionada para transferência.");
       return;
     }
     const perguntar = window.confirm(`Foi feito tudo? Deseja prosseguir com a transferência em lote de ${itensParaTransferir.length} itens?`);
@@ -301,7 +302,7 @@ export function usePalletLogic() {
       setPalletsDestino(filtrados);
       setExibirModalDestino(true);
     } catch {
-      alert("Erro ao carregar a malha de pallets destino.");
+      toast.error("Erro ao carregar a malha de pallets destino.");
     } finally {
       setCarregandoDestinos(false);
     }
@@ -309,7 +310,7 @@ export function usePalletLogic() {
 
   const handleLancarAoRMA = async () => {
     if (itensParaTransferir.length === 0) {
-      alert("Nenhuma triagem foi selecionada para enviar ao RMA.");
+      toast.error("Nenhuma triagem foi selecionada para enviar ao RMA.");
       return;
     }
     const confirmarRMA = window.confirm(
@@ -323,12 +324,12 @@ export function usePalletLogic() {
         codigosItens: itensParaTransferir,
         numeroPalletOrigem: pallet?.numero
       });
-      alert(`Sucesso! ${itensParaTransferir.length} itens lançados ao RMA.`);
+      toast.success(`Sucesso! ${itensParaTransferir.length} itens lançados ao RMA.`);
       setIsModoTransferencia(false);
       setItensParaTransferir([]);
       buscarDadosPallet();
     } catch (error: any) {
-      alert(error.response?.data?.error || "Erro ao lançar itens ao RMA.");
+      toast.error(error.response?.data?.error || "Erro ao lançar itens ao RMA.");
     }
   };
 
@@ -338,13 +339,13 @@ export function usePalletLogic() {
         codigosItens: itensParaTransferir,
         numeroPalletDestino: numeroPalletDestino
       });
-      alert(response.data.mensagem || "Transferência em lote concluída!");
+      toast.success(response.data.mensagem || "Transferência em lote concluída!");
       setIsModoTransferencia(false);
       setItensParaTransferir([]);
       setExibirModalDestino(false);
       buscarDadosPallet();
     } catch (error: any) {
-      alert(error.response?.data?.error || "Erro crítico operacional ao transferir lote.");
+      toast.error(error.response?.data?.error || "Erro crítico operacional ao transferir lote.");
     }
   };
 
@@ -356,7 +357,7 @@ export function usePalletLogic() {
       tocarSom('SAIDA'); 
       buscarDadosPallet();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Erro ao remover item.');
+      toast.error(error.response?.data?.error || 'Erro ao remover item.');
     }
   };
 
