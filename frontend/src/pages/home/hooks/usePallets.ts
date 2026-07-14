@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../../services/api.js';
 import type { FormEvent } from 'react';
 import type { Pallet, CriarPalletInput } from '../../../types/pallet';
+import toast from 'react-hot-toast';
 
 export function usePallets() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ export function usePallets() {
     rua: '',
     estrutura: '',
     nivel: '',
+    descricao: '',
     tipo: 'PADRAO'  // 📦 Inicia o seletor na opção padrão
   });
   
@@ -35,7 +37,7 @@ export function usePallets() {
       const response = await api.get('/pallets');
       setPallets(response.data);
     } catch (error) {
-      alert('Erro ao carregar os pallets do servidor.');
+      toast.error('Erro ao carregar os pallets do servidor.');
     }
   };
 
@@ -91,21 +93,21 @@ export function usePallets() {
     if (palletEncontrado) {
       navigate(`/pallet/${palletEncontrado.id}`);
     } else {
-      alert(`Pallet com identificação "${qrCodeBipado}" não foi localizado no sistema.`);
+      toast.error(`Pallet com identificação "${qrCodeBipado}" não foi localizado no sistema.`);
       setQrCodeBipado('');
     }
   };
 
   const handleCriarPallet = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.numero) return alert('O número do pallet é obrigatório!');
+    if (!form.numero) return toast.error ('O número do pallet é obrigatório!');
 
     try {
       const numeroTemporario = form.numero; 
       await api.post('/pallets', form);
       
       // ✨ Limpa todos os campos retornando o tipo para o padrão "PADRAO"
-      setForm({ numero: '', rua: '', estrutura: '', nivel: '', tipo: 'PADRAO' });
+      setForm({ numero: '', rua: '', estrutura: '', nivel: '', descricao: '', tipo: 'PADRAO' });
       setIsModalOpen(false);
       carregarPallets();
 
@@ -113,7 +115,7 @@ export function usePallets() {
         imprimirEtiqueta(numeroTemporario);
       }
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Erro ao criar o pallet.');
+      toast.error(error.response?.data?.error || 'Erro ao criar o pallet.');
     }
   };
 

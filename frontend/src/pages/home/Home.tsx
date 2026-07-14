@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent, MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { usePallets } from './hooks/usePallets';
 import { imprimirEtiqueta } from './components/utils/imprimirEtiqueta';
 import HomeHeader from './components/parts/HomeHeader';
@@ -60,14 +61,14 @@ export default function Home() {
       const resultado = await response.json();
 
       if (!response.ok) {
-        alert(resultado.error || "Não foi possível excluir o pallet.");
+        toast.error(resultado.error || "Não foi possível excluir o pallet.");
         return;
       }
 
-      alert(resultado.mensagem || "Posição removida com sucesso!");
+      toast.success(resultado.mensagem || "Posição removida com sucesso!");
       window.location.reload();
     } catch {
-      alert("Erro de conexão ao tentar excluir a posição.");
+      toast.error("Erro de conexão ao tentar excluir a posição.");
     }
   };
 
