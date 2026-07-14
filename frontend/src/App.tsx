@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { ToastProvider } from './contexts/toastContext.js'; // <-- Novo import do contexto unificado
 import Home from './pages/home/Home.js';
 import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
@@ -68,31 +68,21 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <BrowserRouter>
-      <Toaster 
-          position="top-right" 
-          reverseOrder={false}
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#0f172a',
-              color: '#f8fafc',
-              fontSize: '13px',
-              borderRadius: '8px',
-            }
-          }}
-        />
-      <LayoutComum>
-        <Routes>
-          {/* Rota Pública */}
-          <Route path="/login" element={<Login />} />
+      {/* O ToastProvider envolve todo o app e injeta o Toaster configurado em bottom-right */}
+      <ToastProvider>
+        <LayoutComum>
+          <Routes>
+            {/* Rota Pública */}
+            <Route path="/login" element={<Login />} />
 
-          {/* Rotas Privadas e Protegidas por Token */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/pallet/:id" element={<PalletInterface />} />
-          </Route>
-        </Routes>
-      </LayoutComum>
+            {/* Rotas Privadas e Protegidas por Token */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/pallet/:id" element={<PalletInterface />} />
+            </Route>
+          </Routes>
+        </LayoutComum>
+      </ToastProvider>
     </BrowserRouter>
   );
 }
