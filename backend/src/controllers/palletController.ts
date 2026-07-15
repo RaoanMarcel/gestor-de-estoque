@@ -1,7 +1,6 @@
 // backend\src\controllers\palletController.ts
 import { Request, Response } from 'express';
-
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient } from '@prisma/client';
 
 const prisma: any = new PrismaClient();
 
