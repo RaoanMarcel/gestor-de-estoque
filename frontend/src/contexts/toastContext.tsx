@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Toaster, toast, Toast } from 'react-hot-toast';
+import { Toaster, toast, type Toast } from 'react-hot-toast';
 
 // 1. Tipagem das funções que estarão disponíveis no sistema
 interface ToastContextType {
@@ -18,12 +18,15 @@ const CustomToastWithTimer = ({ t, message, type }: { t: Toast; message: string;
   const [life, setLife] = useState(100);
 
   useEffect(() => {
-    if (t.paused) return;
+    // Fazemos um cast rápido para 'any' apenas para ler as propriedades de pausa com segurança
+    const toastInternal = t as any;
+    if (toastInternal.paused) return;
 
     const startTime = Date.now();
-    const interval = setInterval(() => {
-      // Calcula o tempo decorrido descontando eventuais pausas
-      const diff = Date.now() - startTime - t.pauseDuration;
+    const interval: ReturnType<typeof setInterval> = setInterval(() => {
+      // Calcula o tempo decorrido descontando eventuais pausas usando o cast
+      const pauseDuration = toastInternal.pauseDuration ?? 0;
+      const diff = Date.now() - startTime - pauseDuration;
       const progress = 100 - (diff / DURATION) * 100;
       
       if (progress <= 0) {
@@ -32,10 +35,10 @@ const CustomToastWithTimer = ({ t, message, type }: { t: Toast; message: string;
       } else {
         setLife(progress);
       }
-    }, 10); // Atualiza de 10 em 10ms para uma animação super fluida
+    }, 10);
 
     return () => clearInterval(interval);
-  }, [t.paused, t.pauseDuration]);
+  }, [t]); // Monitoramos a mudança do objeto t completo
 
   // Mantendo exatamente a mesma paleta de cores do seu Toaster original:
   return (
@@ -75,8 +78,12 @@ const CustomToastWithTimer = ({ t, message, type }: { t: Toast; message: string;
   );
 };
 
+interface ToastProviderProps {
+  children: React.ReactNode;
+}
+
 // 2. O Provider que vai gerenciar o Toaster global e o estilo
-export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ToastProvider = ({ children }: ToastProviderProps) => {
   
   const customToast: ToastContextType = {
     // Agora disparando os toasts customizados com o componente React do timer

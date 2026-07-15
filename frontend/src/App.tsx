@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { ToastProvider } from './contexts/toastContext.tsx'; // <-- Novo import do contexto unificado
+import { ToastProvider } from './contexts/toastContext'; 
 import Home from './pages/home/Home.js';
 import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
