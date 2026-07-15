@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent, MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { useToast } from '../../contexts/toastContext'; // Ajuste o caminho se necessário
 import { usePallets } from './hooks/usePallets';
 import { imprimirEtiqueta } from './components/utils/imprimirEtiqueta';
 import HomeHeader from './components/parts/HomeHeader';
@@ -15,6 +15,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export default function Home() {
   const navigate = useNavigate();
+  const toast = useToast(); // Instanciando nosso Hook de Toasts
   const {
     palletsFiltrados,
     busca,
@@ -30,22 +31,20 @@ export default function Home() {
     handleCriarPallet
   } = usePallets();
 
-  // Estados locais exclusivos do relatório modal Excel
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [palletSelecionado, setPalletSelecionado] = useState('');
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [carregandoExcel, setCarregandoExcel] = useState(false);
 
-  // Nova lógica de capacidade limite de 140 volumes
   const totalPallets = palletsFiltrados.length;
   const palletsOcupados = palletsFiltrados.filter(p => (p._count?.produtos || 0) >= 140).length;
   const palletsVazios = totalPallets - palletsOcupados;
 
-  // 🗑️ FUNÇÃO ADICIONADA: Realiza a chamada DELETE para remover a posição
   const handleExcluirPalletCard = async (e: MouseEvent, palletId: number, numeroPallet: string) => {
     e.stopPropagation(); 
     
-    const confirmou = window.confirm(`Deseja realmente excluir permanentemente a posição "${numeroPallet}" da malha?`);
+    // Substituição do window.confirm pelo toast.confirm customizado assíncrono
+    const confirmou = await toast.confirm(`Deseja realmente excluir permanentemente a posição "${numeroPallet}" da malha?`);
     if (!confirmou) return;
 
     try {
@@ -74,7 +73,7 @@ export default function Home() {
 
   const handleExportarExcel = async (e: FormEvent) => {
     e.preventDefault();
-    if (!palletSelecionado) return alert("Por favor, selecione uma opção!");
+    if (!palletSelecionado) return toast.error("Por favor, selecione uma opção!");
     setCarregandoExcel(true);
     
     try {
@@ -128,7 +127,7 @@ export default function Home() {
       setPalletSelecionado('');
       setNomeArquivo('');
     } catch (error: any) {
-      alert(error.message || "Erro ao baixar o relatório.");
+      toast.error(error.message || "Erro ao baixar o relatório.");
     } finally {
       setCarregandoExcel(false);
     }
@@ -136,7 +135,6 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen bg-[#F6F8FC] text-slate-800 antialiased overflow-hidden">
-      {/* GRADIENTES RADIAIS DE FUNDO */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.14),transparent_70%)] blur-3xl" />
         <div className="absolute top-1/3 -right-52 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.10),transparent_70%)] blur-3xl" />

@@ -1,24 +1,23 @@
-// usePalletLogic.ts
+// src/pages/Interface/components/hooks/usePalletLogic.ts
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import type { PalletData } from '../types/types';
-import api from '../../../../services/api';
-import toast from 'react-hot-toast';
+import type { PalletData } from '../types/types'; // Ajuste caminhos relativos
+import api from '../../../../services/api'; 
+import { useToast } from '../../../../contexts/toastContext'; // Adicionando nosso Hook customizado
 
 export function usePalletLogic() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const toast = useToast(); // Instanciando context
 
   const LOCAL_STORAGE_KEY = `exclusoes_pallet_${id}`;
 
-  // Estados Base
   const [pallet, setPallet] = useState<PalletData | null>(null);
   const [acao, setAcao] = useState<'ENTRADA' | 'SAIDA'>('ENTRADA');
   const [codigoBipado, setCodigoBipado] = useState('');
   const [mensagemStatus, setMensagemStatus] = useState({ texto: '', erro: false });
 
-  // Estados de Transferência e Lote
   const [isModoTransferencia, setIsModoTransferencia] = useState(false);
   const [itensParaTransferir, setItensParaTransferir] = useState<string[]>([]);
   const [palletsDestino, setPalletsDestino] = useState<PalletData[]>([]);
@@ -28,7 +27,6 @@ export function usePalletLogic() {
   const [carregandoRetriagem, setCarregandoRetriagem] = useState(false);
   const [qtdEtiquetas, setQtdEtiquetas] = useState<number>(1);
 
-  // --- NOVOS ESTADOS (Cache Local & Modal de Confirmação) ---
   const [exclusoesPendentes, setExclusoesPendentes] = useState<string[]>(() => {
     const salvo = localStorage.getItem(LOCAL_STORAGE_KEY);
     return salvo ? JSON.parse(salvo) : [];
@@ -40,22 +38,17 @@ export function usePalletLogic() {
 
   const manterFocoNoInput = () => { inputBipRef.current?.focus(); };
 
-  // Sincronizar exclusões pendentes com o LocalStorage
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(exclusoesPendentes));
   }, [exclusoesPendentes, LOCAL_STORAGE_KEY]);
 
-  // --- INTEGRAÇÃO WEBSOCKET (Socket.io) ---
   useEffect(() => {
     if (!id) return;
 
-    // Substitua pela URL correta do seu backend se necessário
     const socket: Socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:3000');
 
-    // Entra na sala específica deste pallet
     socket.emit('join_pallet_room', { palletId: id });
 
-    // Escuta atualizações vindas de outros operadores
     socket.on('pallet_updated', (data: { palletId: string }) => {
       if (String(data.palletId) === String(id)) {
         buscarDadosPallet();
@@ -105,22 +98,17 @@ export function usePalletLogic() {
     }
   };
 
-  // --- NOVAS FUNÇÕES: CONTROLE DO FLUXO OPERACIONAL DE EXCLUSÃO ---
-  
-  // Função para a "setinha" do front: desfaz a intenção de exclusão local
   const handleDesfazerExclusaoItem = (codigoItem: string) => {
     setExclusoesPendentes(prev => prev.filter(c => c !== codigoItem));
     tocarSom('ENTRADA');
     setMensagemStatus({ texto: `Exclusão de ${codigoItem} desfeita localmente.`, erro: false });
   };
 
-  // Envio em lote definitivo para a API
   const handleConfirmarExclusaoEmLote = async () => {
     if (exclusoesPendentes.length === 0) return;
     try {
       setMensagemStatus({ texto: 'Processando baixa no estoque...', erro: false });
       
-      // Enviando todos de uma vez para o backend
       await api.post('/pallets/bipar-lote', { 
         palletId: id, 
         codigosItens: exclusoesPendentes, 
@@ -130,14 +118,12 @@ export function usePalletLogic() {
       tocarSom('SAIDA');
       setMensagemStatus({ texto: `${exclusoesPendentes.length} itens removidos definitivamente!`, erro: false });
       
-      // Limpa os caches e fecha modal
       setExclusoesPendentes([]);
       localStorage.removeItem(LOCAL_STORAGE_KEY);
       setExibirModalExclusaoLote(false);
       
       await buscarDadosPallet();
 
-      // Se o usuário clicou para sair da tela, conclui a navegação após salvar
       if (rotaDestinoPendente) {
         navigate(rotaDestinoPendente);
       }
@@ -157,7 +143,6 @@ export function usePalletLogic() {
     }
   };
 
-  // Interceptador customizado para quando clicar em botões como "Voltar para o Galpão"
   const handleTentarSairDaTela = (rotaDestino: string) => {
     if (exclusoesPendentes.length > 0) {
       setRotaDestinoPendente(rotaDestino);
@@ -167,7 +152,6 @@ export function usePalletLogic() {
     }
   };
 
-  // --- SUBMIT DE BIPAGEM REFORMULADO ---
   const handleBipSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const codigoLimpo = codigoBipado.trim();
@@ -209,7 +193,6 @@ export function usePalletLogic() {
     if (acao === 'SAIDA') {
       const itemExisteNoPallet = pallet?.produtos.some(p => p.codigoItem === codigoLimpo);
       
-      // Verifica se o item já não está na fila temporária de exclusão
       if (exclusoesPendentes.includes(codigoLimpo)) {
         tocarSom('ERRO');
         setMensagemStatus({ texto: `O item "${codigoLimpo}" já está na fila de exclusão temporária!`, erro: true });
@@ -224,7 +207,6 @@ export function usePalletLogic() {
         return;
       }
 
-      // --- SUCESSO FLUIDO: Adiciona direto na fila do cache sem travar a UI ---
       setExclusoesPendentes(prev => [...prev, codigoLimpo]);
       tocarSom('SAIDA');
       setMensagemStatus({ texto: `Fila: ${codigoLimpo} pronto para baixa.`, erro: false });
@@ -232,7 +214,6 @@ export function usePalletLogic() {
     }
   };
 
-  // Fluxo de geração sequencial múltiplo
   const handleGerarEtiquetaRetriagem = async () => {
     setCarregandoRetriagem(true);
     setMensagemStatus({ texto: '', erro: false });
@@ -292,7 +273,9 @@ export function usePalletLogic() {
       toast.error("Nenhuma triagem foi selecionada para transferência.");
       return;
     }
-    const perguntar = window.confirm(`Foi feito tudo? Deseja prosseguir com a transferência em lote de ${itensParaTransferir.length} itens?`);
+
+    // Substituição pelo toast.confirm!
+    const perguntar = await toast.confirm(`Foi feito tudo? Deseja prosseguir com a transferência em lote de ${itensParaTransferir.length} itens?`);
     if (!perguntar) return;
 
     setCarregandoDestinos(true);
@@ -313,9 +296,10 @@ export function usePalletLogic() {
       toast.error("Nenhuma triagem foi selecionada para enviar ao RMA.");
       return;
     }
-    const confirmarRMA = window.confirm(
-      `ATENÇÃO: Você está prestes a dar baixa definitiva em ${itensParaTransferir.length} itens do estoque físico e enviá-los para o fluxo lógico de RMA.\n\n` +
-      `Esta ação limpará estes itens deste pallet. Deseja prosseguir?`
+    
+    // Substituição pelo toast.confirm!
+    const confirmarRMA = await toast.confirm(
+      `ATENÇÃO: Você está prestes a dar baixa definitiva em ${itensParaTransferir.length} itens do estoque físico e enviá-los para o fluxo lógico de RMA.\n\nEsta ação limpará estes itens deste pallet. Deseja prosseguir?`
     );
     if (!confirmarRMA) return;
 
@@ -349,9 +333,11 @@ export function usePalletLogic() {
     }
   };
 
-  // Mantido para remoção pontual via clique direto na tabela (se necessário)
   const handleExcluirItemLinha = async (codigoItem: string) => {
-    if (!window.confirm(`Deseja remover a triagem ${codigoItem} deste pallet?`)) return;
+    // Substituição pelo toast.confirm!
+    const confirmExclusao = await toast.confirm(`Deseja remover a triagem ${codigoItem} deste pallet?`);
+    if (!confirmExclusao) return;
+
     try {
       await api.post('/pallets/bipar', { palletId: id, codigoItem, acao: 'SAIDA' });
       tocarSom('SAIDA'); 
@@ -361,7 +347,6 @@ export function usePalletLogic() {
     }
   };
 
-  // Filtragem visual dos produtos ativos (remove os que já estão na fila de exclusão)
   const produtosFiltradosVisuais = pallet
     ? pallet.produtos.filter(p => !exclusoesPendentes.includes(p.codigoItem))
     : [];
@@ -399,8 +384,6 @@ export function usePalletLogic() {
     handleLancarAoRMA,
     handleConfirmarDestinoFinal,
     handleExcluirItemLinha,
-    
-    // Novas exportações para a UI mapear
     handleDesfazerExclusaoItem,
     handleConfirmarExclusaoEmLote,
     handleDescartarExclusoesCache,

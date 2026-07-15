@@ -4,6 +4,7 @@ import axios from 'axios';
 import api from '../../services/api.js';
 import Button from '../home/components/ui/Button.js';
 import Input from '../home/components/ui/Input.js';
+import toast from 'react-hot-toast';
 
 type Face = 'login' | 'trocar';
 
@@ -63,7 +64,7 @@ export default function Login() {
     setSalvando(true);
     try {
       await api.post('/auth/alterar-senha', { username, novaSenha });
-      alert('Senha atualizada com sucesso! Agora faça o login com as novas credenciais.');
+      toast.success('Senha atualizada com sucesso! Agora faça o login com as novas credenciais.');
       
       // Reseta os estados e volta para a face de login
       setFace('login');
