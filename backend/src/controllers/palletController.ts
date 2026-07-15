@@ -1,6 +1,7 @@
 // backend\src\controllers\palletController.ts
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+
+const { PrismaClient } = require('@prisma/client');
 
 const prisma: any = new PrismaClient();
 
@@ -25,7 +26,7 @@ const notificarMudanca = (req: Request, palletId?: number | string) => {
 // 1. Criar Novo Pallet
 export const criarPallet = async (req: Request, res: Response) => {
   try {
-    const { numero, rua, estrutura, nivel, tipo } = req.body;
+    const { numero, rua, estrutura, nivel, tipo, descricao } = req.body;
 
     if (!numero) {
       return res.status(400).json({ error: 'O número do pallet é obrigatório!' });
@@ -37,6 +38,7 @@ export const criarPallet = async (req: Request, res: Response) => {
         rua,
         estrutura,
         nivel,
+        descricao,
         tipo: tipo || "PADRAO" 
       }
     });
