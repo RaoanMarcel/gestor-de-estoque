@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Toaster, toast, type Toast } from 'react-hot-toast';
 
-// 1. Tipagem das funções que estarão disponíveis no sistema
 interface ToastContextType {
   success: (message: string) => void;
   error: (message: string) => void;
@@ -13,9 +12,8 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-const DURATION = 5000; // Tempo de duração padrão em milissegundos
+const DURATION = 5000;
 
-// --- COMPONENTE DO TOAST CUSTOMIZADO COM TIMER ---
 const CustomToastWithTimer = ({ t, message, type }: { t: Toast; message: string; type: 'success' | 'error' }) => {
   const [life, setLife] = useState(100);
 
@@ -79,56 +77,53 @@ interface ToastProviderProps {
   children: React.ReactNode;
 }
 
-// 2. O Provider que vai gerenciar o Toaster global e o estilo
 export const ToastProvider = ({ children }: ToastProviderProps) => {
   
-  // Função modular de confirmação centralizada, retornando uma Promise
+  // 🔄 ALTERAÇÃO AQUI: Novo layout idêntico ao Toast padrão
   const showConfirm = (message: string): Promise<boolean> => {
     return new Promise((resolve) => {
       toast.custom(
         (t) => (
-          // Wrapper fixed que cobre a tela inteira para criar o fundo escurecido (Backdrop)
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div
-              className={`${
-                t.visible ? 'animate-enter' : 'animate-leave'
-              } flex flex-col p-6 min-w-[320px] max-w-sm bg-white border border-slate-300 text-slate-800 rounded-xl shadow-2xl space-y-4`}
-            >
-              <div className="flex items-start gap-3">
-                <span className="text-2xl mt-0.5">⚠️</span>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-900">Confirmação</p>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed whitespace-pre-wrap">{message}</p>
-                </div>
-              </div>
+          <div
+            className={`${
+              t.visible ? 'animate-enter' : 'animate-leave'
+            } flex flex-col px-4 py-3 min-w-[320px] max-w-md bg-white border border-[#1e293b] text-[#334155] rounded-lg shadow-lg`}
+            style={{
+              fontSize: '13px',
+              fontWeight: '500',
+            }}
+          >
+            <div className="flex items-start gap-2 pb-2">
+              <span className="text-base mt-0.5">⚠️</span>
+              <span className="flex-1 leading-relaxed whitespace-pre-wrap">{message}</span>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    toast.dismiss(t.id);
-                    resolve(false);
-                  }}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => {
-                    toast.dismiss(t.id);
-                    resolve(true);
-                  }}
-                  className="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition-shadow shadow hover:shadow-md"
-                >
-                  Confirmar
-                </button>
-              </div>
+            <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  resolve(false);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  resolve(true);
+                }}
+                className="px-4 py-1.5 text-xs font-semibold text-white bg-[#1e293b] hover:bg-slate-800 rounded-md shadow hover:shadow-md transition-all"
+              >
+                Confirmar
+              </button>
             </div>
           </div>
         ),
         {
-          duration: Infinity, // Não fecha sozinho até o usuário interagir
+          duration: Infinity, 
           position: 'top-center',
-          id: 'confirm-modal' // Previne a abertura de múltiplos modais empilhados
+          id: 'confirm-modal' // Garante que não abra vários empilhados
         }
       );
     });
