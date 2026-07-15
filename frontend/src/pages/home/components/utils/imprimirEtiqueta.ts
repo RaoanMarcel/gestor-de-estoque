@@ -1,8 +1,8 @@
 // components/utils/imprimirEtiqueta.ts
-// Função utilitária de impressão, extraída de Home.tsx sem qualquer alteração de lógica.
+// Função utilitária de impressão, atualizada para incluir a Descrição do Pallet.
 
 // ✅ Recebe os dados de endereçamento para montar o layout WMS industrial
-export const imprimirEtiqueta = (numero: string, rua: string, estrutura: string, nivel: string) => {
+export const imprimirEtiqueta = (numero: string, rua: string, estrutura: string, nivel: string, descricao: string) => {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(numero)}`;
   const janelaImpressao = window.open('', '_blank', 'width=500,height=750');
   if (!janelaImpressao) return;
@@ -68,12 +68,42 @@ export const imprimirEtiqueta = (numero: string, rua: string, estrutura: string,
             font-family: monospace;
             border: 1px solid #000;
           }
-          /* ✅ QR CODE MENOR: Reduzido para tamanho empresarial clássico de triagem */
+          
+          /* ✅ CAIXA DE DESCRIÇÃO ADICIONADA */
+          .description-box {
+            width: 100%;
+            border: 1px solid #000;
+            background-color: #f8f8f8;
+            padding: 2mm 3mm;
+            margin-bottom: 4mm;
+            box-sizing: border-box;
+            text-align: center;
+          }
+          .description-title {
+            font-size: 8px;
+            text-transform: uppercase;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 1mm;
+          }
+          .description-text {
+            font-size: 12px;
+            font-weight: bold;
+            color: #000;
+            word-wrap: break-word;
+            max-height: 15mm;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+          }
+
+          /* ✅ QR CODE MENOR */
           .qr-container {
             display: flex;
             justify-content: center;
             align-items: center;
-            margin: 2mm 0;
+            margin: 0 0 2mm 0;
           }
           img { 
             width: 45mm; 
@@ -113,6 +143,13 @@ export const imprimirEtiqueta = (numero: string, rua: string, estrutura: string,
             </tr>
           </tbody>
         </table>
+
+        ${descricao ? `
+        <div class="description-box">
+          <div class="description-title">Descrição do Pallet</div>
+          <div class="description-text">${descricao}</div>
+        </div>
+        ` : ''}
 
         <div class="qr-container">
           <img src="${qrUrl}" alt="QR Code" />

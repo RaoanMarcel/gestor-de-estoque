@@ -46,6 +46,42 @@ export default function PalletInterface() {
     handleTentarSairDaTela
   } = usePalletLogic();
 
+  // MÁSCARA DINÂMICA DE BIPAGEM
+  const handleCodigoBipadoComMascara = (valorRecebido: string) => {
+    // Verifica qual é o tipo do pallet atual
+    const tipo = pallet?.tipo?.toUpperCase() || '';
+    const isRetriagemOuNovo = tipo.includes('RETRIAGEM') || tipo.includes('NOVO');
+
+    if (isRetriagemOuNovo) {
+      // --- REGRA PARA RETRIAGEM E NOVO (P-XXXXX) ---
+      // 1. Força maiúscula e remove letras que não sejam P e símbolos que não sejam -
+      let valor = valorRecebido.toUpperCase().replace(/[^P\-0-9]/g, '');
+
+      // 2. Regras de prefixo
+      if (valor.length > 0 && valor[0] !== 'P') return; // Tem que começar com P
+      if (valor.length > 1 && valor[1] !== '-') return; // O segundo tem que ser o hífen
+      
+      // 3. UX: Se digitou 'P', já auto-completa com o hífen para ajudar
+      if (valor === 'P') valor = 'P-';
+
+      // 4. Trava um limite máximo de segurança (ex: 10 caracteres)
+      if (valor.length > 10) valor = valor.substring(0, 10);
+
+      setCodigoBipado(valor);
+
+    } else {
+      // --- REGRA PARA PADRÃO E DEFEITO (000XXXXX) ---
+      let valor = valorRecebido.replace(/\D/g, '');
+
+      if (valor.length > 8) valor = valor.substring(0, 8);
+      if (valor.length === 1 && valor !== '0') return;
+      if (valor.length === 2 && valor !== '00') return;
+      if (valor.length >= 3 && !valor.startsWith('000')) return;
+
+      setCodigoBipado(valor);
+    }
+  };
+
   if (!pallet) {
     return (
       <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center text-slate-400 text-xs font-mono tracking-[0.2em] uppercase">
@@ -62,7 +98,6 @@ export default function PalletInterface() {
       </div>
 
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-6">
-        {/* Substituído o botão de voltar padrão da aplicação para passar pelo interceptador de Cache */}
         <PalletHeader
           pallet={pallet}
           isModoTransferencia={isModoTransferencia}
@@ -82,7 +117,8 @@ export default function PalletInterface() {
             isEntrada={isEntrada}
             isModoTransferencia={isModoTransferencia}
             codigoBipado={codigoBipado}
-            setCodigoBipado={setCodigoBipado}
+            // MÁSCARA INTELIGENTE PASSADA AQUI
+            setCodigoBipado={handleCodigoBipadoComMascara}
             handleBipSubmit={handleBipSubmit}
             inputBipRef={inputBipRef}
             qtdEtiquetas={qtdEtiquetas}
@@ -96,7 +132,6 @@ export default function PalletInterface() {
             handleLancarAoRMA={handleLancarAoRMA}
           />
 
-          {/* Adicionado a lista de pendentes e a ação de desfazer */}
           <ConteudoAtualPanel
             pallet={pallet}
             totalUnidades={totalUnidades}
@@ -117,7 +152,6 @@ export default function PalletInterface() {
         />
       </div>
 
-      {/* MODAL DE CONFIRMAÇÃO DO LOTE EM CACHE (Interceptador de navegação) */}
       {exibirModalExclusaoLote && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
           <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4">
@@ -150,7 +184,7 @@ export default function PalletInterface() {
                 <p className="mt-3 text-xs text-slate-500">
                   Deseja confirmar a baixa definitiva destes itens antes de sair?
                 </p>
-              </div>'
+              </div>
             </div>
             <div className="flex flex-col gap-2 pt-2">
               <button

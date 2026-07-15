@@ -10,7 +10,7 @@ interface MalhaEnderecamentoProps {
   palletsFiltrados: Pallet[];
   navigate: NavigateFunction;
   handleExcluirPalletCard: (e: MouseEvent, palletId: number, numeroPallet: string) => void;
-  imprimirEtiqueta: (numero: string, rua: string, estrutura: string, nivel: string) => void;
+  imprimirEtiqueta: (numero: string, rua: string, estrutura: string, nivel: string, descricao: string) => void;
 }
 
 const OPCOES_FILTRO = [
@@ -159,7 +159,7 @@ export default function MalhaEnderecamento({
                       <div className="flex justify-between items-end mt-4">
                         <div className="text-[9px] font-mono bg-white/60 px-2 py-1 rounded border border-slate-200">R:{p.rua || '-'} • E:{p.estrutura || '-'} • N:{p.nivel || '-'}</div>
                         <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                          <button onClick={(e) => { e.stopPropagation(); imprimirEtiqueta(p.numero, p.rua??'', p.estrutura??'', p.nivel??''); }} className="text-lg">🖨️</button>
+                          <button onClick={(e) => { e.stopPropagation(); imprimirEtiqueta(p.numero, p.rua??'', p.estrutura??'', p.nivel??'',p.descricao??''); }} className="text-lg">🖨️</button>
                           <button onClick={(e) => handleExcluirPalletCard(e, p.id, p.numero)} className="text-lg">🗑️</button>
                         </div>
                       </div>

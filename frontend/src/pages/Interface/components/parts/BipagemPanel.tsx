@@ -43,6 +43,20 @@ export default function BipagemPanel({
   carregandoDestinos,
   handleLancarAoRMA,
 }: BipagemPanelProps) {
+  
+  // Identifica o tipo do pallet para alterar as dicas dinamicamente
+  const tipoPallet = pallet?.tipo?.toUpperCase() || '';
+  const isRetriagemOuNovo = tipoPallet.includes('RETRIAGEM') || tipoPallet.includes('NOVO');
+
+  // Textos dinâmicos dos placeholders
+  const placeholderEntrada = isRetriagemOuNovo 
+    ? 'Bipando ENTRADA (Ex: P-00044)...' 
+    : 'Bipando ENTRADA (Ex: 00012345)...';
+    
+  const placeholderSaida = isRetriagemOuNovo 
+    ? 'Bipando SAÍDA (Ex: P-00044)...' 
+    : 'Bipando SAÍDA (Ex: 00012345)...';
+
   return (
     <div className="lg:col-span-2 bg-white/80 backdrop-blur-xl rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-6">
 
@@ -73,16 +87,16 @@ export default function BipagemPanel({
         </div>
       )}
 
-      {/* Campo de Bipagem Principal */}
       <form onSubmit={handleBipSubmit} className="space-y-2">
         <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
           <div className={`h-1.5 w-1.5 rounded-full ${isModoTransferencia ? 'bg-blue-500' : isEntrada ? 'bg-emerald-500' : 'bg-rose-500'}`} />
           Aponte o leitor de código de barras
         </label>
+        
         <input
           ref={inputBipRef}
           type="text"
-          placeholder={isModoTransferencia ? 'Bipando TRANSFERÊNCIA...' : isEntrada ? 'Bipando ENTRADA...' : 'Bipando SAÍDA...'}
+          placeholder={isModoTransferencia ? 'Bipando TRANSFERÊNCIA...' : isEntrada ? placeholderEntrada : placeholderSaida}
           className={`w-full p-6 rounded-xl font-mono text-2xl text-center font-semibold tracking-wider transition-all border-2 focus:outline-none focus:ring-4 ${
             isModoTransferencia
               ? 'bg-blue-50/60 border-blue-500/50 text-blue-800 placeholder-blue-400/60 focus:ring-blue-500/15 focus:border-blue-500'
@@ -93,10 +107,19 @@ export default function BipagemPanel({
           value={codigoBipado}
           onChange={(e) => setCodigoBipado(e.target.value)}
         />
+        
+        {/* DICA VISUAL ADAPTÁVEL */}
+        <p className="text-center text-[11px] font-medium text-slate-400">
+          {isRetriagemOuNovo ? (
+            <>O código do item deve iniciar obrigatoriamente com <strong className="text-slate-500">P-</strong> seguido da numeração.</>
+          ) : (
+            <>O código da triagem deve conter exatamente <strong className="text-slate-500">8 números</strong> e iniciar obrigatoriamente com <strong className="text-slate-500">000</strong>.</>
+          )}
+        </p>
       </form>
 
-      {/* SEÇÃO DE RETRIAGEM COM SELETOR DE QUANTIDADE ADICIONADO */}
-      {pallet.tipo === 'RETRIAGEM' && (
+      {/* SEÇÃO DE RETRIAGEM COM SELETOR DE QUANTIDADE */}
+      {isRetriagemOuNovo && (
         <div className="p-5 border border-dashed border-blue-200 bg-blue-50/40 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex-1">
             <h3 className="text-xs font-bold text-blue-950 uppercase tracking-wider m-0">
@@ -107,7 +130,6 @@ export default function BipagemPanel({
             </p>
           </div>
 
-          {/* Seletor de Quantidade integrado ao lado do botão */}
           <div className="flex items-center gap-2 w-full md:w-auto justify-end" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-col gap-1">
               <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Qtd</span>
@@ -138,7 +160,6 @@ export default function BipagemPanel({
         </div>
       )}
 
-      {/* Feedback de Status */}
       {mensagemStatus.texto && (
         <div
           className={`p-4 rounded-xl font-medium text-center text-sm border backdrop-blur-xl ${
@@ -153,7 +174,6 @@ export default function BipagemPanel({
         </div>
       )}
 
-      {/* Painel de confirmação inferior dinâmico */}
       {isModoTransferencia && (
         <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
           <button
