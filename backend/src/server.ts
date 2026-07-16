@@ -27,7 +27,8 @@ app.get('/api/status', (req, res) => {
 });
 
 app.post('/api/auth/login', authController.login);
-app.post('/api/auth/alterar-senha', authController.alterarSenha);
+app.post('/api/auth/alterar-senha', authController.alterarSenha); // Rota pública mantida para o fluxo obrigatório de primeiro login
+app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.alterarSenhaAutenticado); // NOVA rota de segurança
 app.post('/api/auth/admin/cadastrar', authController.cadastrarUsuario);
 
 app.use('/api', autenticarToken, palletRoutes);

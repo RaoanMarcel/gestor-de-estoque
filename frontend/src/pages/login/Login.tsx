@@ -82,7 +82,7 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden flex items-center justify-center px-4 py-10">
-      {/* ============ FUNDO LIMPO (Sem as linhas de grade) ============ */}
+      {/* ============ FUNDO LIMPO ============ */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0" style={{
           background:
@@ -126,16 +126,10 @@ export default function Login() {
               <PrimaryButton disabled={carregando}>
                 {carregando ? 'Autenticando…' : 'Entrar'}
               </PrimaryButton>
-              <div className="flex items-center justify-between pt-1">
-                <button type="button" onClick={()=>setFace('trocar')}
-                  className="text-xs text-slate-500 hover:text-[#21508f] transition-colors">
-                  Trocar minha senha →
-                </button>
-              </div>
             </form>
           </CardFace>
 
-          {/* FACE TRASEIRA: TROCA DE SENHA OBRIGATÓRIA */}
+          {/* FACE TRASEIRA: TROCA DE SENHA OBRIGATÓRIA (MANTIDA) */}
           <CardFace back>
             <Header eyebrow="Segurança obrigatória"
                     title="Definir Nova Senha"

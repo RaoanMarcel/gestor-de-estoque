@@ -37,6 +37,7 @@ export const authController = {
     }
   },
 
+  // Mantido intacto para o fluxo de primeiro acesso unificado
   async alterarSenha(req: Request, res: Response) {
     try {
       const { username, novaSenha } = req.body;
@@ -55,6 +56,49 @@ export const authController = {
         where: { username },
         data: {
           senha: senhaCriptografada,
+          precisaMudarSenha: false
+        }
+      });
+
+      return res.json({ mensagem: 'Senha atualizada com sucesso!' });
+    } catch (error: any) {
+      return res.status(500).json({ error: 'Erro ao atualizar a senha' });
+    }
+  },
+
+  // NOVA FUNCIONALIDADE: Troca de senha autenticada segura
+  async alterarSenhaAutenticado(req: Request, res: Response) {
+    try {
+      const usuarioId = (req as any).usuario?.id;
+      const { senhaAtual, novaSenha } = req.body;
+
+      if (!usuarioId || !senhaAtual || !novaSenha) {
+        return res.status(400).json({ error: 'Dados incompletos para a troca de senha' });
+      }
+
+      if (novaSenha.length < 4) {
+        return res.status(400).json({ error: 'A nova senha deve ter pelo menos 4 caracteres' });
+      }
+
+      // Busca o usuário baseado no ID decodificado do JWT
+      const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+      if (!usuario) {
+        return res.status(404).json({ error: 'Usuário não encontrado' });
+      }
+
+      // Valida se a senha antiga informada está correta
+      const senhaValida = await bcrypt.compare(senhaAtual, usuario.senha);
+      if (!senhaValida) {
+        return res.status(401).json({ error: 'Senha atual incorreta' });
+      }
+
+      // Gera o hash da nova senha
+      const novaSenhaCriptografada = await bcrypt.hash(novaSenha, 10);
+
+      await prisma.usuario.update({
+        where: { id: usuarioId },
+        data: {
+          senha: novaSenhaCriptografada,
           precisaMudarSenha: false
         }
       });
