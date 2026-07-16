@@ -47,7 +47,6 @@ const CustomToastWithTimer = ({ t, message, type }: { t: Toast; message: string;
       <div className="flex items-center justify-between gap-3 pb-2">
         <div className="flex items-start gap-2">
           <span className="text-xl leading-none mt-[2px]">{type === 'success' ? '✅' : '❌'}</span>
-          {/* Padronizado para 16px, peso normal e cor #363636 */}
           <span className="text-[16px] text-[#363636] font-normal leading-normal">{message}</span>
         </div>
         <button
@@ -87,7 +86,6 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
           >
             <div className="flex items-start gap-3">
               <span className="text-xl leading-none mt-0.5">⚠️</span>
-              {/* 🔄 ALTERAÇÃO AQUI: Tamanho 16px, fonte normal, cor exata do nativo */}
               <span className="text-[16px] text-[#363636] font-normal leading-relaxed whitespace-pre-wrap flex-1">
                 {message}
               </span>

@@ -10,15 +10,15 @@ generator client {
 model Pallet {
   id        Int             @id @default(autoincrement())
   numero    String          @unique 
-  rua       String?         
+  rua       String?
   estrutura String?         
   nivel     String?         
   tipo      String? 
-  descricao String?        
+  descricao String?
+  versao    Int             @default(1)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   produtos  ProdutoPallet[] 
-  
 }
 
 model ProdutoPallet {
@@ -34,7 +34,7 @@ model HistoricoMovimentacao {
   codigoItem String   
   acao       String   
   palletAlvo String   
-  bipadoEm   DateTime?      
+  bipadoEm   DateTime?      @default(now())
 }
 
 model Usuario {
@@ -44,7 +44,6 @@ model Usuario {
   precisaMudarSenha  Boolean  @default(true)
   createdAt          DateTime @default(now())
 }
-
 
 model Contador {
   id    Int    @id @default(autoincrement())

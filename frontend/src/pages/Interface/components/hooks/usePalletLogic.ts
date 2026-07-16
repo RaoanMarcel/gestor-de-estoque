@@ -1,15 +1,16 @@
 // src/pages/Interface/components/hooks/usePalletLogic.ts
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { io, Socket } from 'socket.io-client';
-import type { PalletData } from '../types/types'; // Ajuste caminhos relativos
+import type { PalletData } from '../types/types'; 
 import api from '../../../../services/api'; 
-import { useToast } from '../../../../contexts/toastContext'; // Adicionando nosso Hook customizado
+import { useToast } from '../../../../contexts/toastContext';
+import { useSocket } from '../../../../contexts/SocketContext'; 
 
 export function usePalletLogic() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const toast = useToast(); // Instanciando context
+  const toast = useToast();
+  const { socket } = useSocket();
 
   const LOCAL_STORAGE_KEY = `exclusoes_pallet_${id}`;
 
@@ -35,7 +36,6 @@ export function usePalletLogic() {
   const [rotaDestinoPendente, setRotaDestinoPendente] = useState<string | null>(null);
 
   const inputBipRef = useRef<HTMLInputElement>(null);
-
   const manterFocoNoInput = () => { inputBipRef.current?.focus(); };
 
   useEffect(() => {
@@ -43,23 +43,53 @@ export function usePalletLogic() {
   }, [exclusoesPendentes, LOCAL_STORAGE_KEY]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !socket) return;
 
-    const socket: Socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:3000');
+    // Entra na sala específica deste pallet
+    socket.emit('subscribe:pallet', id);
 
-    socket.emit('join_pallet_room', { palletId: id });
+    // Ouve mutações rápidas feitas por outros operadores
+    const handlePalletUpdated = (payload: any) => {
+      setPallet((prev) => {
+        if (!prev) return prev;
+        
+        // Mutação Otimista Imutável (Não pesa o banco de dados)
+        let novosProdutos = [...prev.produtos];
+        
+        if (payload.acao === 'ENTRADA' && payload.item) {
+          novosProdutos.unshift(payload.item); // Adiciona no topo
+        } else if (payload.acao === 'SAIDA' && payload.codigoItem) {
+          novosProdutos = novosProdutos.filter(p => p.codigoItem !== payload.codigoItem);
+        } else if (payload.acao === 'SAIDA_LOTE' && payload.codigosItens) {
+          novosProdutos = novosProdutos.filter(p => !payload.codigosItens.includes(p.codigoItem));
+        }
 
-    socket.on('pallet_updated', (data: { palletId: string }) => {
-      if (String(data.palletId) === String(id)) {
-        buscarDadosPallet();
-      }
-    });
-
-    return () => {
-      socket.off('pallet_updated');
-      socket.disconnect();
+        // Incrementa a versão localmente para bater com a do banco
+        return { ...prev, versao: (prev.versao || 1) + 1, produtos: novosProdutos };
+      });
     };
-  }, [id]);
+
+    // Caso a mutação seja muito complexa, forçamos o refetch
+    const handlePalletRefresh = () => { buscarDadosPallet(); };
+
+    // Se outro operador apagar o pallet enquanto estamos aqui dentro
+    const handlePalletDeleted = () => {
+      toast.error('Alerta: Este pallet foi excluído da malha por outro operador.');
+      navigate('/');
+    };
+
+    socket.on('pallet:updated', handlePalletUpdated);
+    socket.on('pallet:refresh', handlePalletRefresh);
+    socket.on('pallet:deleted', handlePalletDeleted);
+
+    // Limpeza ao sair da tela
+    return () => {
+      socket.emit('unsubscribe:pallet', id);
+      socket.off('pallet:updated', handlePalletUpdated);
+      socket.off('pallet:refresh', handlePalletRefresh);
+      socket.off('pallet:deleted', handlePalletDeleted);
+    };
+  }, [id, socket, navigate, toast]);
 
   useEffect(() => { buscarDadosPallet(); }, [id]);
   useEffect(() => { manterFocoNoInput(); }, [acao, pallet, isModoTransferencia, exclusoesPendentes]);
@@ -109,10 +139,12 @@ export function usePalletLogic() {
     try {
       setMensagemStatus({ texto: 'Processando baixa no estoque...', erro: false });
       
+      // ✨ Passando a versão atual para o backend bloquear se houve concorrência
       await api.post('/pallets/bipar-lote', { 
         palletId: id, 
         codigosItens: exclusoesPendentes, 
-        acao: 'SAIDA' 
+        acao: 'SAIDA',
+        versao: pallet?.versao 
       });
 
       tocarSom('SAIDA');
@@ -129,7 +161,9 @@ export function usePalletLogic() {
       }
     } catch (error: any) {
       tocarSom('ERRO');
-      setMensagemStatus({ texto: error.response?.data?.error || 'Erro crítico ao salvar lote.', erro: true });
+      const msgErro = error.response?.data?.error || 'Erro crítico ao salvar lote.';
+      setMensagemStatus({ texto: msgErro, erro: true });
+      if (error.response?.status === 409) await buscarDadosPallet(); // Recarrega se deu conflito
     }
   };
 
@@ -177,15 +211,16 @@ export function usePalletLogic() {
     if (acao === 'ENTRADA') {
       try {
         setMensagemStatus({ texto: '', erro: false });
-        const response = await api.post('/pallets/bipar', { palletId: id, codigoItem: codigoLimpo, acao: 'ENTRADA' });
+        await api.post('/pallets/bipar', { palletId: id, codigoItem: codigoLimpo, acao: 'ENTRADA', versao: pallet?.versao });
         tocarSom('ENTRADA'); 
-        setMensagemStatus({ texto: response.data.mensagem || 'Operação realizada!', erro: false });
+        setMensagemStatus({ texto: 'Operação realizada!', erro: false });
         setCodigoBipado('');
         buscarDadosPallet();
       } catch (error: any) {
         tocarSom('ERRO'); 
         setMensagemStatus({ texto: error.response?.data?.error || 'Erro ao processar bipagem.', erro: true });
         setCodigoBipado('');
+        if (error.response?.status === 409) await buscarDadosPallet();
       }
       return;
     }
@@ -195,14 +230,14 @@ export function usePalletLogic() {
       
       if (exclusoesPendentes.includes(codigoLimpo)) {
         tocarSom('ERRO');
-        setMensagemStatus({ texto: `O item "${codigoLimpo}" já está na fila de exclusão temporária!`, erro: true });
+        setMensagemStatus({ texto: `O item "${codigoLimpo}" já está na fila de exclusão!`, erro: true });
         setCodigoBipado('');
         return;
       }
 
       if (!itemExisteNoPallet) {
         tocarSom('ERRO');
-        setMensagemStatus({ texto: `O item "${codigoLimpo}" não consta neste pallet para dar saída!`, erro: true });
+        setMensagemStatus({ texto: `O item "${codigoLimpo}" não consta neste pallet!`, erro: true });
         setCodigoBipado('');
         return;
       }
@@ -228,7 +263,7 @@ export function usePalletLogic() {
         });
 
         const codigoGerado = response.data?.item?.codigoItem;
-        if (!codigoGerado) throw new Error('O servidor não retornou o código gerado.');
+        if (!codigoGerado) throw new Error('O servidor não retornou o código.');
         codigosGerados.push(codigoGerado);
       }
 
@@ -237,7 +272,7 @@ export function usePalletLogic() {
 
       tocarSom('ENTRADA');
       setMensagemStatus({ 
-        texto: `${qtdEtiquetas} etiqueta(s) gerada(s) e enviada(s) para a fila de impressão.`, 
+        texto: `${qtdEtiquetas} etiqueta(s) gerada(s) e enviada(s) para impressão.`, 
         erro: false 
       });
       
@@ -245,7 +280,7 @@ export function usePalletLogic() {
     } catch (error: any) {
       tocarSom('ERRO');
       setMensagemStatus({ 
-        texto: error.response?.data?.error || 'Erro operacional ao processar lote sequencial.', 
+        texto: error.response?.data?.error || 'Erro operacional.', 
         erro: true 
       });
     } finally {
@@ -264,18 +299,17 @@ export function usePalletLogic() {
     } else {
       const todosOsCodigos = pallet.produtos.map(p => p.codigoItem);
       setItensParaTransferir(todosOsCodigos);
-      setMensagemStatus({ texto: `Todos os ${todosOsCodigos.length} itens do pallet foram selecionados de uma vez.`, erro: false });
+      setMensagemStatus({ texto: `Todos os ${todosOsCodigos.length} itens selecionados.`, erro: false });
     }
   };
 
   const handleFinalizerColetaTransferencia = async () => {
     if (itensParaTransferir.length === 0) {
-      toast.error("Nenhuma triagem foi selecionada para transferência.");
+      toast.error("Nenhuma triagem selecionada.");
       return;
     }
 
-    // Substituição pelo toast.confirm!
-    const perguntar = await toast.confirm(`Foi feito tudo? Deseja prosseguir com a transferência em lote de ${itensParaTransferir.length} itens?`);
+    const perguntar = await toast.confirm(`Deseja prosseguir com a transferência de ${itensParaTransferir.length} itens?`);
     if (!perguntar) return;
 
     setCarregandoDestinos(true);
@@ -285,7 +319,7 @@ export function usePalletLogic() {
       setPalletsDestino(filtrados);
       setExibirModalDestino(true);
     } catch {
-      toast.error("Erro ao carregar a malha de pallets destino.");
+      toast.error("Erro ao carregar malha destino.");
     } finally {
       setCarregandoDestinos(false);
     }
@@ -293,13 +327,12 @@ export function usePalletLogic() {
 
   const handleLancarAoRMA = async () => {
     if (itensParaTransferir.length === 0) {
-      toast.error("Nenhuma triagem foi selecionada para enviar ao RMA.");
+      toast.error("Nenhum item selecionado para RMA.");
       return;
     }
     
-    // Substituição pelo toast.confirm!
     const confirmarRMA = await toast.confirm(
-      `ATENÇÃO: Você está prestes a dar baixa definitiva em ${itensParaTransferir.length} itens do estoque físico e enviá-los para o fluxo lógico de RMA.\n\nEsta ação limpará estes itens deste pallet. Deseja prosseguir?`
+      `ATENÇÃO: Você dará baixa definitiva em ${itensParaTransferir.length} itens e os enviará ao RMA.\nDeseja prosseguir?`
     );
     if (!confirmarRMA) return;
 
@@ -323,27 +356,27 @@ export function usePalletLogic() {
         codigosItens: itensParaTransferir,
         numeroPalletDestino: numeroPalletDestino
       });
-      toast.success(response.data.mensagem || "Transferência em lote concluída!");
+      toast.success(response.data.mensagem || "Transferência concluída!");
       setIsModoTransferencia(false);
       setItensParaTransferir([]);
       setExibirModalDestino(false);
       buscarDadosPallet();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || "Erro crítico operacional ao transferir lote.");
+      toast.error(error.response?.data?.error || "Erro ao transferir lote.");
     }
   };
 
   const handleExcluirItemLinha = async (codigoItem: string) => {
-    // Substituição pelo toast.confirm!
     const confirmExclusao = await toast.confirm(`Deseja remover a triagem ${codigoItem} deste pallet?`);
     if (!confirmExclusao) return;
 
     try {
-      await api.post('/pallets/bipar', { palletId: id, codigoItem, acao: 'SAIDA' });
+      await api.post('/pallets/bipar', { palletId: id, codigoItem, acao: 'SAIDA', versao: pallet?.versao });
       tocarSom('SAIDA'); 
       buscarDadosPallet();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Erro ao remover item.');
+      if (error.response?.status === 409) await buscarDadosPallet();
     }
   };
 

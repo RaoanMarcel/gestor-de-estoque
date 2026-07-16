@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { ToastProvider } from './contexts/toastContext'; 
+import { ToastProvider } from './contexts/toastContext';
+import { SocketProvider } from './contexts/SocketContext';
 import Home from './pages/home/Home.js';
 import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
@@ -10,7 +11,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   const esconderHeader = location.pathname === '/login';
   const usuarioLogado = localStorage.getItem('wms_user') || 'Operador';
 
-  // Pega a primeira letra do nome para o Avatar do Card
   const inicialUsuario = usuarioLogado.charAt(0).toUpperCase();
 
   const handleLogout = () => {
@@ -70,18 +70,20 @@ function App() {
     <BrowserRouter>
       {/* O ToastProvider envolve todo o app e injeta o Toaster configurado em bottom-right */}
       <ToastProvider>
-        <LayoutComum>
-          <Routes>
-            {/* Rota Pública */}
-            <Route path="/login" element={<Login />} />
+        <SocketProvider>
+          <LayoutComum>
+            <Routes>
+              {/* Rota Pública */}
+              <Route path="/login" element={<Login />} />
 
-            {/* Rotas Privadas e Protegidas por Token */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/pallet/:id" element={<PalletInterface />} />
-            </Route>
-          </Routes>
-        </LayoutComum>
+              {/* Rotas Privadas e Protegidas por Token */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/" element={<Home />} />
+                <Route path="/pallet/:id" element={<PalletInterface />} />
+              </Route>
+            </Routes>
+          </LayoutComum>
+        </SocketProvider>
       </ToastProvider>
     </BrowserRouter>
   );

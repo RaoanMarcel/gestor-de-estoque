@@ -3,34 +3,48 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../../services/api.js';
 import type { FormEvent } from 'react';
 import type { Pallet, CriarPalletInput } from '../../../types/pallet';
-import toast from 'react-hot-toast';
+import { useToast } from '../../../contexts/toastContext';
+import { useSocket } from '../../../contexts/SocketContext'; // ✨ Novo Hook Global
 
 export function usePallets() {
   const navigate = useNavigate();
+  const toast = useToast();
+  const { socket } = useSocket();
   
   // Estados de dados
   const [pallets, setPallets] = useState<Pallet[]>([]);
   const [busca, setBusca] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Estados do formulário de criação (✨ Atualizado com a propriedade "tipo")
+  // Estados do formulário de criação
   const [form, setForm] = useState<CriarPalletInput>({
     numero: '',
     rua: '',
     estrutura: '',
     nivel: '',
     descricao: '',
-    tipo: 'PADRAO'  // 📦 Inicia o seletor na opção padrão
+    tipo: 'PADRAO'
   });
   
-  // Estado e Referência para Bipagem Rápida
   const [qrCodeBipado, setQrCodeBipado] = useState('');
   const qrInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     carregarPallets();
     qrInputRef.current?.focus();
-  }, []);
+
+    if (socket) {
+      const handleGridUpdate = () => {
+        carregarPallets();
+      };
+
+      socket.on('grid:updated', handleGridUpdate);
+
+      return () => {
+        socket.off('grid:updated', handleGridUpdate);
+      };
+    }
+  }, [socket]);
 
   const carregarPallets = async () => {
     try {
@@ -106,12 +120,12 @@ export function usePallets() {
       const numeroTemporario = form.numero; 
       await api.post('/pallets', form);
       
-      // ✨ Limpa todos os campos retornando o tipo para o padrão "PADRAO"
       setForm({ numero: '', rua: '', estrutura: '', nivel: '', descricao: '', tipo: 'PADRAO' });
       setIsModalOpen(false);
       carregarPallets();
 
-      if (window.confirm(`Posição "${numeroTemporario}" criada! Deseja emitir a etiqueta térmica agora?`)) {
+      const perguntar = await toast.confirm(`Posição "${numeroTemporario}" criada! Deseja emitir a etiqueta térmica agora?`);
+      if (perguntar) {
         imprimirEtiqueta(numeroTemporario);
       }
     } catch (error: any) {
