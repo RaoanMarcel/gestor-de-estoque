@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent, MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '../../contexts/toastContext'; // Ajuste o caminho se necessário
+import { useToast } from '../../contexts/toastContext'; 
 import { usePallets } from './hooks/usePallets';
 import { imprimirEtiqueta } from './components/utils/imprimirEtiqueta';
 import HomeHeader from './components/parts/HomeHeader';
@@ -15,9 +15,11 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export default function Home() {
   const navigate = useNavigate();
-  const toast = useToast(); // Instanciando nosso Hook de Toasts
+  const toast = useToast(); 
+  
   const {
     palletsFiltrados,
+    presenceData,
     busca,
     setBusca,
     isModalOpen,
@@ -42,28 +44,20 @@ export default function Home() {
 
   const handleExcluirPalletCard = async (e: MouseEvent, palletId: number, numeroPallet: string) => {
     e.stopPropagation(); 
-    
-    // Substituição do window.confirm pelo toast.confirm customizado assíncrono
     const confirmou = await toast.confirm(`Deseja realmente excluir permanentemente a posição "${numeroPallet}" da malha?`);
     if (!confirmou) return;
 
     try {
       const token = localStorage.getItem('wms_token');
-
       const response = await fetch(`${API_URL}/pallets/${palletId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-
       const resultado = await response.json();
-
       if (!response.ok) {
         toast.error(resultado.error || "Não foi possível excluir o pallet.");
         return;
       }
-
       toast.success(resultado.mensagem || "Posição removida com sucesso!");
       window.location.reload();
     } catch {
@@ -78,30 +72,20 @@ export default function Home() {
     
     try {
       const token = localStorage.getItem('wms_token');
-
       let urlEndpoint = `${API_URL}/historico/exportar`;
       let corpoRequisicao: any = { palletAlvo: palletSelecionado, nomeArquivo };
       let configuracaoFetch: any = {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(corpoRequisicao)
       };
 
       if (palletSelecionado === 'FLUXO_RMA_SISTEMA') {
         urlEndpoint = `${API_URL}/historico/exportar-rma`;
-        configuracaoFetch = { 
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        };
+        configuracaoFetch = { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } };
       }
 
       const response = await fetch(urlEndpoint, configuracaoFetch);
-      
       if (!response.ok) {
         const erroDados = await response.json();
         throw new Error(erroDados.error || "Erro ao gerar planilha");
@@ -111,13 +95,7 @@ export default function Home() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      
-      if (palletSelecionado === 'FLUXO_RMA_SISTEMA') {
-        a.download = nomeArquivo ? `${nomeArquivo}.xlsx` : `relatorio-estoque-fantasma-rma.xlsx`;
-      } else {
-        a.download = nomeArquivo ? `${nomeArquivo}.xlsx` : `historico-${palletSelecionado}.xlsx`;
-      }
-      
+      a.download = palletSelecionado === 'FLUXO_RMA_SISTEMA' ? (nomeArquivo ? `${nomeArquivo}.xlsx` : `relatorio-rma.xlsx`) : (nomeArquivo ? `${nomeArquivo}.xlsx` : `historico-${palletSelecionado}.xlsx`);
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -144,44 +122,21 @@ export default function Home() {
 
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-8">
         <HomeHeader setIsExcelModalOpen={setIsExcelModalOpen} setIsModalOpen={setIsModalOpen} />
-
-        <ScannerBar
-          handleQrBipado={handleQrBipado}
-          qrCodeBipado={qrCodeBipado}
-          setQrCodeBipado={setQrCodeBipado}
-          qrInputRef={qrInputRef}
-        />
-
+        <ScannerBar handleQrBipado={handleQrBipado} qrCodeBipado={qrCodeBipado} setQrCodeBipado={setQrCodeBipado} qrInputRef={qrInputRef} />
         <MetricasPanel totalPallets={totalPallets} palletsOcupados={palletsOcupados} palletsVazios={palletsVazios} />
-
+        
         <MalhaEnderecamento
           busca={busca}
           setBusca={setBusca}
           palletsFiltrados={palletsFiltrados}
+          presenceData={presenceData} 
           navigate={navigate}
           handleExcluirPalletCard={handleExcluirPalletCard}
           imprimirEtiqueta={imprimirEtiqueta}
         />
 
-        <ModalCriarPallet
-          isModalOpen={isModalOpen}
-          setIsModalOpen={setIsModalOpen}
-          form={form}
-          setForm={setForm}
-          handleCriarPallet={handleCriarPallet}
-        />
-
-        <ModalExportarExcel
-          isExcelModalOpen={isExcelModalOpen}
-          setIsExcelModalOpen={setIsExcelModalOpen}
-          palletSelecionado={palletSelecionado}
-          setPalletSelecionado={setPalletSelecionado}
-          nomeArquivo={nomeArquivo}
-          setNomeArquivo={setNomeArquivo}
-          carregandoExcel={carregandoExcel}
-          handleExportarExcel={handleExportarExcel}
-          palletsFiltrados={palletsFiltrados}
-        />
+        <ModalCriarPallet isModalOpen={isModalOpen} setIsModalOpen={setIsModalOpen} form={form} setForm={setForm} handleCriarPallet={handleCriarPallet} />
+        <ModalExportarExcel isExcelModalOpen={isExcelModalOpen} setIsExcelModalOpen={setIsExcelModalOpen} palletSelecionado={palletSelecionado} setPalletSelecionado={setPalletSelecionado} nomeArquivo={nomeArquivo} setNomeArquivo={setNomeArquivo} carregandoExcel={carregandoExcel} handleExportarExcel={handleExportarExcel} palletsFiltrados={palletsFiltrados} />
       </div>
     </div>
   );

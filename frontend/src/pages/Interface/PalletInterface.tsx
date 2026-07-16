@@ -56,15 +56,12 @@ export default function PalletInterface() {
     if (isRetriagemOuNovo) {
       // --- REGRA PARA RETRIAGEM E NOVO (P-XXXXX) ---
       // 1. Força maiúscula e remove letras que não sejam P e símbolos que não sejam -
-      let valor = valorRecebido.toUpperCase().replace(/[^P\-0-9]/g, '');
+      let valor = valorRecebido.toUpperCase().replace(/[^P\0-9]/g, '');
 
       // 2. Regras de prefixo
       if (valor.length > 0 && valor[0] !== 'P') return; // Tem que começar com P
       if (valor.length > 1 && valor[1] !== '-') return; // O segundo tem que ser o hífen
       
-      // 3. UX: Se digitou 'P', já auto-completa com o hífen para ajudar
-      if (valor === 'P') valor = 'P-';
-
       // 4. Trava um limite máximo de segurança (ex: 10 caracteres)
       if (valor.length > 10) valor = valor.substring(0, 10);
 

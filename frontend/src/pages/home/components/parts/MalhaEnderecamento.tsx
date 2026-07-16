@@ -30,6 +30,18 @@ const getFilterActiveStyle = (id: string) => {
   }
 };
 
+const getUserColor = (name: string) => {
+  const colors = [
+    'bg-rose-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 
+    'bg-purple-500', 'bg-cyan-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
 const ITENS_POR_PAGINA = 5;
 
 export default function MalhaEnderecamento({
@@ -77,7 +89,6 @@ export default function MalhaEnderecamento({
   return (
     <div className="pt-2 pb-10">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
-        
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h2 className="text-sm font-bold text-slate-800 shrink-0">Malha de Endereçamento</h2>
           <input 
@@ -127,41 +138,45 @@ export default function MalhaEnderecamento({
 
                     return (
                       <div key={p.id} onClick={() => navigate(`/pallet/${p.id}`)}
-                        className={`group relative rounded-xl p-4 min-h-[120px] flex flex-col justify-between cursor-pointer border transition-all duration-300 hover:scale-[1.03] hover:shadow ${getCardStyle(chave)}`}>
+                        className={`group relative rounded-xl p-4 min-h-[130px] flex flex-col justify-between cursor-pointer border transition-all duration-300 hover:scale-[1.03] hover:shadow ${getCardStyle(chave)}`}>
                         
                         <div className={`absolute top-0 left-4 h-[2.5px] w-12 rounded-b-full transition-all duration-300 group-hover:w-16 ${getTopBarStyle(chave)}`} />
                         
                         <div className="flex justify-between items-start">
                           <h3 className="text-[15px] font-bold text-slate-900 group-hover:text-slate-950">{p.numero}</h3>
-                          <div className="flex flex-col items-end gap-1">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/50 border border-slate-200">{p._count?.produtos || 0} un.</span>
-                            
-                            {usuariosNestePallet.length > 0 && (
-                              <div className="flex -space-x-1.5" title={`${usuariosNestePallet.join(', ')} editando`}>
-                                {usuariosNestePallet.slice(0, 3).map((user, idx) => (
-                                  <div key={idx} className="h-4 w-4 rounded-full bg-blue-600 border border-white text-white flex items-center justify-center text-[7px] font-bold uppercase shadow-sm relative z-10">
-                                    {user.charAt(0)}
-                                  </div>
-                                ))}
-                                {usuariosNestePallet.length > 3 && (
-                                  <div className="h-4 w-4 rounded-full bg-slate-200 border border-white text-slate-600 flex items-center justify-center text-[7px] font-bold shadow-sm relative z-0">
-                                    +{usuariosNestePallet.length - 3}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/50 border border-slate-200 text-slate-700">{p._count?.produtos || 0} un.</span>
                         </div>
 
                         <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{p.descricao || 'Sem descrição'}</p>
                         
                         <div className="flex justify-between items-end mt-4">
-                          <div className="text-[9px] font-mono bg-white/60 px-2 py-1 rounded border border-slate-200">R:{p.rua || '-'} • E:{p.estrutura || '-'} • N:{p.nivel || '-'}</div>
+                          <div className="text-[9px] font-mono bg-white/60 px-2 py-1 rounded border border-slate-200 text-slate-600">R:{p.rua || '-'} • E:{p.estrutura || '-'} • N:{p.nivel || '-'}</div>
                           <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
                             <button onClick={(e) => { e.stopPropagation(); imprimirEtiqueta(p.numero, p.rua??'', p.estrutura??'', p.nivel??'',p.descricao??''); }} className="text-lg">🖨️</button>
                             <button onClick={(e) => handleExcluirPalletCard(e, p.id, p.numero)} className="text-lg">🗑️</button>
                           </div>
                         </div>
+
+                        {usuariosNestePallet.length > 0 && (
+                          <div className="mt-3 flex items-center justify-between border-t border-slate-200/50 pt-3">
+                            <div className="flex items-center gap-1.5">
+                              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                              <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider">Em uso por:</span>
+                            </div>
+                            <div className="flex -space-x-1.5" title={`${usuariosNestePallet.join(', ')} editando`}>
+                              {usuariosNestePallet.slice(0, 3).map((user, idx) => (
+                                <div key={idx} className={`h-6 w-6 rounded-full border-2 border-white text-white flex items-center justify-center text-[10px] font-bold uppercase shadow-sm relative z-10 ${getUserColor(user)}`}>
+                                  {user.charAt(0)}
+                                </div>
+                              ))}
+                              {usuariosNestePallet.length > 3 && (
+                                <div className="h-6 w-6 rounded-full bg-slate-100 border-2 border-white text-slate-600 flex items-center justify-center text-[10px] font-bold shadow-sm relative z-0">
+                                  +{usuariosNestePallet.length - 3}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

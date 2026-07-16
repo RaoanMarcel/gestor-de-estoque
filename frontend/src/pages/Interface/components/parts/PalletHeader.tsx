@@ -12,6 +12,16 @@ interface PalletHeaderProps {
   activeUsers?: string[];
 }
 
+const getUserColor = (name: string) => {
+  const colors = [
+    'bg-rose-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 
+    'bg-purple-500', 'bg-cyan-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+};
+
 export default function PalletHeader({
   pallet, isModoTransferencia, setIsModoTransferencia, setMensagemStatus, itensParaTransferir, setItensParaTransferir, handleAdicionarTodoOPalletNoLote, navigate, activeUsers = []
 }: PalletHeaderProps) {
@@ -34,11 +44,11 @@ export default function PalletHeader({
       <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 w-full sm:w-auto justify-end">
         
         {activeUsers.length > 0 && (
-          <div className="flex items-center gap-2 mr-2 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mr-2 bg-slate-50 px-2.5 py-1.5 rounded-full border border-slate-200 shadow-sm">
             <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Ativos</span>
-            <div className="flex -space-x-1.5" title={`${activeUsers.join(', ')} nesta tela`}>
+            <div className="flex -space-x-2" title={`${activeUsers.join(', ')} nesta tela`}>
               {activeUsers.map((user, idx) => (
-                <div key={idx} className="h-5 w-5 rounded-full bg-blue-600 border border-white text-white flex items-center justify-center text-[9px] font-bold uppercase shadow-sm relative z-10 hover:z-20 transition-all hover:-translate-y-0.5">
+                <div key={idx} className={`h-6 w-6 rounded-full border-2 border-white text-white flex items-center justify-center text-[10px] font-bold uppercase shadow-sm relative z-10 hover:z-20 transition-all hover:-translate-y-0.5 ${getUserColor(user)}`}>
                   {user.charAt(0)}
                 </div>
               ))}
