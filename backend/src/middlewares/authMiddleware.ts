@@ -16,6 +16,7 @@ export function autenticarToken(req: Request, res: Response, next: NextFunction)
     (req as any).usuario = verificado;
     next(); 
   } catch (error) {
-    return res.status(403).json({ error: 'Token inválido ou expirado.' });
+    // Retornamos 401 para o Axios saber que deve acionar o fluxo de Refresh Token
+    return res.status(401).json({ error: 'Token inválido ou expirado.' });
   }
 }
