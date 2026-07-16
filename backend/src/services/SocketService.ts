@@ -7,6 +7,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 export class SocketService {
   private static instance: SocketService;
   private io: Server | null = null;
+  
+  // Mapa em memória: Sala (palletId) -> Set de Usernames
+  // Usamos Set para evitar duplicatas caso o mesmo usuário abra duas abas
+  private activeUsersInRooms: Map<string, Set<string>> = new Map();
+  // Rastreio reverso: SocketId -> Username e Salas que está conectado (para lidar com quedas)
+  private socketData: Map<string, { username: string; rooms: Set<string> }> = new Map();
 
   private constructor() {}
 
@@ -19,20 +25,12 @@ export class SocketService {
 
   public init(httpServer: HttpServer) {
     this.io = new Server(httpServer, {
-      cors: {
-        origin: '*',
-        methods: ['GET', 'POST', 'PUT', 'DELETE']
-      }
+      cors: { origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }
     });
 
-    // Middleware de Autenticação do WebSocket
     this.io.use((socket, next) => {
       const token = socket.handshake.auth.token || socket.handshake.headers['authorization'];
-      
-      if (!token) {
-        return next(new Error('Acesso negado. Token não fornecido.'));
-      }
-
+      if (!token) return next(new Error('Acesso negado. Token não fornecido.'));
       try {
         const tokenLimpo = token.replace('Bearer ', '');
         const verificado = jwt.verify(tokenLimpo, JWT_SECRET);
@@ -47,29 +45,76 @@ export class SocketService {
       const username = (socket as any).usuario?.username || 'Operador';
       console.log(`🔌 Conectado: ${username} [${socket.id}]`);
       
-      // Todos entram na malha global automaticamente
       socket.join('global_malha');
+      this.socketData.set(socket.id, { username, rooms: new Set() });
+      
+      // Ao conectar, manda o estado atual de todas as salas para popular a malha
+      socket.emit('presence:global_update', this.getGlobalPresenceData());
 
-      // Sistema de Presença e Subscrição Granular
       socket.on('subscribe:pallet', (palletId: string | number) => {
         const sala = `pallet_${palletId}`;
         socket.join(sala);
-        socket.to(sala).emit('presence:pallet_joined', { username });
+        
+        // Registra a presença
+        if (!this.activeUsersInRooms.has(String(palletId))) {
+          this.activeUsersInRooms.set(String(palletId), new Set());
+        }
+        this.activeUsersInRooms.get(String(palletId))!.add(username);
+        this.socketData.get(socket.id)!.rooms.add(String(palletId));
+
+        // Avisa a sala e a malha global
+        this.broadcastPresenceUpdate(String(palletId));
       });
 
       socket.on('unsubscribe:pallet', (palletId: string | number) => {
-        const sala = `pallet_${palletId}`;
-        socket.leave(sala);
-        socket.to(sala).emit('presence:pallet_left', { username });
+        this.removeUserFromRoom(socket, String(palletId), username);
       });
 
       socket.on('disconnect', () => {
         console.log(`❌ Desconectado: ${username} [${socket.id}]`);
+        const userData = this.socketData.get(socket.id);
+        if (userData) {
+          userData.rooms.forEach(palletId => {
+            this.removeUserFromRoom(socket, palletId, username);
+          });
+        }
+        this.socketData.delete(socket.id);
       });
     });
   }
 
-  // Emite para a Home (Malha)
+  private removeUserFromRoom(socket: Socket, palletId: string, username: string) {
+    const sala = `pallet_${palletId}`;
+    socket.leave(sala);
+    
+    const roomUsers = this.activeUsersInRooms.get(palletId);
+    if (roomUsers) {
+      roomUsers.delete(username);
+      if (roomUsers.size === 0) {
+        this.activeUsersInRooms.delete(palletId);
+      }
+      this.broadcastPresenceUpdate(palletId);
+    }
+  }
+
+  private broadcastPresenceUpdate(palletId: string) {
+    if (!this.io) return;
+    const users = Array.from(this.activeUsersInRooms.get(palletId) || []);
+    
+    // Atualiza quem está dentro da tela
+    this.io.to(`pallet_${palletId}`).emit('presence:room_update', { users });
+    // Atualiza o mapa global (Home)
+    this.io.to('global_malha').emit('presence:global_update', this.getGlobalPresenceData());
+  }
+
+  private getGlobalPresenceData() {
+    const data: Record<string, string[]> = {};
+    this.activeUsersInRooms.forEach((users, palletId) => {
+      data[palletId] = Array.from(users);
+    });
+    return data;
+  }
+
   public emitToGlobal(event: string, payload: any, excludeSocketId?: string) {
     if (!this.io) return;
     if (excludeSocketId) {
@@ -79,7 +124,6 @@ export class SocketService {
     }
   }
 
-  // Emite apenas para quem está com a tela daquele pallet aberta
   public emitToPallet(palletId: string | number, event: string, payload: any, excludeSocketId?: string) {
     if (!this.io) return;
     const sala = `pallet_${palletId}`;

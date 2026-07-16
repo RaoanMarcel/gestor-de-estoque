@@ -1,4 +1,4 @@
-// PalletInterface.tsx
+// src/pages/Interface/PalletInterface.tsx
 import { usePalletLogic } from "./components/hooks/usePalletLogic";
 import PalletHeader from "./components/parts/PalletHeader";
 import BipagemPanel from "./components/parts/BipagemPanel";
@@ -8,6 +8,7 @@ import ModalDestino from "./components/parts/ModalDestino";
 export default function PalletInterface() {
   const {
     pallet,
+    activeUsers,
     exclusoesPendentes,
     exibirModalExclusaoLote,
     acao,
@@ -100,6 +101,7 @@ export default function PalletInterface() {
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-6">
         <PalletHeader
           pallet={pallet}
+          activeUsers={activeUsers}
           isModoTransferencia={isModoTransferencia}
           setIsModoTransferencia={setIsModoTransferencia}
           setMensagemStatus={setMensagemStatus}

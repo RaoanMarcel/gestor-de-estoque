@@ -1,4 +1,3 @@
-// components/parts/MalhaEnderecamento.tsx
 import { useState, useMemo } from "react";
 import type { MouseEvent } from "react";
 import type { NavigateFunction } from "react-router-dom";
@@ -11,6 +10,7 @@ interface MalhaEnderecamentoProps {
   navigate: NavigateFunction;
   handleExcluirPalletCard: (e: MouseEvent, palletId: number, numeroPallet: string) => void;
   imprimirEtiqueta: (numero: string, rua: string, estrutura: string, nivel: string, descricao: string) => void;
+  presenceData?: Record<string, string[]>;
 }
 
 const OPCOES_FILTRO = [
@@ -20,7 +20,6 @@ const OPCOES_FILTRO = [
   { id: 'DESCARTE', titulo: 'Descarte'},
 ];
 
-// Cores PASTÉIS suaves para os botões ativos
 const getFilterActiveStyle = (id: string) => {
   switch (id) {
     case 'DEFEITO': return 'bg-rose-100 text-rose-800 border-rose-300';
@@ -31,21 +30,13 @@ const getFilterActiveStyle = (id: string) => {
   }
 };
 
-// LIMITE DE PALLETS POR PÁGINA EM CADA CATEGORIA
 const ITENS_POR_PAGINA = 5;
 
 export default function MalhaEnderecamento({
-  busca,
-  setBusca,
-  palletsFiltrados,
-  navigate,
-  handleExcluirPalletCard,
-  imprimirEtiqueta,
+  busca, setBusca, palletsFiltrados, navigate, handleExcluirPalletCard, imprimirEtiqueta, presenceData = {}
 }: MalhaEnderecamentoProps) {
   
   const [filtrosAtivos, setFiltrosAtivos] = useState<string[]>([]);
-  
-  // NOVO: Estado para gerenciar a página atual de cada categoria
   const [paginasAtuais, setPaginasAtuais] = useState<Record<string, number>>({});
 
   const palletsAgrupados = useMemo(() => {
@@ -79,7 +70,6 @@ export default function MalhaEnderecamento({
     return 'bg-amber-400';
   };
 
-  // NOVO: Função para alterar a página de uma categoria específica
   const mudarPagina = (chave: string, novaPagina: number) => {
     setPaginasAtuais(prev => ({ ...prev, [chave]: novaPagina }));
   };
@@ -88,22 +78,15 @@ export default function MalhaEnderecamento({
     <div className="pt-2 pb-10">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
         
-        {/* CABEÇALHO: Responsivo */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h2 className="text-sm font-bold text-slate-800 shrink-0">Malha de Endereçamento</h2>
           <input 
-            type="text" 
-            placeholder="Buscar triagem em pallet, rua!" 
-            value={busca} 
-            onChange={(e) => {
-              setBusca(e.target.value);
-              setPaginasAtuais({}); // Reseta as páginas ao buscar para evitar páginas vazias
-            }}
+            type="text" placeholder="Buscar triagem em pallet, rua!" value={busca} 
+            onChange={(e) => { setBusca(e.target.value); setPaginasAtuais({}); }}
             className="w-full sm:w-80 border border-slate-200 rounded-lg px-4 py-2 text-xs text-slate-700 outline-none shadow-sm"
           />
         </div>
 
-        {/* FILTROS: Carrossel horizontal no celular */}
         <div className="flex items-center gap-2 mb-8 overflow-x-auto w-full scrollbar-hide pb-2">
           <span className="text-xs font-bold text-slate-400 uppercase shrink-0 mr-1">FILTRAR:</span>
           {OPCOES_FILTRO.map((op) => {
@@ -111,27 +94,19 @@ export default function MalhaEnderecamento({
             const ativo = filtrosAtivos.includes(op.id);
             return (
               <button 
-                key={op.id} 
-                onClick={() => toggleFiltro(op.id)}
-                className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg border text-xs font-semibold transition-all flex items-center gap-2 ${
-                  ativo ? getFilterActiveStyle(op.id) : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
+                key={op.id} onClick={() => toggleFiltro(op.id)}
+                className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg border text-xs font-semibold transition-all flex items-center gap-2 ${ativo ? getFilterActiveStyle(op.id) : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
-                {op.titulo} 
-                <span className={`px-1.5 py-0.5 rounded text-[10px] ${ativo ? 'bg-white/60 font-bold text-slate-900' : 'bg-slate-100'}`}>
-                  {qtd}
-                </span>
+                {op.titulo} <span className={`px-1.5 py-0.5 rounded text-[10px] ${ativo ? 'bg-white/60 font-bold text-slate-900' : 'bg-slate-100'}`}>{qtd}</span>
               </button>
             );
           })}
         </div>
         
-        {/* LISTAGEM DOS CARDS COM PAGINAÇÃO */}
         <div className="space-y-10">
           {Object.entries(palletsAgrupados).map(([chave, lista]) => {
             if (lista.length === 0 || (filtrosAtivos.length > 0 && !filtrosAtivos.includes(chave))) return null;
             
-            // LÓGICA DE PAGINAÇÃO
             const totalPaginas = Math.ceil(lista.length / ITENS_POR_PAGINA);
             const paginaAtual = Math.min(paginasAtuais[chave] || 1, totalPaginas === 0 ? 1 : totalPaginas);
             const indexInicio = (paginaAtual - 1) * ITENS_POR_PAGINA;
@@ -147,49 +122,58 @@ export default function MalhaEnderecamento({
                 </h3>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  {listaPaginada.map((p) => (
-                    <div key={p.id} onClick={() => navigate(`/pallet/${p.id}`)}
-                      className={`group relative rounded-xl p-4 min-h-[120px] flex flex-col justify-between cursor-pointer border transition-all duration-300 hover:scale-[1.03] hover:shadow ${getCardStyle(chave)}`}>
-                      <div className={`absolute top-0 left-4 h-[2.5px] w-12 rounded-b-full transition-all duration-300 group-hover:w-16 ${getTopBarStyle(chave)}`} />
-                      <div className="flex justify-between items-start">
-                        <h3 className="text-[15px] font-bold text-slate-900 group-hover:text-slate-950">{p.numero}</h3>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/50 border border-slate-200">{p._count?.produtos || 0} un.</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{p.descricao || 'Sem descrição'}</p>
-                      <div className="flex justify-between items-end mt-4">
-                        <div className="text-[9px] font-mono bg-white/60 px-2 py-1 rounded border border-slate-200">R:{p.rua || '-'} • E:{p.estrutura || '-'} • N:{p.nivel || '-'}</div>
-                        <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                          <button onClick={(e) => { e.stopPropagation(); imprimirEtiqueta(p.numero, p.rua??'', p.estrutura??'', p.nivel??'',p.descricao??''); }} className="text-lg">🖨️</button>
-                          <button onClick={(e) => handleExcluirPalletCard(e, p.id, p.numero)} className="text-lg">🗑️</button>
+                  {listaPaginada.map((p) => {
+                    const usuariosNestePallet = presenceData[String(p.id)] || [];
+
+                    return (
+                      <div key={p.id} onClick={() => navigate(`/pallet/${p.id}`)}
+                        className={`group relative rounded-xl p-4 min-h-[120px] flex flex-col justify-between cursor-pointer border transition-all duration-300 hover:scale-[1.03] hover:shadow ${getCardStyle(chave)}`}>
+                        
+                        <div className={`absolute top-0 left-4 h-[2.5px] w-12 rounded-b-full transition-all duration-300 group-hover:w-16 ${getTopBarStyle(chave)}`} />
+                        
+                        <div className="flex justify-between items-start">
+                          <h3 className="text-[15px] font-bold text-slate-900 group-hover:text-slate-950">{p.numero}</h3>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/50 border border-slate-200">{p._count?.produtos || 0} un.</span>
+                            
+                            {usuariosNestePallet.length > 0 && (
+                              <div className="flex -space-x-1.5" title={`${usuariosNestePallet.join(', ')} editando`}>
+                                {usuariosNestePallet.slice(0, 3).map((user, idx) => (
+                                  <div key={idx} className="h-4 w-4 rounded-full bg-blue-600 border border-white text-white flex items-center justify-center text-[7px] font-bold uppercase shadow-sm relative z-10">
+                                    {user.charAt(0)}
+                                  </div>
+                                ))}
+                                {usuariosNestePallet.length > 3 && (
+                                  <div className="h-4 w-4 rounded-full bg-slate-200 border border-white text-slate-600 flex items-center justify-center text-[7px] font-bold shadow-sm relative z-0">
+                                    +{usuariosNestePallet.length - 3}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{p.descricao || 'Sem descrição'}</p>
+                        
+                        <div className="flex justify-between items-end mt-4">
+                          <div className="text-[9px] font-mono bg-white/60 px-2 py-1 rounded border border-slate-200">R:{p.rua || '-'} • E:{p.estrutura || '-'} • N:{p.nivel || '-'}</div>
+                          <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                            <button onClick={(e) => { e.stopPropagation(); imprimirEtiqueta(p.numero, p.rua??'', p.estrutura??'', p.nivel??'',p.descricao??''); }} className="text-lg">🖨️</button>
+                            <button onClick={(e) => handleExcluirPalletCard(e, p.id, p.numero)} className="text-lg">🗑️</button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                {/* CONTROLES DE PAGINAÇÃO DA CATEGORIA */}
                 {totalPaginas > 1 && (
                   <div className="flex items-center justify-center gap-3 mt-4">
-                    <button
-                      onClick={() => mudarPagina(chave, paginaAtual - 1)}
-                      disabled={paginaAtual === 1}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
-                    >
-                      ← Anterior
-                    </button>
-                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">
-                      Página {paginaAtual} de {totalPaginas}
-                    </span>
-                    <button
-                      onClick={() => mudarPagina(chave, paginaAtual + 1)}
-                      disabled={paginaAtual === totalPaginas}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
-                    >
-                      Próxima →
-                    </button>
+                    <button onClick={() => mudarPagina(chave, paginaAtual - 1)} disabled={paginaAtual === 1} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm">← Anterior</button>
+                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">Página {paginaAtual} de {totalPaginas}</span>
+                    <button onClick={() => mudarPagina(chave, paginaAtual + 1)} disabled={paginaAtual === totalPaginas} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm">Próxima →</button>
                   </div>
                 )}
-
               </div>
             );
           })}
