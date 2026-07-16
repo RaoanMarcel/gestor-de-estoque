@@ -42,26 +42,23 @@ const CustomToastWithTimer = ({ t, message, type }: { t: Toast; message: string;
     <div
       className={`${
         t.visible ? 'animate-enter' : 'animate-leave'
-      } relative overflow-hidden flex flex-col justify-between px-4 py-3 min-w-[300px] max-w-md bg-white border border-[#1e293b] text-[#334155] rounded-lg shadow-md`}
-      style={{
-        fontSize: '13px',
-        fontWeight: '500',
-      }}
+      } relative overflow-hidden flex flex-col justify-between px-4 py-3 min-w-[300px] max-w-sm bg-white ring-1 ring-black/5 shadow-[0_3px_10px_rgba(0,0,0,0.1),0_3px_3px_rgba(0,0,0,0.05)] rounded-lg pointer-events-auto`}
     >
       <div className="flex items-center justify-between gap-3 pb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-base">{type === 'success' ? '✅' : '❌'}</span>
-          <span>{message}</span>
+        <div className="flex items-start gap-2">
+          <span className="text-xl leading-none mt-[2px]">{type === 'success' ? '✅' : '❌'}</span>
+          {/* Padronizado para 16px, peso normal e cor #363636 */}
+          <span className="text-[16px] text-[#363636] font-normal leading-normal">{message}</span>
         </div>
         <button
           onClick={() => toast.dismiss(t.id)}
-          className="text-[#64748b] hover:text-[#1e293b] font-bold text-sm transition-colors"
+          className="text-slate-400 hover:text-slate-600 font-bold text-sm transition-colors self-start"
         >
           ✕
         </button>
       </div>
 
-      <div className="relative w-full h-1 bg-[#f1f5f9] rounded-full overflow-hidden">
+      <div className="relative w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-1">
         <div
           className={`h-full rounded-full transition-all duration-75 ${
             type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
@@ -79,7 +76,6 @@ interface ToastProviderProps {
 
 export const ToastProvider = ({ children }: ToastProviderProps) => {
   
-  // 🔄 ALTERAÇÃO AQUI: Novo layout idêntico ao Toast padrão
   const showConfirm = (message: string): Promise<boolean> => {
     return new Promise((resolve) => {
       toast.custom(
@@ -87,24 +83,23 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
           <div
             className={`${
               t.visible ? 'animate-enter' : 'animate-leave'
-            } flex flex-col px-4 py-3 min-w-[320px] max-w-md bg-white border border-[#1e293b] text-[#334155] rounded-lg shadow-lg`}
-            style={{
-              fontSize: '13px',
-              fontWeight: '500',
-            }}
+            } max-w-sm w-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.1),0_3px_3px_rgba(0,0,0,0.05)] ring-1 ring-black/5 rounded-lg pointer-events-auto flex flex-col p-4`}
           >
-            <div className="flex items-start gap-2 pb-2">
-              <span className="text-base mt-0.5">⚠️</span>
-              <span className="flex-1 leading-relaxed whitespace-pre-wrap">{message}</span>
+            <div className="flex items-start gap-3">
+              <span className="text-xl leading-none mt-0.5">⚠️</span>
+              {/* 🔄 ALTERAÇÃO AQUI: Tamanho 16px, fonte normal, cor exata do nativo */}
+              <span className="text-[16px] text-[#363636] font-normal leading-relaxed whitespace-pre-wrap flex-1">
+                {message}
+              </span>
             </div>
 
-            <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-slate-100">
+            <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100">
               <button
                 onClick={() => {
                   toast.dismiss(t.id);
                   resolve(false);
                 }}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                className="px-3 py-1.5 text-sm font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-md transition-colors"
               >
                 Cancelar
               </button>
@@ -113,7 +108,7 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
                   toast.dismiss(t.id);
                   resolve(true);
                 }}
-                className="px-4 py-1.5 text-xs font-semibold text-white bg-[#1e293b] hover:bg-slate-800 rounded-md shadow hover:shadow-md transition-all"
+                className="px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm rounded-md transition-colors"
               >
                 Confirmar
               </button>
@@ -123,7 +118,7 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
         {
           duration: Infinity, 
           position: 'top-center',
-          id: 'confirm-modal' // Garante que não abra vários empilhados
+          id: 'confirm-modal'
         }
       );
     });
@@ -144,8 +139,12 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
       {children}
       <Toaster 
         position="top-center"
-        gutter={64} 
+        gutter={12} 
         reverseOrder={false}
+        toastOptions={{
+          className: 'z-[9999]',
+          style: { zIndex: 9999 }
+        }}
       />
     </ToastContext.Provider>
   );
