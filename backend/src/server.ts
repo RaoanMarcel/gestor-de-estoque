@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
@@ -22,18 +22,14 @@ const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 app.use(cors());
 app.use(express.json());
 
-// Middleware de verificação de versão do App
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('X-Backend-Version', APP_VERSION);
-  
   if (req.path === '/api/status') return next();
 
-  const clientVersion = req.headers['x-app-version'] as string;
-  
+  const clientVersion = req.headers['x-app-version'] as string | undefined;
   if (clientVersion) {
     const clientMajor = clientVersion.split('.')[0];
     const serverMajor = APP_VERSION.split('.')[0];
-    
     if (clientMajor !== serverMajor) {
       return res.status(426).json({ 
         error: 'Upgrade Required', 
@@ -41,20 +37,15 @@ app.use((req, res, next) => {
       });
     }
   }
-  
   next();
 });
 
-// Rota pública de status da API
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'API Rodando perfeitamente!', versao: APP_VERSION, timestamp: new Date() });
+app.get('/api/status', (req: Request, res: Response) => {
+  res.json({ status: 'API Rodando!', versao: APP_VERSION, timestamp: new Date() });
 });
 
-// ==============================================================================
-// ROTAS PÚBLICAS DE AUTENTICAÇÃO (Não usam autenticarToken)
-// ==============================================================================
+// ROTAS PÚBLICAS
 const publicAuthRouter = express.Router();
-
 publicAuthRouter.post('/login', authController.login);
 publicAuthRouter.post('/refresh', authController.refreshToken); 
 publicAuthRouter.post('/alterar-senha', authController.alterarSenha); 
@@ -62,23 +53,17 @@ publicAuthRouter.post('/admin/cadastrar', authController.cadastrarUsuario);
 
 app.use('/api/auth', publicAuthRouter);
 
-// ==============================================================================
-// ROTAS PROTEGIDAS DE AUTENTICAÇÃO
-// ==============================================================================
+// ROTAS PROTEGIDAS DA APLICAÇÃO
 app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.alterarSenhaAutenticado);
 
-// ==============================================================================
-// DEMAIS ROTAS PROTEGIDAS DA APLICAÇÃO
-// ==============================================================================
-app.use('/api', autenticarToken, palletRoutes);
+// CORREÇÃO AQUI: Removido o 'autenticarToken' global, pois o palletRoutes já o implementa internamente[cite: 1]
+app.use('/api', palletRoutes);
 
-// Inicialização do Servidor
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor ativo na porta ${PORT} | Versão: ${APP_VERSION}`);
 });
 
 const gracefulShutdown = async () => {
-  console.log('Encerrando conexões graciosamente...');
   await prisma.$disconnect();
   process.exit(0);
 };
