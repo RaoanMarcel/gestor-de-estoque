@@ -1,5 +1,3 @@
-// schema.prisma
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -30,17 +28,18 @@ model ProdutoPallet {
   bipadoEm   DateTime       @default(now())
 }
 
-// 🔄 ALTERAÇÃO: Modelo expandido para suportar Rastreabilidade Total e Linha do Tempo
+
 model HistoricoMovimentacao {
   id             Int      @id @default(autoincrement())
   codigoItem     String   
-  codigoAnterior String?  // Novo: Para vincular o código antigo ao novo na retriagem
+  codigoAnterior String?  
   acao           String   
-  palletOrigem   String?  // Novo: De qual pallet saiu
-  palletDestino  String?  // Novo: Para qual pallet entrou
+  palletOrigem   String?  
+  palletDestino  String?  
+  palletAlvo    String?
   usuarioId      Int?
   usuario        Usuario? @relation(fields: [usuarioId], references: [id])
-  
+  bipadoEm       DateTime @default(now())
   createdAt      DateTime @default(now())
 }
 

@@ -1,3 +1,4 @@
+// src/pages/Interface/components/hooks/usePalletLogic.ts
 import { useState, useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -47,6 +48,12 @@ export function usePalletLogic() {
   });
   const [exibirModalExclusaoLote, setExibirModalExclusaoLote] = useState(false);
   const [rotaDestinoPendente, setRotaDestinoPendente] = useState<string | null>(null);
+
+  // 🚀 NOVOS ESTADOS DA RASTREABILIDADE
+  const [exibirModalRastreabilidade, setExibirModalRastreabilidade] = useState(false);
+  const [itemRastreabilidade, setItemRastreabilidade] = useState<string>('');
+  const [historicoData, setHistoricoData] = useState<any[]>([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
   const inputBipRef = useRef<HTMLInputElement>(null);
   const manterFocoNoInput = () => { inputBipRef.current?.focus(); };
@@ -103,7 +110,7 @@ export function usePalletLogic() {
   }, [id, socket, navigate, toast]);
 
   useEffect(() => { buscarDadosPallet(); }, [id]);
-  useEffect(() => { manterFocoNoInput(); }, [acao, pallet, isModoTransferencia, exclusoesPendentes]);
+  useEffect(() => { manterFocoNoInput(); }, [acao, pallet, isModoTransferencia, exclusoesPendentes, exibirModalRastreabilidade]);
 
   const buscarDadosPallet = async () => {
     try {
@@ -138,6 +145,24 @@ export function usePalletLogic() {
       osc.start(); osc.stop(ctx.currentTime + 0.35);
     }
   };
+
+  // 🚀 NOVA FUNÇÃO DA RASTREABILIDADE
+  const handleAbrirRastreabilidade = async (codigoItem: string) => {
+    setItemRastreabilidade(codigoItem);
+    setExibirModalRastreabilidade(true);
+    setCarregandoHistorico(true);
+    try {
+      const response = await api.get(`/historico/${codigoItem}`);
+      setHistoricoData(response.data);
+    } catch (error) {
+      toast.error("Erro ao buscar a linha do tempo do item.");
+      setExibirModalRastreabilidade(false);
+    } finally {
+      setCarregandoHistorico(false);
+    }
+  };
+
+  //... O resto das funções continuam as mesmas: handleDesfazerExclusaoItem, etc ...
 
   const handleDesfazerExclusaoItem = (codigoItem: string) => {
     setExclusoesPendentes(prev => prev.filter(c => c !== codigoItem));
@@ -180,6 +205,23 @@ export function usePalletLogic() {
     e.preventDefault();
     const codigoLimpo = codigoBipado.trim();
     if (!codigoLimpo) return;
+
+    const tipoPallet = pallet?.tipo?.toUpperCase() || '';
+    const isRetriagemOuNovo = tipoPallet.includes('RETRIAGEM') || tipoPallet.includes('NOVO');
+
+    if (!isRetriagemOuNovo) {
+      const padraoEsperado = /^000\d{5}$/;
+      if (!padraoEsperado.test(codigoLimpo)) {
+        tocarSom('ERRO');
+        setMensagemStatus({ 
+          texto: 'Erro! O código deve iniciar obrigatoriamente com 000 e conter 8 dígitos.', 
+          erro: true 
+        });
+        setCodigoBipado('');
+        return;
+      }
+    }
+
     if (isModoTransferencia) {
       if (pallet?.produtos.some(p => p.codigoItem === codigoLimpo)) {
         setItensParaTransferir(prev => prev.includes(codigoLimpo) ? prev : [...prev, codigoLimpo]);
@@ -271,7 +313,9 @@ export function usePalletLogic() {
 
   return {
     pallet: pallet ? { ...pallet, produtos: produtosFiltradosVisuais } : null,
-    activeUsers,
-    exclusoesPendentes, exibirModalExclusaoLote, acao, setAcao, codigoBipado, setCodigoBipado, mensagemStatus, setMensagemStatus, isModoTransferencia, setIsModoTransferencia, itensParaTransferir, setItensParaTransferir, palletsDestino, exibirModalDestino, setExibirModalDestino, carregandoDestinos, inputBipRef, carregandoRetriagem, qtdEtiquetas, setQtdEtiquetas, isEntrada: acao === 'ENTRADA', totalUnidades: produtosFiltradosVisuais.length, navigate, manterFocoNoInput, handleBipSubmit, handleGerarEtiquetaRetriagem, handleAdicionarTodoOPalletNoLote, handleFinalizerColetaTransferencia, handleLancarAoRMA, handleConfirmarDestinoFinal, handleExcluirItemLinha, handleDesfazerExclusaoItem, handleConfirmarExclusaoEmLote, handleDescartarExclusoesCache, handleTentarSairDaTela
+    activeUsers, exclusoesPendentes, exibirModalExclusaoLote, acao, setAcao, codigoBipado, setCodigoBipado, mensagemStatus, setMensagemStatus, isModoTransferencia, setIsModoTransferencia, itensParaTransferir, setItensParaTransferir, palletsDestino, exibirModalDestino, setExibirModalDestino, carregandoDestinos, inputBipRef, carregandoRetriagem, qtdEtiquetas, setQtdEtiquetas, isEntrada: acao === 'ENTRADA', totalUnidades: produtosFiltradosVisuais.length, navigate, manterFocoNoInput, handleBipSubmit, handleGerarEtiquetaRetriagem, handleAdicionarTodoOPalletNoLote, handleFinalizerColetaTransferencia, handleLancarAoRMA, handleConfirmarDestinoFinal, handleExcluirItemLinha, handleDesfazerExclusaoItem, handleConfirmarExclusaoEmLote, handleDescartarExclusoesCache, handleTentarSairDaTela,
+    
+    // 🚀 EXPORTANDO AS FUNÇÕES DO MODAL
+    exibirModalRastreabilidade, setExibirModalRastreabilidade, itemRastreabilidade, historicoData, carregandoHistorico, handleAbrirRastreabilidade
   };
 }

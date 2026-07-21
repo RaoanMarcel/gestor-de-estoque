@@ -3,11 +3,11 @@ import PalletHeader from "./components/parts/PalletHeader";
 import BipagemPanel from "./components/parts/BipagemPanel";
 import ConteudoAtualPanel from "./components/parts/ConteudoAtualPanel";
 import ModalDestino from "./components/parts/ModalDestino";
+import ModalRastreabilidade from "./components/parts/ModalRastreabilidade"; // NOVO IMPORT
 
 export default function PalletInterface() {
   const {
     pallet,
-    activeUsers, 
     exclusoesPendentes,
     exibirModalExclusaoLote,
     acao,
@@ -41,7 +41,13 @@ export default function PalletInterface() {
     handleDesfazerExclusaoItem,
     handleConfirmarExclusaoEmLote,
     handleDescartarExclusoesCache,
-    handleTentarSairDaTela
+    handleTentarSairDaTela,
+    exibirModalRastreabilidade,
+    setExibirModalRastreabilidade,
+    itemRastreabilidade,
+    historicoData,
+    carregandoHistorico,
+    handleAbrirRastreabilidade
   } = usePalletLogic();
 
   if (!pallet) {
@@ -62,7 +68,6 @@ export default function PalletInterface() {
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-6">
         <PalletHeader
           pallet={pallet}
-          activeUsers={activeUsers} // 🔄 ALTERAÇÃO: Repassando activeUsers para renderizar os avatares no cabeçalho
           isModoTransferencia={isModoTransferencia}
           setIsModoTransferencia={setIsModoTransferencia}
           setMensagemStatus={setMensagemStatus}
@@ -102,6 +107,7 @@ export default function PalletInterface() {
             handleExcluirItemLinha={handleExcluirItemLinha}
             exclusoesPendentes={exclusoesPendentes}
             handleDesfazerExclusaoItem={handleDesfazerExclusaoItem}
+            handleAbrirRastreabilidade={handleAbrirRastreabilidade} 
           />
         </div>
 
@@ -111,6 +117,14 @@ export default function PalletInterface() {
           itensParaTransferir={itensParaTransferir}
           palletsDestino={palletsDestino}
           handleConfirmarDestinoFinal={handleConfirmarDestinoFinal}
+        />
+
+        <ModalRastreabilidade
+          exibir={exibirModalRastreabilidade}
+          fechar={() => setExibirModalRastreabilidade(false)}
+          codigoItem={itemRastreabilidade}
+          historico={historicoData}
+          carregando={carregandoHistorico}
         />
       </div>
 

@@ -1,4 +1,3 @@
-// components/parts/BipagemPanel.tsx
 import type { FormEvent, RefObject } from "react";
 import type { PalletData } from "../types/types";
 
@@ -44,11 +43,9 @@ export default function BipagemPanel({
   handleLancarAoRMA,
 }: BipagemPanelProps) {
   
-  // Identifica o tipo do pallet para alterar as dicas dinamicamente
   const tipoPallet = pallet?.tipo?.toUpperCase() || '';
   const isRetriagemOuNovo = tipoPallet.includes('RETRIAGEM') || tipoPallet.includes('NOVO');
 
-  // Textos dinâmicos dos placeholders
   const placeholderEntrada = isRetriagemOuNovo 
     ? 'Bipando ENTRADA (Ex: P-00044)...' 
     : 'Bipando ENTRADA (Ex: 00012345)...';
@@ -58,31 +55,31 @@ export default function BipagemPanel({
     : 'Bipando SAÍDA (Ex: 00012345)...';
 
   return (
-    <div className="lg:col-span-2 bg-white/80 backdrop-blur-xl rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-6">
+    <div className="lg:col-span-2 bg-white/85 backdrop-blur-xl rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-6">
 
       {!isModoTransferencia ? (
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setAcao('ENTRADA')}
             className={`p-4 rounded-xl text-xs font-semibold uppercase tracking-[0.15em] border transition-all flex items-center justify-center gap-2 ${
-              isEntrada ? 'bg-emerald-50 border-emerald-500/60 text-emerald-700 shadow-[0_10px_30px_-12px_rgba(16,185,129,0.4)]' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+              isEntrada ? 'bg-emerald-50 border-emerald-500/60 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
             }`}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${isEntrada ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]' : 'bg-slate-300'}`} />
+            <span className={`h-1.5 w-1.5 rounded-full ${isEntrada ? 'bg-emerald-500' : 'bg-slate-300'}`} />
             Entrada de Produtos
           </button>
           <button
             onClick={() => setAcao('SAIDA')}
             className={`p-4 rounded-xl text-xs font-semibold uppercase tracking-[0.15em] border transition-all flex items-center justify-center gap-2 ${
-              !isEntrada ? 'bg-rose-50 border-rose-500/60 text-rose-700 shadow-[0_10px_30px_-12px_rgba(244,63,94,0.4)]' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+              !isEntrada ? 'bg-rose-50 border-rose-500/60 text-rose-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
             }`}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${!isEntrada ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.7)]' : 'bg-slate-300'}`} />
+            <span className={`h-1.5 w-1.5 rounded-full ${!isEntrada ? 'bg-rose-500' : 'bg-slate-300'}`} />
             Exclusão / Saída
           </button>
         </div>
       ) : (
-        <div className="p-4 rounded-xl bg-blue-600 text-white text-center font-semibold text-xs uppercase tracking-widest shadow-[0_10px_30px_-12px_rgba(37,99,235,0.4)]">
+        <div className="p-4 rounded-xl bg-blue-600 text-white text-center font-semibold text-xs uppercase tracking-widest shadow-sm">
           🔵 MODO DE REMANEJAMENTO ATIVO · SELECIONE OS ITENS
         </div>
       )}
@@ -96,6 +93,7 @@ export default function BipagemPanel({
         <input
           ref={inputBipRef}
           type="text"
+          maxLength={isRetriagemOuNovo ? 20 : 8}
           placeholder={isModoTransferencia ? 'Bipando TRANSFERÊNCIA...' : isEntrada ? placeholderEntrada : placeholderSaida}
           className={`w-full p-6 rounded-xl font-mono text-2xl text-center font-semibold tracking-wider transition-all border-2 focus:outline-none focus:ring-4 ${
             isModoTransferencia
@@ -105,10 +103,35 @@ export default function BipagemPanel({
               : 'bg-rose-50/60 border-rose-500/50 text-rose-800 placeholder-rose-400/60 focus:ring-rose-500/15 focus:border-rose-500'
           }`}
           value={codigoBipado}
-          onChange={(e) => setCodigoBipado(e.target.value)}
+          onChange={(e) => {
+            let valorInjetado = e.target.value;
+            
+            if (isRetriagemOuNovo) {
+              setCodigoBipado(valorInjetado.toUpperCase());
+            } else {
+              // 🔄 ALTERAÇÃO: Algoritmo de bloqueio manual de não-zeros no início
+              let apenasNumeros = valorInjetado.replace(/\D/g, '');
+              let mascaraFinal = '';
+              
+              for (let i = 0; i < apenasNumeros.length; i++) {
+                if (i < 3) {
+                  // Se nos 3 primeiros caracteres o usuário digitar algo diferente de 0, bloqueia
+                  if (apenasNumeros[i] === '0') {
+                    mascaraFinal += '0';
+                  } else {
+                    break;
+                  }
+                } else {
+                  // Do quarto caractere em diante, permite qualquer número
+                  mascaraFinal += apenasNumeros[i];
+                }
+              }
+              
+              setCodigoBipado(mascaraFinal);
+            }
+          }}
         />
         
-        {/* DICA VISUAL ADAPTÁVEL */}
         <p className="text-center text-[11px] font-medium text-slate-400">
           {isRetriagemOuNovo ? (
             <>O código do item deve iniciar obrigatoriamente com <strong className="text-slate-500">P-</strong> seguido da numeração.</>
@@ -118,7 +141,6 @@ export default function BipagemPanel({
         </p>
       </form>
 
-      {/* SEÇÃO DE RETRIAGEM COM SELETOR DE QUANTIDADE */}
       {isRetriagemOuNovo && (
         <div className="p-5 border border-dashed border-blue-200 bg-blue-50/40 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex-1">
