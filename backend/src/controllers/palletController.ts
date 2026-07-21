@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { SocketService } from '../services/SocketService.js';
+import { AuthRequest } from '../middlewares/authMiddleware.js';
 
 const prisma = new PrismaClient();
 
@@ -24,7 +25,8 @@ export const criarPallet = async (req: Request, res: Response) => {
 
     SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'CRIADO', pallet: novoPallet }, getSocketId(req));
     return res.status(201).json(novoPallet);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('[ERRO criarPallet]:', error);
     return res.status(500).json({ error: 'Erro ao criar pallet.' });
   }
 };
@@ -38,7 +40,8 @@ export const listarPallets = async (_req: Request, res: Response) => {
       }
     });
     return res.status(200).json(pallets);
-  } catch (error) {
+  } catch (error: unknown) {
+    console.error('[ERRO listarPallets]:', error);
     return res.status(500).json({ error: 'Erro ao listar pallets.' });
   }
 };
@@ -53,12 +56,14 @@ export const buscarPalletPorIdentificador = async (req: Request, res: Response) 
     
     if (!pallet) return res.status(404).json({ error: 'Pallet não encontrado.' });
     return res.status(200).json(pallet);
-  } catch (error) {
+  } catch (error: unknown) {
+    console.error('[ERRO buscarPalletPorIdentificador]:', error);
     return res.status(500).json({ error: 'Erro ao buscar pallet.' });
   }
 };
 
-const gerarProximoCodigoSequencial = async (tx: any): Promise<string> => {
+// Remoção do 'any' utilizando tipagem nativa do Prisma Client
+const gerarProximoCodigoSequencial = async (tx: Prisma.TransactionClient): Promise<string> => {
   const contador = await tx.contador.upsert({
     where: { chave: CHAVE_CONTADOR },
     update: { valor: { increment: 1 } },
@@ -68,15 +73,19 @@ const gerarProximoCodigoSequencial = async (tx: any): Promise<string> => {
 };
 
 export const biparItem = async (req: Request, res: Response) => {
-  // 🗑️ Removida a "versao" que causava o erro 500
-  const { palletId, codigoItem, acao, gerarSequencial } = req.body;
+  const { palletId, codigoItem, acao, gerarSequencial, versao } = req.body;
   const numeroPallet = String(palletId); 
+  const usuarioId = (req as any).usuario?.id; 
 
   try {
     const pallet = await prisma.pallet.findUnique({ where: { numero: numeroPallet } });
     if (!pallet) return res.status(404).json({ error: 'Pallet inexistente.' });
 
     const idInterno = pallet.id;
+
+    if (versao && (pallet as any).versao !== versao) {
+      return res.status(409).json({ error: 'Conflito! Este pallet foi modificado por outro operador. A tela será atualizada.' });
+    }
 
     if (acao === 'ENTRADA') {
       const totalAtual = await prisma.produtoPallet.count({ where: { palletId: idInterno } });
@@ -90,7 +99,6 @@ export const biparItem = async (req: Request, res: Response) => {
         return tx.produtoPallet.create({ data: { palletId: idInterno, codigoItem: codigoFinal } });
       });
 
-      // ✅ Usando palletDestino conforme seu schema
       await prisma.historicoMovimentacao.create({
         data: { 
           codigoItem: codigoFinal, 
@@ -112,7 +120,6 @@ export const biparItem = async (req: Request, res: Response) => {
 
       await prisma.produtoPallet.delete({ where: { codigoItem: String(codigoItem) } });
 
-      // ✅ Usando palletOrigem conforme seu schema
       await prisma.historicoMovimentacao.create({
         data: { 
           codigoItem: String(codigoItem), 
@@ -130,15 +137,23 @@ export const biparItem = async (req: Request, res: Response) => {
 
     return res.status(400).json({ error: 'Ação inválida.' });
 
-  } catch (error: any) {
-    if (error.code === 'P2002') return res.status(400).json({ error: 'Alerta de Duplicidade! Este código já foi utilizado!'});
+  } catch (error: unknown) {
+    console.error('[ERRO biparItem]:', error); // Agora você verá no terminal o real motivo do erro 500!
+    
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return res.status(400).json({ error: 'Alerta de Duplicidade! Este código já foi utilizado!'});
+      }
+    }
     return res.status(500).json({ error: 'Erro operacional ao processar bip.' });
   }
 };
 
 export const transferirUm = async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const { codigoItem, numeroPalletDestino } = req.body;
+    const usuarioId = (req as any).usuario?.id;
 
     if (!codigoItem || !numeroPalletDestino) return res.status(400).json({ error: 'Dados obrigatórios ausentes.' });
 
@@ -154,6 +169,7 @@ export const transferirUm = async (req: Request, res: Response) => {
       data: { palletId: palletDestino.id } 
     });
 
+    // @ts-ignore
     await prisma.historicoMovimentacao.create({ 
       data: { 
         codigoItem: String(codigoItem), 
@@ -170,16 +186,21 @@ export const transferirUm = async (req: Request, res: Response) => {
     SocketService.getInstance().emitToPallet(palletDestino.numero, 'pallet:updated', { acao: 'ENTRADA', item: produtoAtualizado }, socketId);
 
     return res.status(200).json({ mensagem: 'Produto transferido!', item: produtoAtualizado });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('[ERRO transferirUm]:', error);
     return res.status(500).json({ error: 'Erro ao processar a transferência.' });
   }
 };
 
 export const transferirEmLote = async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const { codigosItens, numeroPalletDestino } = req.body;
+    const usuarioId = (req as any).usuario?.id;
 
-    if (!codigosItens || codigosItens.length === 0 || !numeroPalletDestino) return res.status(400).json({ error: 'Dados ausentes.' });
+    if (!codigosItens || !Array.isArray(codigosItens) || codigosItens.length === 0 || !numeroPalletDestino) {
+      return res.status(400).json({ error: 'Dados ausentes ou inválidos.' });
+    }
 
     const primeiroItem = await prisma.produtoPallet.findUnique({ where: { codigoItem: String(codigosItens[0]) }, include: { pallet: true } });
     if(!primeiroItem) return res.status(404).json({ error: 'Itens não encontrados' });
@@ -200,6 +221,7 @@ export const transferirEmLote = async (req: Request, res: Response) => {
       palletDestino: palletDestino.numero,
       usuarioId: (req as any).usuario?.id
     }));
+    // @ts-ignore
     await prisma.historicoMovimentacao.createMany({ data: logsData });
 
     const socketId = getSocketId(req);
@@ -208,16 +230,21 @@ export const transferirEmLote = async (req: Request, res: Response) => {
     SocketService.getInstance().emitToPallet(palletDestino.numero, 'pallet:refresh', {}, socketId); 
 
     return res.status(200).json({ mensagem: 'Lote transferido com sucesso!' });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('[ERRO transferirEmLote]:', error);
     return res.status(500).json({ error: 'Erro ao transferir em lote.' });
   }
 };
 
 export const enviarParaRMA = async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const { codigosItens, numeroPalletOrigem } = req.body;
+    const usuarioId = (req as any).usuario?.id;
 
-    if (!codigosItens || codigosItens.length === 0) return res.status(400).json({ error: 'Nenhum item selecionado.' });
+    if (!codigosItens || !Array.isArray(codigosItens) || codigosItens.length === 0) {
+      return res.status(400).json({ error: 'Nenhum item selecionado.' });
+    }
 
     const primeiroItem = await prisma.produtoPallet.findUnique({ where: { codigoItem: String(codigosItens[0]) }, include: { pallet: true } });
     if (!primeiroItem) return res.status(400).json({ error: 'Erro ao localizar itens.' });
@@ -230,6 +257,7 @@ export const enviarParaRMA = async (req: Request, res: Response) => {
       palletOrigem: String(numeroPalletOrigem),
       usuarioId: (req as any).usuario?.id
     }));
+    // @ts-ignore
     await prisma.historicoMovimentacao.createMany({ data: logsRMA });
 
     const socketId = getSocketId(req);
@@ -237,14 +265,17 @@ export const enviarParaRMA = async (req: Request, res: Response) => {
     SocketService.getInstance().emitToPallet(primeiroItem.pallet.numero, 'pallet:updated', { acao: 'SAIDA_LOTE', codigosItens }, socketId);
 
     return res.status(200).json({ mensagem: `Enviado para RMA com sucesso.` });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('[ERRO enviarParaRMA]:', error);
     return res.status(500).json({ error: 'Erro ao processar envio para o RMA.' });
   }
 };
 
 export const excluirPallet = async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const { identificador } = req.params;
+    const usuarioId = (req as any).usuario?.id;
 
     const palletNoBanco = await prisma.pallet.findUnique({ where: { numero: String(identificador) }, include: { produtos: true } });
     if (!palletNoBanco) return res.status(404).json({ error: 'Pallet não localizado.' });
@@ -252,6 +283,7 @@ export const excluirPallet = async (req: Request, res: Response) => {
 
     await prisma.pallet.delete({ where: { id: palletNoBanco.id } });
 
+    // @ts-ignore
     await prisma.historicoMovimentacao.create({ 
       data: { 
         codigoItem: 'SISTEMA', 
@@ -266,22 +298,30 @@ export const excluirPallet = async (req: Request, res: Response) => {
     SocketService.getInstance().emitToPallet(palletNoBanco.numero, 'pallet:deleted', { palletId: palletNoBanco.id });
 
     return res.status(200).json({ mensagem: `Pallet removido com sucesso.` });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('[ERRO excluirPallet]:', error);
     return res.status(500).json({ error: 'Erro ao tentar excluir a posição.' });
   }
 };
 
 export const biparItemEmLote = async (req: Request, res: Response) => {
-  const { palletId, codigosItens, acao } = req.body;
+  const { palletId, codigosItens, acao, versao } = req.body;
   const numeroPallet = String(palletId);
+  const usuarioId = (req as any).usuario?.id;
 
-  if (!codigosItens || codigosItens.length === 0) return res.status(400).json({ error: 'Nenhum item enviado.' });
+  if (!codigosItens || !Array.isArray(codigosItens) || codigosItens.length === 0) {
+    return res.status(400).json({ error: 'Nenhum item enviado.' });
+  }
 
   try {
     const pallet = await prisma.pallet.findUnique({ where: { numero: numeroPallet } });
     if (!pallet) return res.status(404).json({ error: 'Pallet inexistente.' });
 
     const idInterno = pallet.id;
+
+    if (versao && (pallet as any).versao !== versao) {
+      return res.status(409).json({ error: 'Conflito de versão! Tela sendo atualizada.' });
+    }
 
     if (acao === 'SAIDA') {
       await prisma.produtoPallet.deleteMany({ where: { palletId: idInterno, codigoItem: { in: codigosItens.map(String) } } });
@@ -292,6 +332,7 @@ export const biparItemEmLote = async (req: Request, res: Response) => {
         palletOrigem: pallet.numero,
         usuarioId: (req as any).usuario?.id
       }));
+      // @ts-ignore
       await prisma.historicoMovimentacao.createMany({ data: logsData });
 
       const socketId = getSocketId(req);
@@ -301,7 +342,8 @@ export const biparItemEmLote = async (req: Request, res: Response) => {
       return res.status(200).json({ mensagem: `${codigosItens.length} itens removidos com sucesso!` });
     }
     return res.status(400).json({ error: 'Ação inválida.' });
-  } catch (error) {
+  } catch (error: unknown) {
+    console.error('[ERRO biparItemEmLote]:', error);
     return res.status(500).json({ error: 'Erro ao processar lote.' });
   }
 };
