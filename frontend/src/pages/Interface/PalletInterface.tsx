@@ -1,4 +1,3 @@
-// src/pages/Interface/PalletInterface.tsx
 import { usePalletLogic } from "./components/hooks/usePalletLogic";
 import PalletHeader from "./components/parts/PalletHeader";
 import BipagemPanel from "./components/parts/BipagemPanel";
@@ -8,7 +7,7 @@ import ModalDestino from "./components/parts/ModalDestino";
 export default function PalletInterface() {
   const {
     pallet,
-    activeUsers,
+    activeUsers, 
     exclusoesPendentes,
     exibirModalExclusaoLote,
     acao,
@@ -39,46 +38,11 @@ export default function PalletInterface() {
     handleLancarAoRMA,
     handleConfirmarDestinoFinal,
     handleExcluirItemLinha,
-    
-    // Injeções novas do Hook
     handleDesfazerExclusaoItem,
     handleConfirmarExclusaoEmLote,
     handleDescartarExclusoesCache,
     handleTentarSairDaTela
   } = usePalletLogic();
-
-  // MÁSCARA DINÂMICA DE BIPAGEM
-  const handleCodigoBipadoComMascara = (valorRecebido: string) => {
-    // Verifica qual é o tipo do pallet atual
-    const tipo = pallet?.tipo?.toUpperCase() || '';
-    const isRetriagemOuNovo = tipo.includes('RETRIAGEM') || tipo.includes('NOVO');
-
-    if (isRetriagemOuNovo) {
-      // --- REGRA PARA RETRIAGEM E NOVO (P-XXXXX) ---
-      // 1. Força maiúscula e remove letras que não sejam P e símbolos que não sejam -
-      let valor = valorRecebido.toUpperCase().replace(/[^P\0-9]/g, '');
-
-      // 2. Regras de prefixo
-      if (valor.length > 0 && valor[0] !== 'P') return; // Tem que começar com P
-      if (valor.length > 1 && valor[1] !== '-') return; // O segundo tem que ser o hífen
-      
-      // 4. Trava um limite máximo de segurança (ex: 10 caracteres)
-      if (valor.length > 10) valor = valor.substring(0, 10);
-
-      setCodigoBipado(valor);
-
-    } else {
-      // --- REGRA PARA PADRÃO E DEFEITO (000XXXXX) ---
-      let valor = valorRecebido.replace(/\D/g, '');
-
-      if (valor.length > 8) valor = valor.substring(0, 8);
-      if (valor.length === 1 && valor !== '0') return;
-      if (valor.length === 2 && valor !== '00') return;
-      if (valor.length >= 3 && !valor.startsWith('000')) return;
-
-      setCodigoBipado(valor);
-    }
-  };
 
   if (!pallet) {
     return (
@@ -98,7 +62,7 @@ export default function PalletInterface() {
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-6">
         <PalletHeader
           pallet={pallet}
-          activeUsers={activeUsers}
+          activeUsers={activeUsers} // 🔄 ALTERAÇÃO: Repassando activeUsers para renderizar os avatares no cabeçalho
           isModoTransferencia={isModoTransferencia}
           setIsModoTransferencia={setIsModoTransferencia}
           setMensagemStatus={setMensagemStatus}
@@ -116,8 +80,7 @@ export default function PalletInterface() {
             isEntrada={isEntrada}
             isModoTransferencia={isModoTransferencia}
             codigoBipado={codigoBipado}
-            // MÁSCARA INTELIGENTE PASSADA AQUI
-            setCodigoBipado={handleCodigoBipadoComMascara}
+            setCodigoBipado={setCodigoBipado}
             handleBipSubmit={handleBipSubmit}
             inputBipRef={inputBipRef}
             qtdEtiquetas={qtdEtiquetas}

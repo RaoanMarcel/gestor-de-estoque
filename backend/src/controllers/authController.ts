@@ -7,6 +7,12 @@ const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const REFRESH_SECRET = process.env.REFRESH_SECRET || 'fallback_refresh_secret';
 
+interface TokenPayload {
+  id: number;
+  username: string;
+  // tenantId: number; // 🚀 Descomentaremos na Fase 4 (Multi-tenant)
+}
+
 export const authController = {
   async login(req: Request, res: Response) {
     try {
@@ -20,8 +26,8 @@ export const authController = {
       const senhaValida = await bcrypt.compare(senha, usuario.senha);
       if (!senhaValida) return res.status(401).json({ error: 'Usuário ou senha incorretos' });
 
-      // Geração da dupla de Tokens
-      const token = jwt.sign({ id: usuario.id, username: usuario.username }, JWT_SECRET, { expiresIn: '8h' });
+      const payload: TokenPayload = { id: usuario.id, username: usuario.username };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
       const refreshToken = jwt.sign({ id: usuario.id }, REFRESH_SECRET, { expiresIn: '7d' });
 
       return res.json({
@@ -30,24 +36,23 @@ export const authController = {
         precisaMudarSenha: usuario.precisaMudarSenha,
         username: usuario.username
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return res.status(500).json({ error: 'Erro interno no servidor de login' });
     }
   },
 
-  // NOVA FUNÇÃO: Rotação de credenciais
   async refreshToken(req: Request, res: Response) {
     try {
       const { refreshToken } = req.body;
       if (!refreshToken) return res.status(401).json({ error: 'Refresh token ausente' });
 
-      const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as any;
+      const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as { id: number };
       const usuario = await prisma.usuario.findUnique({ where: { id: decoded.id } });
       
       if (!usuario) return res.status(401).json({ error: 'Usuário inválido ou inativo' });
 
-      // Gera novo token de acesso válido por mais 8 horas
-      const newToken = jwt.sign({ id: usuario.id, username: usuario.username }, JWT_SECRET, { expiresIn: '8h' });
+      const payload: TokenPayload = { id: usuario.id, username: usuario.username };
+      const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
 
       return res.json({ token: newToken });
     } catch (error) {
@@ -69,7 +74,7 @@ export const authController = {
       });
 
       return res.json({ mensagem: 'Senha atualizada com sucesso!' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return res.status(500).json({ error: 'Erro ao atualizar a senha' });
     }
   },
@@ -96,7 +101,7 @@ export const authController = {
       });
 
       return res.json({ mensagem: 'Senha atualizada com sucesso!' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return res.status(500).json({ error: 'Erro ao atualizar a senha' });
     }
   },

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../../../services/api.js';
 import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../../../services/api';
 import type { Pallet, CriarPalletInput } from '../../../types/pallet';
 import { useToast } from '../../../contexts/toastContext';
 import { useSocket } from '../../../contexts/SocketContext';
@@ -66,13 +66,14 @@ export function usePallets() {
     const termo = qrCodeBipado.trim().toLowerCase();
     if (!termo) return;
     const palletEncontrado = pallets.find((p) => p.numero.toLowerCase() === termo);
-    if (palletEncontrado) navigate(`/pallet/${palletEncontrado.id}`);
+    
+    if (palletEncontrado) navigate(`/pallet/${palletEncontrado.numero}`);
     else { toast.error(`Pallet não localizado.`); setQrCodeBipado(''); }
   };
 
   const handleCriarPallet = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.numero) return toast.error ('O número do pallet é obrigatório!');
+    if (!form.numero) return toast.error('O número do pallet é obrigatório!');
     try {
       const numeroTemporario = form.numero; 
       await api.post('/pallets', form);
@@ -80,10 +81,12 @@ export function usePallets() {
       setIsModalOpen(false);
       carregarPallets();
       if (await toast.confirm(`Criada! Deseja emitir etiqueta agora?`)) imprimirEtiqueta(numeroTemporario);
-    } catch (error: any) { toast.error(error.response?.data?.error || 'Erro ao criar.'); }
+    } catch (error: any) { 
+      toast.error(error.response?.data?.error || 'Erro ao criar.'); 
+    }
   };
 
-  const palletsFiltrados = pallets.filter((pallet: any) => {
+  const palletsFiltrados = pallets.filter((pallet: Pallet) => {
     if (!busca.trim()) return true;
     const termoBusca = busca.trim().toLowerCase();
     const bateNomePallet = pallet.numero.toLowerCase().includes(termoBusca);

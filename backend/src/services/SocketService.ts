@@ -8,10 +8,7 @@ export class SocketService {
   private static instance: SocketService;
   private io: Server | null = null;
   
-  // Mapa em memória: Sala (palletId) -> Set de Usernames
-  // Usamos Set para evitar duplicatas caso o mesmo usuário abra duas abas
   private activeUsersInRooms: Map<string, Set<string>> = new Map();
-  // Rastreio reverso: SocketId -> Username e Salas que está conectado (para lidar com quedas)
   private socketData: Map<string, { username: string; rooms: Set<string> }> = new Map();
 
   private constructor() {}
@@ -32,7 +29,7 @@ export class SocketService {
       const token = socket.handshake.auth.token || socket.handshake.headers['authorization'];
       if (!token) return next(new Error('Acesso negado. Token não fornecido.'));
       try {
-        const tokenLimpo = token.replace('Bearer ', '');
+        const tokenLimpo = token.startsWith('Bearer ') ? token.slice(7) : token;
         const verificado = jwt.verify(tokenLimpo, JWT_SECRET);
         (socket as any).usuario = verificado;
         next();
@@ -48,21 +45,18 @@ export class SocketService {
       socket.join('global_malha');
       this.socketData.set(socket.id, { username, rooms: new Set() });
       
-      // Ao conectar, manda o estado atual de todas as salas para popular a malha
       socket.emit('presence:global_update', this.getGlobalPresenceData());
 
       socket.on('subscribe:pallet', (palletId: string | number) => {
         const sala = `pallet_${palletId}`;
         socket.join(sala);
         
-        // Registra a presença
         if (!this.activeUsersInRooms.has(String(palletId))) {
           this.activeUsersInRooms.set(String(palletId), new Set());
         }
         this.activeUsersInRooms.get(String(palletId))!.add(username);
         this.socketData.get(socket.id)!.rooms.add(String(palletId));
 
-        // Avisa a sala e a malha global
         this.broadcastPresenceUpdate(String(palletId));
       });
 
@@ -101,9 +95,7 @@ export class SocketService {
     if (!this.io) return;
     const users = Array.from(this.activeUsersInRooms.get(palletId) || []);
     
-    // Atualiza quem está dentro da tela
     this.io.to(`pallet_${palletId}`).emit('presence:room_update', { users });
-    // Atualiza o mapa global (Home)
     this.io.to('global_malha').emit('presence:global_update', this.getGlobalPresenceData());
   }
 

@@ -1,7 +1,6 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-// Define a versão do frontend via variável da Vercel (Padrão 1.0.0)
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0';
 
 const api = axios.create({
@@ -12,9 +11,13 @@ const api = axios.create({
   },
 });
 
-// Filas para segurar requisições enquanto o token atualiza
+interface FailedRequest {
+  resolve: (value: string | null) => void;
+  reject: (reason: any) => void;
+}
+
 let isRefreshing = false;
-let failedQueue: any[] = [];
+let failedQueue: FailedRequest[] = [];
 
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach(prom => {
@@ -24,7 +27,6 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// 1. Interceptor de REQUISIÇÃO (Injeta Tokens)
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('wms_token');
   const socketId = localStorage.getItem('wms_socket_id');
@@ -36,10 +38,8 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 2. Interceptor de RESPOSTA (Gerencia Versão e Refresh)
 api.interceptors.response.use(
   (response) => {
-    // Se a versão mudou de forma segura (Minor/Patch), avisa sutilmente (apenas 1x por sessão)
     const serverVersion = response.headers['x-backend-version'];
     if (serverVersion && serverVersion !== APP_VERSION) {
       if (!sessionStorage.getItem('update_notified')) {
@@ -52,7 +52,6 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // FLUXO DE VERSION LOCK (Hard Update Forçado pelo Backend)
     if (error.response?.status === 426) {
       if (!sessionStorage.getItem('hard_update_triggered')) {
         sessionStorage.setItem('hard_update_triggered', 'true');
@@ -62,12 +61,11 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // FLUXO DE REFRESH TOKEN (Quando o token de 8h expira)
     if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== '/auth/login' && originalRequest.url !== '/auth/refresh') {
       originalRequest._retry = true;
 
       if (isRefreshing) {
-        return new Promise(function(resolve, reject) {
+        return new Promise<string | null>(function(resolve, reject) {
           failedQueue.push({ resolve, reject });
         }).then(token => {
           originalRequest.headers['Authorization'] = 'Bearer ' + token;
@@ -92,10 +90,9 @@ api.interceptors.response.use(
         originalRequest.headers['Authorization'] = 'Bearer ' + data.token;
         
         processQueue(null, data.token);
-        return api(originalRequest); // Refaz a requisição original que havia falhado
+        return api(originalRequest); 
 
       } catch (err) {
-        // Se o Refresh Token (7 dias) também expirou ou foi invalidado
         processQueue(err, null);
         localStorage.clear();
         toast.error('Sua sessão de segurança expirou. Faça login novamente.');

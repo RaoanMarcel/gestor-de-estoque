@@ -12,28 +12,18 @@ interface PalletHeaderProps {
   activeUsers?: string[];
 }
 
-// [ALTERADO] Nova paleta unificada e lógica determinística com salvaguarda aplicada ao cabeçalho do pallet
-const AVATAR_COLORS = [
-  { bg: 'bg-indigo-600', text: 'text-white' },
-  { bg: 'bg-emerald-600', text: 'text-white' },
-  { bg: 'bg-violet-600', text: 'text-white' },
-  { bg: 'bg-amber-600', text: 'text-white' },
-  { bg: 'bg-rose-600', text: 'text-white' },
-  { bg: 'bg-cyan-600', text: 'text-white' },
-  { bg: 'bg-teal-600', text: 'text-white' },
-  { bg: 'bg-fuchsia-600', text: 'text-white' },
-  { bg: 'bg-blue-600', text: 'text-white' },
-  { bg: 'bg-orange-600', text: 'text-white' }
-];
-
-const obterCorAvatar = (username: string) => {
-  if (!username) return AVATAR_COLORS[0];
+const getAvatarColor = (name: string) => {
+  if (!name) return 'bg-slate-400';
+  const colors = [
+    'bg-rose-500', 'bg-blue-600', 'bg-emerald-600', 
+    'bg-amber-500', 'bg-purple-600', 'bg-cyan-600', 
+    'bg-indigo-500', 'bg-pink-500', 'bg-teal-600'
+  ];
   let hash = 0;
-  for (let i = 0; i < username.length; i++) {
-    hash = username.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const index = Math.abs(hash) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[index];
+  return colors[Math.abs(hash) % colors.length];
 };
 
 export default function PalletHeader({
@@ -57,16 +47,17 @@ export default function PalletHeader({
 
       <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 w-full sm:w-auto justify-end">
         
+        {/* AVATARES DOS USUÁRIOS ATIVOS NA TELA */}
         {activeUsers.length > 0 && (
           <div className="flex items-center gap-2 mr-2 bg-slate-50 px-2.5 py-1.5 rounded-full border border-slate-200 shadow-sm">
             <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Ativos</span>
             <div className="flex -space-x-2" title={`${activeUsers.join(', ')} nesta tela`}>
-              {/* [ALTERADO] Desestruturação da cor nova para os usuários ativos na interface de bipagem */}
               {activeUsers.map((user, idx) => {
-                const cor = obterCorAvatar(user);
+                const bgCor = getAvatarColor(user);
+                const inicial = user.charAt(0).toUpperCase();
                 return (
-                  <div key={idx} className={`h-6 w-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold uppercase shadow-sm relative z-10 hover:z-20 transition-all hover:-translate-y-0.5 ${cor.bg} ${cor.text}`}>
-                    {user.charAt(0)}
+                  <div key={idx} className={`h-6 w-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white uppercase shadow-sm relative z-10 hover:z-20 transition-all hover:-translate-y-0.5 ${bgCor}`}>
+                    {inicial}
                   </div>
                 );
               })}

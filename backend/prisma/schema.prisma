@@ -1,3 +1,5 @@
+// schema.prisma
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -10,12 +12,11 @@ generator client {
 model Pallet {
   id        Int             @id @default(autoincrement())
   numero    String          @unique 
-  rua       String?
+  rua       String?         
   estrutura String?         
   nivel     String?         
   tipo      String? 
-  descricao String?
-  versao    Int             @default(1)
+  descricao String?        
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   produtos  ProdutoPallet[] 
@@ -29,12 +30,18 @@ model ProdutoPallet {
   bipadoEm   DateTime       @default(now())
 }
 
+// 🔄 ALTERAÇÃO: Modelo expandido para suportar Rastreabilidade Total e Linha do Tempo
 model HistoricoMovimentacao {
-  id         Int            @id @default(autoincrement())
-  codigoItem String   
-  acao       String   
-  palletAlvo String   
-  bipadoEm   DateTime?      @default(now())
+  id             Int      @id @default(autoincrement())
+  codigoItem     String   
+  codigoAnterior String?  // Novo: Para vincular o código antigo ao novo na retriagem
+  acao           String   
+  palletOrigem   String?  // Novo: De qual pallet saiu
+  palletDestino  String?  // Novo: Para qual pallet entrou
+  usuarioId      Int?
+  usuario        Usuario? @relation(fields: [usuarioId], references: [id])
+  
+  createdAt      DateTime @default(now())
 }
 
 model Usuario {
@@ -43,6 +50,7 @@ model Usuario {
   senha              String
   precisaMudarSenha  Boolean  @default(true)
   createdAt          DateTime @default(now())
+  historicos         HistoricoMovimentacao[]
 }
 
 model Contador {

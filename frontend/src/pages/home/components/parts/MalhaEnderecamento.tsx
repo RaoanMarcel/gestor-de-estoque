@@ -30,7 +30,6 @@ const getFilterActiveStyle = (id: string) => {
   }
 };
 
-// [ALTERADO] Nova paleta unificada e lógica determinística com salvaguarda
 const AVATAR_COLORS = [
   { bg: 'bg-indigo-600', text: 'text-white' },
   { bg: 'bg-emerald-600', text: 'text-white' },
@@ -106,7 +105,7 @@ export default function MalhaEnderecamento({
           <input 
             type="text" placeholder="Buscar triagem em pallet, rua!" value={busca} 
             onChange={(e) => { setBusca(e.target.value); setPaginasAtuais({}); }}
-            className="w-full sm:w-80 border border-slate-200 rounded-lg px-4 py-2 text-xs text-slate-700 outline-none shadow-sm"
+            className="w-full sm:w-80 border border-slate-200 rounded-lg px-4 py-2 text-xs text-slate-700 outline-none shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
           />
         </div>
 
@@ -146,10 +145,11 @@ export default function MalhaEnderecamento({
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {listaPaginada.map((p) => {
-                    const usuariosNestePallet = presenceData[String(p.id)] || [];
+                    // 🔄 ALTERADO: Busca no socket usando o "numero" em vez do "id", pois a nossa rota mudou para /pallet/99
+                    const usuariosNestePallet = presenceData[String(p.numero)] || [];
 
                     return (
-                      <div key={p.id} onClick={() => navigate(`/pallet/${p.id}`)}
+                      <div key={p.id} onClick={() => navigate(`/pallet/${p.numero}`)}
                         className={`group relative rounded-xl p-4 min-h-[130px] flex flex-col justify-between cursor-pointer border transition-all duration-300 hover:scale-[1.03] hover:shadow ${getCardStyle(chave)}`}>
                         
                         <div className={`absolute top-0 left-4 h-[2.5px] w-12 rounded-b-full transition-all duration-300 group-hover:w-16 ${getTopBarStyle(chave)}`} />
@@ -169,6 +169,7 @@ export default function MalhaEnderecamento({
                           </div>
                         </div>
 
+                        {/* RENDERIZAÇÃO DOS USUÁRIOS ONLINE (Sockets) */}
                         {usuariosNestePallet.length > 0 && (
                           <div className="mt-3 flex items-center justify-between border-t border-slate-200/50 pt-3">
                             <div className="flex items-center gap-1.5">
@@ -176,15 +177,16 @@ export default function MalhaEnderecamento({
                               <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider">Em uso por:</span>
                             </div>
                             <div className="flex -space-x-1.5" title={`${usuariosNestePallet.join(', ')} editando`}>
-                              {/* [ALTERADO] Desestruturação da cor nova no mapeamento dos usuários */}
+                              
                               {usuariosNestePallet.slice(0, 3).map((user, idx) => {
                                 const cor = obterCorAvatar(user);
                                 return (
                                   <div key={idx} className={`h-6 w-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold uppercase shadow-sm relative z-10 ${cor.bg} ${cor.text}`}>
-                                    {user.charAt(0)}
+                                    {user.charAt(0).toUpperCase()}
                                   </div>
                                 );
                               })}
+                              
                               {usuariosNestePallet.length > 3 && (
                                 <div className="h-6 w-6 rounded-full bg-slate-100 border-2 border-white text-slate-600 flex items-center justify-center text-[10px] font-bold shadow-sm relative z-0">
                                   +{usuariosNestePallet.length - 3}

@@ -1,9 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
+import type { FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { PalletData } from '../types/types'; 
 import api from '../../../../services/api'; 
 import { useToast } from '../../../../contexts/toastContext';
 import { useSocket } from '../../../../contexts/SocketContext'; 
+
+let globalAudioContext: AudioContext | null = null;
+const getAudioContext = () => {
+  if (!globalAudioContext) {
+    globalAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  if (globalAudioContext.state === 'suspended') {
+    globalAudioContext.resume();
+  }
+  return globalAudioContext;
+};
 
 export function usePalletLogic() {
   const { id } = useParams<{ id: string }>();
@@ -103,7 +115,7 @@ export function usePalletLogic() {
   };
 
   const tocarSom = (tipo: 'ENTRADA' | 'SAIDA' | 'ERRO') => {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const ctx = getAudioContext();
     if (tipo === 'ENTRADA') {
       const osc = ctx.createOscillator(); const gain = ctx.createGain();
       osc.type = 'sine'; osc.frequency.setValueAtTime(1200, ctx.currentTime);
@@ -164,7 +176,7 @@ export function usePalletLogic() {
     else navigate(rotaDestino);
   };
 
-  const handleBipSubmit = async (e: React.FormEvent) => {
+  const handleBipSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const codigoLimpo = codigoBipado.trim();
     if (!codigoLimpo) return;
