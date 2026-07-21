@@ -17,12 +17,12 @@ SocketService.getInstance().init(httpServer);
 
 const prisma = new PrismaClient();
 const PORT = Number(process.env.PORT) || 3001;
-
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 
 app.use(cors());
 app.use(express.json());
 
+// Middleware de verificação de versão do App
 app.use((req, res, next) => {
   res.setHeader('X-Backend-Version', APP_VERSION);
   
@@ -45,19 +45,34 @@ app.use((req, res, next) => {
   next();
 });
 
+// Rota pública de status da API
 app.get('/api/status', (req, res) => {
   res.json({ status: 'API Rodando perfeitamente!', versao: APP_VERSION, timestamp: new Date() });
 });
 
-// Rotas de Autenticação
-app.post('/api/auth/login', authController.login);
-app.post('/api/auth/refresh', authController.refreshToken); 
-app.post('/api/auth/alterar-senha', authController.alterarSenha); 
-app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.alterarSenhaAutenticado);
-app.post('/api/auth/admin/cadastrar', authController.cadastrarUsuario);
+// ==============================================================================
+// ROTAS PÚBLICAS DE AUTENTICAÇÃO (Não usam autenticarToken)
+// ==============================================================================
+const publicAuthRouter = express.Router();
 
+publicAuthRouter.post('/login', authController.login);
+publicAuthRouter.post('/refresh', authController.refreshToken); 
+publicAuthRouter.post('/alterar-senha', authController.alterarSenha); 
+publicAuthRouter.post('/admin/cadastrar', authController.cadastrarUsuario);
+
+app.use('/api/auth', publicAuthRouter);
+
+// ==============================================================================
+// ROTAS PROTEGIDAS DE AUTENTICAÇÃO
+// ==============================================================================
+app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.alterarSenhaAutenticado);
+
+// ==============================================================================
+// DEMAIS ROTAS PROTEGIDAS DA APLICAÇÃO
+// ==============================================================================
 app.use('/api', autenticarToken, palletRoutes);
 
+// Inicialização do Servidor
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor ativo na porta ${PORT} | Versão: ${APP_VERSION}`);
 });
