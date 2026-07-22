@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent, MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '../../contexts/toastContext';
+import { useToast } from '../../contexts/toastContext'; 
 import { usePallets } from './hooks/usePallets';
 import { imprimirEtiqueta } from './components/utils/imprimirEtiqueta';
 import HomeHeader from './components/parts/HomeHeader';
@@ -15,12 +15,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export default function Home() {
   const navigate = useNavigate();
-  // Modificado: Injeção dos métodos do ToastContext
-  const toast = useToast();
+  const toast = useToast(); 
 
   const {
     palletsFiltrados,
-    presenceData,
     busca,
     setBusca,
     isModalOpen,
@@ -31,30 +29,29 @@ export default function Home() {
     setQrCodeBipado,
     qrInputRef,
     handleQrBipado,
-    handleCriarPallet
+    handleCriarPallet,
+    carregarPallets // 🚀 INJETANDO A FUNÇÃO DE RECARREGAMENTO
   } = usePallets();
 
-  const [isExcelModalOpen, setIsExcelModalOpen] = useState<boolean>(false);
-  const [palletSelecionado, setPalletSelecionado] = useState<string>('');
-  const [nomeArquivo, setNomeArquivo] = useState<string>('');
-  const [carregandoExcel, setCarregandoExcel] = useState<boolean>(false);
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+  const [palletSelecionado, setPalletSelecionado] = useState('');
+  const [nomeArquivo, setNomeArquivo] = useState('');
+  const [carregandoExcel, setCarregandoExcel] = useState(false);
 
   const totalPallets = palletsFiltrados.length;
   const palletsOcupados = palletsFiltrados.filter(p => (p._count?.produtos || 0) >= 140).length;
   const palletsVazios = totalPallets - palletsOcupados;
 
-  // Modificado: Remoção do window.confirm e window.location.reload
   const handleExcluirPalletCard = async (e: MouseEvent, palletId: number, numeroPallet: string) => {
     e.stopPropagation(); 
     
-    // Substituído por modal assíncrono do ToastContext
     const confirmou = await toast.confirm(`Deseja realmente excluir permanentemente a posição "${numeroPallet}" da malha?`);
     if (!confirmou) return;
 
     try {
       const token = localStorage.getItem('wms_token');
 
-      const response = await fetch(`${API_URL}/pallets/${palletId}`, {
+      const response = await fetch(`${API_URL}/pallets/${numeroPallet}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -69,6 +66,9 @@ export default function Home() {
       }
 
       toast.success(resultado.mensagem || "Posição removida com sucesso!");
+      
+      // 🚀 ATUALIZAÇÃO IMEDIATA: Força o recarregamento na tela de quem clicou
+      carregarPallets(); 
     } catch {
       toast.error("Erro de conexão ao tentar excluir a posição.");
     }
@@ -83,8 +83,8 @@ export default function Home() {
       const token = localStorage.getItem('wms_token');
 
       let urlEndpoint = `${API_URL}/historico/exportar`;
-      let corpoRequisicao: { palletAlvo: string; nomeArquivo: string } = { palletAlvo: palletSelecionado, nomeArquivo };
-      let configuracaoFetch: RequestInit = {
+      let corpoRequisicao: any = { palletAlvo: palletSelecionado, nomeArquivo };
+      let configuracaoFetch: any = {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -129,9 +129,8 @@ export default function Home() {
       setIsExcelModalOpen(false);
       setPalletSelecionado('');
       setNomeArquivo('');
-    } catch (error: unknown) {
-      const mensagem = error instanceof Error ? error.message : "Erro ao baixar o relatório.";
-      toast.error(mensagem);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao baixar o relatório.");
     } finally {
       setCarregandoExcel(false);
     }
@@ -162,7 +161,6 @@ export default function Home() {
           busca={busca}
           setBusca={setBusca}
           palletsFiltrados={palletsFiltrados}
-          presenceData={presenceData}
           navigate={navigate}
           handleExcluirPalletCard={handleExcluirPalletCard}
           imprimirEtiqueta={imprimirEtiqueta}

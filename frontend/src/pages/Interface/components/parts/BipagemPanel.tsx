@@ -1,3 +1,4 @@
+// src/pages/Interface/components/parts/BipagemPanel.tsx
 import type { FormEvent, RefObject } from "react";
 import type { PalletData } from "../types/types";
 
@@ -44,15 +45,54 @@ export default function BipagemPanel({
 }: BipagemPanelProps) {
   
   const tipoPallet = pallet?.tipo?.toUpperCase() || '';
-  const isRetriagemOuNovo = tipoPallet.includes('RETRIAGEM') || tipoPallet.includes('NOVO');
+  const descPallet = pallet?.descricao?.toUpperCase() || '';
+  const numPallet = pallet?.numero?.toUpperCase() || '';
+  
+  // 🚀 LÓGICA INTELIGENTE DE PREFIXOS E MÁSCARAS (Junta a string toda para achar o padrão)
+  const textoBusca = `${tipoPallet} ${descPallet} ${numPallet}`;
 
-  const placeholderEntrada = isRetriagemOuNovo 
-    ? 'Bipando ENTRADA (Ex: P-00044)...' 
-    : 'Bipando ENTRADA (Ex: 00012345)...';
-    
-  const placeholderSaida = isRetriagemOuNovo 
-    ? 'Bipando SAÍDA (Ex: P-00044)...' 
-    : 'Bipando SAÍDA (Ex: 00012345)...';
+  let prefixo = '000';
+  let isEspecial = false;
+  let maxLen = 8;
+  let nomeOperacao = '';
+
+  if (textoBusca.includes('RETORNO') || numPallet.startsWith('R-')) {
+    prefixo = 'R-';
+    isEspecial = true;
+    maxLen = 7; 
+    nomeOperacao = 'RETORNO';
+  } else if (textoBusca.includes('NOVO') || numPallet.startsWith('N-')) {
+    prefixo = 'N-';
+    isEspecial = true;
+    maxLen = 7; 
+    nomeOperacao = 'PRODUTO NOVO';
+  } else if (textoBusca.includes('DEVOLUCAO') || numPallet.startsWith('CR-')) {
+    prefixo = 'CR-';
+    isEspecial = true;
+    maxLen = 8; 
+    nomeOperacao = 'DEVOLUÇÃO';
+  } else if (textoBusca.includes('RETRIAGEM')) {
+    prefixo = '000';
+    isEspecial = true; // Retriagem pura permite a geração de etiquetas no padrão '000'
+    maxLen = 8;
+    nomeOperacao = 'RETRIAGEM';
+  }
+
+  const textoAcao = isEntrada ? 'ENTRADA' : 'SAÍDA';
+  const exemploCodigo = `${prefixo}12345`.substring(0, maxLen);
+  const placeholderInput = isModoTransferencia 
+    ? 'Bipando TRANSFERÊNCIA...' 
+    : `Bipando ${textoAcao} (Ex: ${exemploCodigo})...`;
+
+  const getTemaGerador = () => {
+    switch(prefixo) {
+      case 'R-': return { bg: 'bg-amber-50/60', border: 'border-amber-200', textTitle: 'text-amber-950', textDesc: 'text-amber-700', btn: 'bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400', focus: 'focus:ring-amber-500/40' };
+      case 'N-': return { bg: 'bg-teal-50/60', border: 'border-teal-200', textTitle: 'text-teal-950', textDesc: 'text-teal-700', btn: 'bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400', focus: 'focus:ring-teal-500/40' };
+      case 'CR-': return { bg: 'bg-purple-50/60', border: 'border-purple-200', textTitle: 'text-purple-950', textDesc: 'text-purple-700', btn: 'bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400', focus: 'focus:ring-purple-500/40' };
+      default: return { bg: 'bg-blue-50/60', border: 'border-blue-200', textTitle: 'text-blue-950', textDesc: 'text-blue-600', btn: 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400', focus: 'focus:ring-blue-500/40' };
+    }
+  };
+  const tema = getTemaGerador();
 
   return (
     <div className="lg:col-span-2 bg-white/85 backdrop-blur-xl rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-6">
@@ -93,8 +133,8 @@ export default function BipagemPanel({
         <input
           ref={inputBipRef}
           type="text"
-          maxLength={isRetriagemOuNovo ? 20 : 8}
-          placeholder={isModoTransferencia ? 'Bipando TRANSFERÊNCIA...' : isEntrada ? placeholderEntrada : placeholderSaida}
+          maxLength={maxLen}
+          placeholder={placeholderInput}
           className={`w-full p-6 rounded-xl font-mono text-2xl text-center font-semibold tracking-wider transition-all border-2 focus:outline-none focus:ring-4 ${
             isModoTransferencia
               ? 'bg-blue-50/60 border-blue-500/50 text-blue-800 placeholder-blue-400/60 focus:ring-blue-500/15 focus:border-blue-500'
@@ -104,51 +144,46 @@ export default function BipagemPanel({
           }`}
           value={codigoBipado}
           onChange={(e) => {
-            let valorInjetado = e.target.value;
+            let valorInjetado = e.target.value.toUpperCase();
             
-            if (isRetriagemOuNovo) {
-              setCodigoBipado(valorInjetado.toUpperCase());
+            if (prefixo !== '000') {
+              setCodigoBipado(valorInjetado.trim());
             } else {
-              // 🔄 ALTERAÇÃO: Algoritmo de bloqueio manual de não-zeros no início
               let apenasNumeros = valorInjetado.replace(/\D/g, '');
               let mascaraFinal = '';
-              
               for (let i = 0; i < apenasNumeros.length; i++) {
                 if (i < 3) {
-                  // Se nos 3 primeiros caracteres o usuário digitar algo diferente de 0, bloqueia
                   if (apenasNumeros[i] === '0') {
                     mascaraFinal += '0';
                   } else {
                     break;
                   }
                 } else {
-                  // Do quarto caractere em diante, permite qualquer número
                   mascaraFinal += apenasNumeros[i];
                 }
               }
-              
               setCodigoBipado(mascaraFinal);
             }
           }}
         />
         
         <p className="text-center text-[11px] font-medium text-slate-400">
-          {isRetriagemOuNovo ? (
-            <>O código do item deve iniciar obrigatoriamente com <strong className="text-slate-500">P-</strong> seguido da numeração.</>
+          {prefixo !== '000' ? (
+            <>O código do item deve iniciar obrigatoriamente com <strong className="text-slate-600">{prefixo}</strong> seguido da numeração.</>
           ) : (
-            <>O código da triagem deve conter exatamente <strong className="text-slate-500">8 números</strong> e iniciar obrigatoriamente com <strong className="text-slate-500">000</strong>.</>
+            <>O código da triagem deve conter exatamente <strong className="text-slate-600">8 números</strong> e iniciar obrigatoriamente com <strong className="text-slate-600">000</strong>.</>
           )}
         </p>
       </form>
 
-      {isRetriagemOuNovo && (
-        <div className="p-5 border border-dashed border-blue-200 bg-blue-50/40 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
+      {isEspecial && (
+        <div className={`p-5 border border-dashed rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 transition-colors duration-300 ${tema.bg} ${tema.border}`}>
           <div className="flex-1">
-            <h3 className="text-xs font-bold text-blue-950 uppercase tracking-wider m-0">
-              CÓDIGO DE IDENTIFICAÇÃO
+            <h3 className={`text-xs font-bold uppercase tracking-wider m-0 ${tema.textTitle}`}>
+              GERAÇÃO DE ETIQUETAS · {nomeOperacao}
             </h3>
-            <p className="text-[11px] text-blue-600/90 mt-1 mb-0 leading-relaxed">
-              Escolha a quantidade de caixas que deseja etiquetar. O sistema registrará os códigos sequenciais automaticamente.
+            <p className={`text-[11px] mt-1 mb-0 leading-relaxed font-medium ${tema.textDesc}`}>
+              Escolha a quantidade de caixas. O sistema registrará e imprimirá os códigos <strong className="font-bold">{prefixo}</strong> automaticamente.
             </p>
           </div>
 
@@ -158,12 +193,13 @@ export default function BipagemPanel({
               <input
                 type="number"
                 min={1}
+                max={50}
                 value={qtdEtiquetas}
                 onChange={(e) => {
                   const valor = Number(e.target.value);
                   setQtdEtiquetas(valor > 0 ? valor : 1);
                 }}
-                className="bg-white border border-slate-200 rounded-lg h-11 px-3 text-sm font-semibold text-slate-700 text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-[70px]"
+                className={`bg-white border border-slate-200 rounded-lg h-11 px-3 text-sm font-semibold text-slate-700 text-center focus:outline-none focus:ring-2 w-[70px] ${tema.focus}`}
               />
             </div>
 
@@ -173,9 +209,9 @@ export default function BipagemPanel({
                 type="button"
                 disabled={carregandoRetriagem}
                 onClick={handleGerarEtiquetaRetriagem}
-                className="w-full md:w-auto shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-5 h-11 text-xs font-semibold rounded-lg shadow-sm transition-all tracking-wider uppercase flex items-center justify-center gap-2"
+                className={`w-full md:w-auto shrink-0 text-white px-5 h-11 text-xs font-bold rounded-lg shadow-sm transition-all tracking-wider uppercase flex items-center justify-center gap-2 ${tema.btn}`}
               >
-                {carregandoRetriagem ? 'Gerando...' : 'Gerar Novas'}
+                {carregandoRetriagem ? 'Gerando...' : 'Gerar e Imprimir'}
               </button>
             </div>
           </div>
@@ -184,7 +220,7 @@ export default function BipagemPanel({
 
       {mensagemStatus.texto && (
         <div
-          className={`p-4 rounded-xl font-medium text-center text-sm border backdrop-blur-xl ${
+          className={`p-4 rounded-xl font-medium text-center text-sm border backdrop-blur-xl animate-in fade-in duration-300 ${
             mensagemStatus.erro
               ? 'bg-rose-50/80 border-rose-200 text-rose-700'
               : isModoTransferencia
@@ -197,12 +233,12 @@ export default function BipagemPanel({
       )}
 
       {isModoTransferencia && (
-        <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
+        <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full animate-in slide-in-from-bottom-2 duration-300">
           <button
             type="button"
             onClick={handleFinalizerColetaTransferencia}
             disabled={carregandoDestinos}
-            className="flex-1 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs tracking-wider uppercase shadow-sm transition-all"
+            className="flex-1 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs tracking-wider uppercase shadow-sm transition-all disabled:opacity-50"
           >
             {carregandoDestinos ? 'Aguarde...' : `✓ Mover Posição (${itensParaTransferir.length})`}
           </button>

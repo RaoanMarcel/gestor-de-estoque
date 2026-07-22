@@ -5,7 +5,6 @@ import {
 } from '../controllers/palletController.js';
 import { exportarHistoricoExcel, exportarRelatorioRMA } from '../controllers/excelController.js';
 
-// 🔄 CORREÇÃO: Descomentado e restaurado para parar os erros 404
 import { buscarHistoricoItem } from '../controllers/historicoController.js'; 
 
 import { autenticarToken } from '../middlewares/authMiddleware.js'; 
@@ -19,7 +18,7 @@ router.get('/pallets/:identificador', autenticarToken, buscarPalletPorIdentifica
 router.get('/historico/exportar-rma', autenticarToken, exportarRelatorioRMA);
 router.post('/historico/exportar', autenticarToken, exportarHistoricoExcel);
 
-// 🔄 CORREÇÃO: Rota devolvida para o frontend conseguir buscar a timeline dos itens
+
 router.get('/historico/:codigoItem', autenticarToken, buscarHistoricoItem);
 
 router.post('/pallets/bipar', autenticarToken, biparItem);

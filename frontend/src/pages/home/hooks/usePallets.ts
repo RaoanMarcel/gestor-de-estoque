@@ -80,7 +80,8 @@ export function usePallets() {
       setForm({ numero: '', rua: '', estrutura: '', nivel: '', descricao: '', tipo: 'PADRAO' });
       setIsModalOpen(false);
       carregarPallets();
-      if (await toast.confirm(`Criada! Deseja emitir etiqueta agora?`)) imprimirEtiqueta(numeroTemporario);
+      const confirmou = await toast.confirm(`Criada! Deseja emitir etiqueta agora?`);
+      if (confirmou) imprimirEtiqueta(numeroTemporario);
     } catch (error: any) { 
       toast.error(error.response?.data?.error || 'Erro ao criar.'); 
     }
@@ -96,6 +97,7 @@ export function usePallets() {
 
   return {
     palletsFiltrados, presenceData, busca, setBusca, isModalOpen, setIsModalOpen,
-    form, setForm, qrCodeBipado, setQrCodeBipado, qrInputRef, handleQrBipado, handleCriarPallet
+    form, setForm, qrCodeBipado, setQrCodeBipado, qrInputRef, handleQrBipado, handleCriarPallet,
+    carregarPallets // 🚀 AGORA EXPORTAMOS A FUNÇÃO PARA FORÇAR A ATUALIZAÇÃO LOCAL
   };
 }

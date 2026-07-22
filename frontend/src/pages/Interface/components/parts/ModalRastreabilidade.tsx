@@ -1,5 +1,7 @@
+// src/pages/Interface/components/parts/ModalRastreabilidade.tsx
 import React from 'react';
 
+// ✅ Interface atualizada para receber o usuário aninhado
 interface HistoricoItem {
   id: number;
   codigoItem: string;
@@ -9,6 +11,7 @@ interface HistoricoItem {
   palletDestino?: string | null;
   bipadoEm?: string | null;
   createdAt?: string | null;
+  usuario?: { username: string } | null; 
 }
 
 interface ModalRastreabilidadeProps {
@@ -52,7 +55,6 @@ export default function ModalRastreabilidade({ exibir, fechar, codigoItem, histo
         className="bg-white rounded-2xl border border-slate-200 w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Cabeçalho */}
         <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">
           <div>
             <h2 className="text-lg font-bold text-slate-900 tracking-tight">Rastreabilidade do Item</h2>
@@ -65,7 +67,6 @@ export default function ModalRastreabilidade({ exibir, fechar, codigoItem, histo
           </button>
         </div>
 
-        {/* Corpo / Timeline */}
         <div className="p-6 max-h-[60vh] overflow-y-auto bg-slate-50/50">
           {carregando ? (
             <div className="flex justify-center items-center py-10 text-slate-400 text-sm font-medium animate-pulse">
@@ -79,10 +80,8 @@ export default function ModalRastreabilidade({ exibir, fechar, codigoItem, histo
             <div className="relative pl-3 ml-2 border-l-2 border-slate-200 space-y-6">
               {historico.map((hist, index) => (
                 <div key={hist.id || index} className="relative">
-                  {/* Ponto da Timeline */}
                   <div className="absolute -left-[17px] top-4 h-3 w-3 rounded-full bg-blue-500 ring-4 ring-white shadow-sm" />
                   
-                  {/* Card do Evento */}
                   <div className="ml-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center mb-3">
                       <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getBadgeStyle(hist.acao)}`}>
@@ -92,10 +91,21 @@ export default function ModalRastreabilidade({ exibir, fechar, codigoItem, histo
                         {formatarData(hist.bipadoEm || hist.createdAt)}
                       </span>
                     </div>
-                    <div className="text-sm text-slate-600 flex items-center gap-2">
+                    
+                    <div className="text-sm text-slate-600 flex items-center gap-2 mb-3">
                       <span className="font-semibold text-slate-800">Pallet:</span>
-                      <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold">
+                      <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200">
                         {obterIdentificadorPallet(hist)}
+                      </span>
+                    </div>
+
+                    {/* ✅ Rodapé do evento informando o usuário responsável */}
+                    <div className="flex items-center gap-1.5 pt-3 border-t border-slate-100">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-slate-400">
+                        <path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" />
+                      </svg>
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        Operação por: <strong className="text-slate-700">{hist.usuario?.username || 'Sistema'}</strong>
                       </span>
                     </div>
                   </div>
@@ -105,7 +115,6 @@ export default function ModalRastreabilidade({ exibir, fechar, codigoItem, histo
           )}
         </div>
 
-        {/* Rodapé */}
         <div className="p-4 border-t border-slate-100 bg-white">
           <button
             onClick={fechar}

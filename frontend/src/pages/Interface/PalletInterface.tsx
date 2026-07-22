@@ -1,9 +1,11 @@
+// src/pages/Interface/PalletInterface.tsx
 import { usePalletLogic } from "./components/hooks/usePalletLogic";
 import PalletHeader from "./components/parts/PalletHeader";
 import BipagemPanel from "./components/parts/BipagemPanel";
 import ConteudoAtualPanel from "./components/parts/ConteudoAtualPanel";
 import ModalDestino from "./components/parts/ModalDestino";
-import ModalRastreabilidade from "./components/parts/ModalRastreabilidade"; // NOVO IMPORT
+import ModalNovaEtiqueta from "./components/parts/ModalNovaEtiqueta";
+import ModalRastreabilidade from "./components/parts/ModalRastreabilidade"; // 🚀 IMPORT DO MODAL DO HISTÓRICO
 
 export default function PalletInterface() {
   const {
@@ -42,12 +44,31 @@ export default function PalletInterface() {
     handleConfirmarExclusaoEmLote,
     handleDescartarExclusoesCache,
     handleTentarSairDaTela,
+    
+    // Estados do Histórico 
     exibirModalRastreabilidade,
     setExibirModalRastreabilidade,
     itemRastreabilidade,
     historicoData,
     carregandoHistorico,
-    handleAbrirRastreabilidade
+    handleAbrirRastreabilidade, // 🚀 RECUPERANDO A FUNÇÃO DE ABRIR O HISTÓRICO
+    
+    // Estados do Modal Puxar
+    exibirModalPuxar,
+    setExibirModalPuxar,
+    codigoPuxar,
+    setCodigoPuxar,
+    handlePuxarItemSubmit,
+    inputPuxarRef,
+
+    // Estados do Modal Vermelho de Nova Etiqueta
+    modalNovaEtiqueta,
+    cancelarNovaEtiqueta,
+    dadosRetriagem,
+    novaEtiquetaBipada,
+    setNovaEtiquetaBipada,
+    handleBiparNovaEtiquetaSubmit,
+    inputNovaEtiquetaRef
   } = usePalletLogic();
 
   if (!pallet) {
@@ -75,6 +96,7 @@ export default function PalletInterface() {
           setItensParaTransferir={setItensParaTransferir}
           handleAdicionarTodoOPalletNoLote={handleAdicionarTodoOPalletNoLote}
           navigate={(rota) => handleTentarSairDaTela(String(rota))}
+          onAbrirModalPuxar={() => setExibirModalPuxar(true)}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -107,7 +129,7 @@ export default function PalletInterface() {
             handleExcluirItemLinha={handleExcluirItemLinha}
             exclusoesPendentes={exclusoesPendentes}
             handleDesfazerExclusaoItem={handleDesfazerExclusaoItem}
-            handleAbrirRastreabilidade={handleAbrirRastreabilidade} 
+            handleAbrirRastreabilidade={handleAbrirRastreabilidade} // 🚀 REPASSANDO A FUNÇÃO PARA OS BOTÕES
           />
         </div>
 
@@ -119,6 +141,7 @@ export default function PalletInterface() {
           handleConfirmarDestinoFinal={handleConfirmarDestinoFinal}
         />
 
+        {/* 🚀 MODAL DE RASTREABILIDADE (HISTÓRICO) */}
         <ModalRastreabilidade
           exibir={exibirModalRastreabilidade}
           fechar={() => setExibirModalRastreabilidade(false)}
@@ -126,8 +149,65 @@ export default function PalletInterface() {
           historico={historicoData}
           carregando={carregandoHistorico}
         />
+
+        <ModalNovaEtiqueta 
+          exibir={modalNovaEtiqueta}
+          cancelar={cancelarNovaEtiqueta}
+          dadosRetriagem={dadosRetriagem}
+          novaEtiquetaBipada={novaEtiquetaBipada}
+          setNovaEtiquetaBipada={setNovaEtiquetaBipada}
+          handleBiparNovaEtiquetaSubmit={handleBiparNovaEtiquetaSubmit}
+          inputRef={inputNovaEtiquetaRef}
+        />
       </div>
 
+      {/* MODAL DE PUXAR ITEM INDIVIDUAL */}
+      {exibirModalPuxar && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setExibirModalPuxar(false)}>
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-slate-900 uppercase tracking-tight">
+                Puxar Item para {pallet.numero}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Digite ou bipe o código do item que está em outro pallet para transferi-lo imediatamente para cá.
+              </p>
+            </div>
+
+            <form onSubmit={handlePuxarItemSubmit} className="space-y-4 pt-2">
+              <input
+                ref={inputPuxarRef}
+                type="text"
+                value={codigoPuxar}
+                onChange={(e) => setCodigoPuxar(e.target.value.toUpperCase())}
+                placeholder="Ex: 00012345 ou CR-00004"
+                className="w-full text-center text-lg font-mono font-bold text-slate-800 bg-slate-50 border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all placeholder:text-slate-300"
+                autoComplete="off"
+                autoFocus
+              />
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setExibirModalPuxar(false)}
+                  className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs tracking-wider uppercase transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!codigoPuxar.trim()}
+                  className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs tracking-wider uppercase shadow-md disabled:opacity-50 transition-all"
+                >
+                  Confirmar Puxada
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DO LOTE EM CACHE (Interceptador de navegação) */}
       {exibirModalExclusaoLote && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
           <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4">
@@ -150,7 +230,6 @@ export default function PalletInterface() {
                       <span className="font-mono text-sm font-semibold text-slate-800">
                         {codigo}
                       </span>
-
                       <span className="text-[10px] uppercase tracking-wider text-rose-600 font-bold">
                         EXCLUSÃO
                       </span>

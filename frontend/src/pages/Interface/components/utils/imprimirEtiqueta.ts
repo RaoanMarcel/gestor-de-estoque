@@ -1,5 +1,5 @@
 // utils/imprimirEtiqueta.ts
-// Função utilitária de impressão da etiqueta de retriagem (60x40mm - Horizontal).
+// Função utilitária de impressão da etiqueta (60x40mm - Horizontal).
 
 const ESTILOS_ETIQUETA = `
   @page { size: 60mm 40mm; margin: 0; }
@@ -76,21 +76,31 @@ const ESTILOS_ETIQUETA = `
   }
 `;
 
+// 🚀 LÓGICA DE TÍTULO DINÂMICO
+const getTituloEtiqueta = (codigo: string) => {
+  if (codigo.startsWith('CR-')) return 'DEVOLUÇÃO';
+  if (codigo.startsWith('R-')) return 'RETORNO DE CAMPO';
+  if (codigo.startsWith('N-')) return 'PRODUTO NOVO';
+  return 'CÓDIGO DE RASTREABILIDADE';
+};
+
 export const imprimirEtiquetaRetriagem = (codigo: string) => {
   const janelaImpressao = window.open('', '_blank', 'width=500,height=400');
   if (!janelaImpressao) return;
 
+  const titulo = getTituloEtiqueta(codigo);
+
   janelaImpressao.document.write(`
     <html>
       <head>
-        <title>Etiqueta CR - ${codigo}</title>
+        <title>Etiqueta - ${codigo}</title>
         <style>${ESTILOS_ETIQUETA}</style>
       </head>
       <body>
         <div class="pagina">
           <div class="etiqueta">
             <div class="header">
-              <div class="title">CÓDIGO DE RASTREABILIDADE</div>
+              <div class="title">${titulo}</div>
             </div>
             <div class="barcode-container">
               <img id="barcode" class="barcode-img" />
@@ -126,32 +136,35 @@ export const imprimirEtiquetaRetriagem = (codigo: string) => {
   janelaImpressao.document.close();
 };
 
-// Imprime várias etiquetas de uma vez, em uma única janela/impressão (uma página por etiqueta).
 export const imprimirEtiquetasRetriagemLote = (codigos: string[]) => {
   if (codigos.length === 0) return;
 
   const janelaImpressao = window.open('', '_blank', 'width=500,height=400');
   if (!janelaImpressao) return;
 
-  const paginas = codigos.map((codigo, index) => `
-    <div class="pagina"${index > 0 ? ' style="page-break-before: always;"' : ''}>
-      <div class="etiqueta">
-        <div class="header">
-          <div class="title">CÓDIGO DE RASTREABILIDADE</div>
+  const paginas = codigos.map((codigo, index) => {
+    const titulo = getTituloEtiqueta(codigo);
+    
+    return `
+      <div class="pagina"${index > 0 ? ' style="page-break-before: always;"' : ''}>
+        <div class="etiqueta">
+          <div class="header">
+            <div class="title">${titulo}</div>
+          </div>
+          <div class="barcode-container">
+            <img class="barcode-img" data-codigo="${codigo}" />
+          </div>
+          <div class="code-text">${codigo}</div>
+          <div class="footer">PRO4CE WMS</div>
         </div>
-        <div class="barcode-container">
-          <img class="barcode-img" data-codigo="${codigo}" />
-        </div>
-        <div class="code-text">${codigo}</div>
-        <div class="footer">PRO4CE WMS</div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   janelaImpressao.document.write(`
     <html>
       <head>
-        <title>Etiquetas CR em Lote</title>
+        <title>Etiquetas em Lote</title>
         <style>${ESTILOS_ETIQUETA}</style>
       </head>
       <body>

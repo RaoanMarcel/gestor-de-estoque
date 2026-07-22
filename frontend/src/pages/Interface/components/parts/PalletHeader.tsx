@@ -1,3 +1,4 @@
+// src/pages/Interface/components/parts/PalletHeader.tsx
 import type { PalletData } from "../types/types";
 
 interface PalletHeaderProps {
@@ -10,6 +11,7 @@ interface PalletHeaderProps {
   handleAdicionarTodoOPalletNoLote: () => void;
   navigate: (rota: string) => void;
   activeUsers?: string[];
+  onAbrirModalPuxar?: () => void; 
 }
 
 const getAvatarColor = (name: string) => {
@@ -27,8 +29,12 @@ const getAvatarColor = (name: string) => {
 };
 
 export default function PalletHeader({
-  pallet, isModoTransferencia, setIsModoTransferencia, setMensagemStatus, itensParaTransferir, setItensParaTransferir, handleAdicionarTodoOPalletNoLote, navigate, activeUsers = []
+  pallet, isModoTransferencia, setIsModoTransferencia, setMensagemStatus, itensParaTransferir, setItensParaTransferir, handleAdicionarTodoOPalletNoLote, navigate, activeUsers = [], onAbrirModalPuxar
 }: PalletHeaderProps) {
+
+  // 🚀 LÓGICA DE TAGS VISUAIS INTELIGENTE
+  const tipoUpper = pallet.tipo?.toUpperCase() || '';
+
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-5 border-b border-slate-200 gap-4">
       <div className="space-y-1">
@@ -39,15 +45,17 @@ export default function PalletHeader({
           <h1 className="text-xl font-mono font-semibold tracking-tight text-slate-900">{pallet.numero}</h1>
           <span className="text-[10px] font-mono text-slate-500 bg-white/70 backdrop-blur px-2 py-0.5 rounded border border-slate-200">
             R:{pallet.rua || '-'} • E:{pallet.estrutura || '-'} • N:{pallet.nivel || '-'}
-            {pallet.tipo === 'DEFEITO' && ' • ⚠️ DEFEITO'}
-            {pallet.tipo === 'RETRIAGEM' && ' • 🏷️ RETRIAGEM'}
+            {tipoUpper.includes('DEFEITO') && ' • ⚠️ DEFEITO'}
+            {tipoUpper.includes('RETRIAGEM') && ' • 🏷️ RETRIAGEM'}
+            {tipoUpper.includes('RETORNO') && ' • ♻️ RETORNO'}
+            {tipoUpper.includes('DEVOLUCAO') && ' • ↩️ DEVOLUÇÃO'}
+            {tipoUpper.includes('NOVO') && ' • 🆕 NOVO'}
           </span>
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 w-full sm:w-auto justify-end">
         
-        {/* AVATARES DOS USUÁRIOS ATIVOS NA TELA */}
         {activeUsers.length > 0 && (
           <div className="flex items-center gap-2 mr-2 bg-slate-50 px-2.5 py-1.5 rounded-full border border-slate-200 shadow-sm">
             <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Ativos</span>
@@ -66,10 +74,17 @@ export default function PalletHeader({
         )}
 
         {!isModoTransferencia ? (
-          <button onClick={() => { setIsModoTransferencia(true); setMensagemStatus({ texto: 'Selecione os itens do lote.', erro: false }); }}
-            className="px-4 h-9 rounded-lg border border-blue-200 bg-white hover:bg-blue-50 text-blue-600 text-xs font-semibold tracking-wider uppercase transition-all">
-             Transferir Lote
-          </button>
+          <div className="flex items-center gap-2">
+            {onAbrirModalPuxar && (
+              <button onClick={onAbrirModalPuxar} className="px-4 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold tracking-wider uppercase transition-all shadow-sm">
+                Puxar Item
+              </button>
+            )}
+            <button onClick={() => { setIsModoTransferencia(true); setMensagemStatus({ texto: 'Selecione os itens do lote.', erro: false }); }}
+              className="px-4 h-9 rounded-lg border border-blue-200 bg-white hover:bg-blue-50 text-blue-600 text-xs font-semibold tracking-wider uppercase transition-all shadow-sm">
+               Transferir Lote
+            </button>
+          </div>
         ) : (
           <div className="flex items-center gap-2">
             <button onClick={handleAdicionarTodoOPalletNoLote} className="px-3 h-9 rounded-lg bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold tracking-wider uppercase transition-all">

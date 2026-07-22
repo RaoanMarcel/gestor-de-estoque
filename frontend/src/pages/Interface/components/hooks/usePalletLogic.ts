@@ -1,4 +1,3 @@
-// src/pages/Interface/components/hooks/usePalletLogic.ts
 import { useState, useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -49,28 +48,45 @@ export function usePalletLogic() {
   const [exibirModalExclusaoLote, setExibirModalExclusaoLote] = useState(false);
   const [rotaDestinoPendente, setRotaDestinoPendente] = useState<string | null>(null);
 
-  // 🚀 NOVOS ESTADOS DA RASTREABILIDADE
   const [exibirModalRastreabilidade, setExibirModalRastreabilidade] = useState(false);
   const [itemRastreabilidade, setItemRastreabilidade] = useState<string>('');
   const [historicoData, setHistoricoData] = useState<any[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
+  const [modalNovaEtiqueta, setModalNovaEtiqueta] = useState(false);
+  const [dadosRetriagem, setDadosRetriagem] = useState<{ codigoOriginal: string; prefixoEsperado: string } | null>(null);
+  const [novaEtiquetaBipada, setNovaEtiquetaBipada] = useState('');
+  
+  const [exibirModalPuxar, setExibirModalPuxar] = useState(false);
+  const [codigoPuxar, setCodigoPuxar] = useState('');
+
   const inputBipRef = useRef<HTMLInputElement>(null);
-  const manterFocoNoInput = () => { inputBipRef.current?.focus(); };
+  const inputNovaEtiquetaRef = useRef<HTMLInputElement>(null);
+  const inputPuxarRef = useRef<HTMLInputElement>(null);
+
+  const manterFocoNoInput = () => { 
+    if (modalNovaEtiqueta) {
+      inputNovaEtiquetaRef.current?.focus();
+    } else if (exibirModalPuxar) {
+      inputPuxarRef.current?.focus();
+    } else {
+      inputBipRef.current?.focus(); 
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(exclusoesPendentes));
   }, [exclusoesPendentes, LOCAL_STORAGE_KEY]);
 
+  useEffect(() => { manterFocoNoInput(); }, [acao, pallet, isModoTransferencia, exclusoesPendentes, exibirModalRastreabilidade, modalNovaEtiqueta, exibirModalPuxar]);
+
   useEffect(() => {
     if (!id || !socket) return;
-
     socket.emit('subscribe:pallet', id);
 
     const handlePalletUpdated = (payload: any) => {
       setPallet((prev) => {
         if (!prev) return prev;
-        
         let novosProdutos = [...prev.produtos];
         
         if (payload.acao === 'ENTRADA' && payload.item) {
@@ -80,20 +96,13 @@ export function usePalletLogic() {
         } else if (payload.acao === 'SAIDA_LOTE' && payload.codigosItens) {
           novosProdutos = novosProdutos.filter(p => !payload.codigosItens.includes(p.codigoItem));
         }
-
         return { ...prev, versao: (prev.versao || 1) + 1, produtos: novosProdutos };
       });
     };
 
     const handlePalletRefresh = () => { buscarDadosPallet(); };
-    const handlePalletDeleted = () => {
-      toast.error('Alerta: Este pallet foi excluído da malha.');
-      navigate('/');
-    };
-    
-    const handlePresenceUpdate = (data: { users: string[] }) => {
-      setActiveUsers(data.users);
-    };
+    const handlePalletDeleted = () => { toast.error('Alerta: Pallet excluído da malha.'); navigate('/'); };
+    const handlePresenceUpdate = (data: { users: string[] }) => { setActiveUsers(data.users); };
 
     socket.on('pallet:updated', handlePalletUpdated);
     socket.on('pallet:refresh', handlePalletRefresh);
@@ -110,7 +119,6 @@ export function usePalletLogic() {
   }, [id, socket, navigate, toast]);
 
   useEffect(() => { buscarDadosPallet(); }, [id]);
-  useEffect(() => { manterFocoNoInput(); }, [acao, pallet, isModoTransferencia, exclusoesPendentes, exibirModalRastreabilidade]);
 
   const buscarDadosPallet = async () => {
     try {
@@ -146,7 +154,6 @@ export function usePalletLogic() {
     }
   };
 
-  // 🚀 NOVA FUNÇÃO DA RASTREABILIDADE
   const handleAbrirRastreabilidade = async (codigoItem: string) => {
     setItemRastreabilidade(codigoItem);
     setExibirModalRastreabilidade(true);
@@ -162,8 +169,6 @@ export function usePalletLogic() {
     }
   };
 
-  //... O resto das funções continuam as mesmas: handleDesfazerExclusaoItem, etc ...
-
   const handleDesfazerExclusaoItem = (codigoItem: string) => {
     setExclusoesPendentes(prev => prev.filter(c => c !== codigoItem));
     tocarSom('ENTRADA');
@@ -174,7 +179,7 @@ export function usePalletLogic() {
     if (exclusoesPendentes.length === 0) return;
     try {
       setMensagemStatus({ texto: 'Processando baixa...', erro: false });
-      await api.post('/pallets/bipar-lote', { palletId: id, codigosItens: exclusoesPendentes, acao: 'SAIDA', versao: pallet?.versao });
+      await api.post('/pallets/bipar-lote', { palletId: id, codigosItens: exclusoesPendentes, acao: 'SAIDA' });
       tocarSom('SAIDA');
       setMensagemStatus({ texto: `${exclusoesPendentes.length} itens removidos!`, erro: false });
       setExclusoesPendentes([]);
@@ -203,18 +208,23 @@ export function usePalletLogic() {
 
   const handleBipSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const codigoLimpo = codigoBipado.trim();
+    const codigoLimpo = codigoBipado.trim().toUpperCase();
     if (!codigoLimpo) return;
 
+    // 🚀 BLINDAGEM DE ACORDO COM AS NOVAS REGRAS DE DESCRIÇÃO
     const tipoPallet = pallet?.tipo?.toUpperCase() || '';
-    const isRetriagemOuNovo = tipoPallet.includes('RETRIAGEM') || tipoPallet.includes('NOVO');
+    const descPallet = pallet?.descricao?.toUpperCase() || '';
+    const numPallet = pallet?.numero?.toUpperCase() || '';
+    const textoBusca = `${tipoPallet} ${descPallet} ${numPallet}`;
 
-    if (!isRetriagemOuNovo) {
+    const isPalletEspecial = ['DEVOLUCAO', 'RETORNO', 'NOVO', 'R-', 'CR-', 'N-'].some(t => textoBusca.includes(t));
+
+    if (!isPalletEspecial) {
       const padraoEsperado = /^000\d{5}$/;
       if (!padraoEsperado.test(codigoLimpo)) {
         tocarSom('ERRO');
         setMensagemStatus({ 
-          texto: 'Erro! O código deve iniciar obrigatoriamente com 000 e conter 8 dígitos.', 
+          texto: 'Erro! O código de triagem padrão deve iniciar com 000 e conter 8 dígitos.', 
           erro: true 
         });
         setCodigoBipado('');
@@ -229,21 +239,108 @@ export function usePalletLogic() {
       } else { tocarSom('ERRO'); setMensagemStatus({ texto: `Item não pertence!`, erro: true }); }
       setCodigoBipado(''); return;
     }
+
     if (acao === 'ENTRADA') {
       try {
-        await api.post('/pallets/bipar', { palletId: id, codigoItem: codigoLimpo, acao: 'ENTRADA', versao: pallet?.versao });
-        tocarSom('ENTRADA'); setMensagemStatus({ texto: 'Sucesso!', erro: false }); setCodigoBipado('');
+        const response = await api.post('/pallets/bipar', { palletId: id, codigoItem: codigoLimpo, acao: 'ENTRADA' });
+        
+        if (response.data.requerNovaBipagem) {
+          tocarSom('ERRO'); 
+          setDadosRetriagem({ codigoOriginal: response.data.codigoOriginal, prefixoEsperado: response.data.prefixoEsperado });
+          setModalNovaEtiqueta(true);
+          setCodigoBipado('');
+          return;
+        }
+
+        tocarSom('ENTRADA'); 
+        setMensagemStatus({ texto: response.data.mensagem || 'Sucesso!', erro: false }); 
+        setCodigoBipado('');
+
+        if (response.data.imprimirNovaEtiqueta && response.data.item) {
+          const { imprimirEtiquetasRetriagemLote } = await import('../utils/imprimirEtiqueta');
+          imprimirEtiquetasRetriagemLote([response.data.item.codigoItem]);
+          toast.success(`Etiqueta automática gerada: ${response.data.item.codigoItem}`);
+        }
+
         buscarDadosPallet();
       } catch (error: any) {
-        tocarSom('ERRO'); setMensagemStatus({ texto: error.response?.data?.error || 'Erro.', erro: true }); setCodigoBipado('');
+        tocarSom('ERRO'); setMensagemStatus({ texto: error.response?.data?.error || 'Erro de duplicidade ou operação.', erro: true }); setCodigoBipado('');
         if (error.response?.status === 409) await buscarDadosPallet();
       }
       return;
     }
+    
     if (acao === 'SAIDA') {
       if (exclusoesPendentes.includes(codigoLimpo)) { tocarSom('ERRO'); setMensagemStatus({ texto: `Já na fila!`, erro: true }); setCodigoBipado(''); return; }
       if (!pallet?.produtos.some(p => p.codigoItem === codigoLimpo)) { tocarSom('ERRO'); setMensagemStatus({ texto: `Não consta!`, erro: true }); setCodigoBipado(''); return; }
       setExclusoesPendentes(prev => [...prev, codigoLimpo]); tocarSom('SAIDA'); setMensagemStatus({ texto: `Fila pronta.`, erro: false }); setCodigoBipado('');
+    }
+  };
+
+  const handleBiparNovaEtiquetaSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const codigoLimpo = novaEtiquetaBipada.trim().toUpperCase();
+    if (!codigoLimpo || !dadosRetriagem) return;
+
+    try {
+      const response = await api.post('/pallets/bipar', {
+        palletId: id,
+        codigoItem: dadosRetriagem.codigoOriginal,
+        acao: 'ENTRADA',
+        novoCodigoBipado: codigoLimpo 
+      });
+      
+      tocarSom('ENTRADA');
+      setMensagemStatus({ texto: response.data.mensagem || 'Transformado!', erro: false });
+      setModalNovaEtiqueta(false);
+      setDadosRetriagem(null);
+      setNovaEtiquetaBipada('');
+      buscarDadosPallet();
+    } catch (error: any) {
+      tocarSom('ERRO');
+      toast.error(error.response?.data?.error || 'Erro na verificação da nova etiqueta.');
+      setNovaEtiquetaBipada(''); 
+    }
+  };
+
+  const cancelarNovaEtiqueta = () => {
+    setModalNovaEtiqueta(false);
+    setDadosRetriagem(null);
+    setNovaEtiquetaBipada('');
+    setMensagemStatus({ texto: 'Transformação cancelada pelo operador.', erro: true });
+  };
+
+  const handlePuxarItemSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const codigoLimpo = codigoPuxar.trim().toUpperCase();
+    if (!codigoLimpo) return;
+
+    try {
+      const response = await api.put('/pallets/transferir', {
+        codigoItem: codigoLimpo,
+        numeroPalletDestino: pallet?.numero
+      });
+
+      if (response.data.requerNovaBipagem) {
+        tocarSom('ERRO'); 
+        setDadosRetriagem({ 
+          codigoOriginal: response.data.codigoOriginal, 
+          prefixoEsperado: response.data.prefixoEsperado 
+        });
+        setExibirModalPuxar(false); 
+        setCodigoPuxar('');
+        setModalNovaEtiqueta(true); 
+        return;
+      }
+
+      tocarSom('ENTRADA');
+      toast.success(response.data.mensagem || `Item puxado com sucesso!`);
+      setExibirModalPuxar(false);
+      setCodigoPuxar('');
+      buscarDadosPallet();
+    } catch (error: any) {
+      tocarSom('ERRO');
+      toast.error(error.response?.data?.error || 'Erro ao puxar item.');
     }
   };
 
@@ -253,13 +350,27 @@ export function usePalletLogic() {
       const codigosGerados: string[] = [];
       for (let i = 0; i < qtdEtiquetas; i++) {
         const response = await api.post('/pallets/bipar', { palletId: id, acao: 'ENTRADA', gerarSequencial: true });
-        codigosGerados.push(response.data?.item?.codigoItem);
+        
+        if (response.data?.item?.codigoItem) {
+          codigosGerados.push(response.data.item.codigoItem);
+        } else {
+          throw new Error("Falha ao gerar código no servidor.");
+        }
       }
-      const { imprimirEtiquetasRetriagemLote } = await import('../utils/imprimirEtiqueta');
-      imprimirEtiquetasRetriagemLote(codigosGerados);
-      tocarSom('ENTRADA'); setMensagemStatus({ texto: `Etiquetas geradas.`, erro: false });
-      await buscarDadosPallet();
-    } catch (error: any) { tocarSom('ERRO'); setMensagemStatus({ texto: error.response?.data?.error || 'Erro.', erro: true }); } finally { setCarregandoRetriagem(false); }
+      
+      if (codigosGerados.length > 0) {
+        const { imprimirEtiquetasRetriagemLote } = await import('../utils/imprimirEtiqueta');
+        imprimirEtiquetasRetriagemLote(codigosGerados);
+        tocarSom('ENTRADA'); 
+        setMensagemStatus({ texto: `Etiquetas geradas.`, erro: false });
+        await buscarDadosPallet();
+      }
+    } catch (error: any) { 
+      tocarSom('ERRO'); 
+      setMensagemStatus({ texto: error.message || error.response?.data?.error || 'Erro na geração.', erro: true }); 
+    } finally { 
+      setCarregandoRetriagem(false); 
+    }
   };
 
   const handleAdicionarTodoOPalletNoLote = () => {
@@ -270,7 +381,8 @@ export function usePalletLogic() {
 
   const handleFinalizerColetaTransferencia = async () => {
     if (itensParaTransferir.length === 0) return toast.error("Nenhuma triagem.");
-    if (!await toast.confirm(`Prosseguir com transferência?`)) return;
+    const confirmou = await toast.confirm(`Prosseguir com transferência?`);
+    if (!confirmou) return;
     setCarregandoDestinos(true);
     try {
       const response = await api.get('/pallets');
@@ -280,7 +392,8 @@ export function usePalletLogic() {
 
   const handleLancarAoRMA = async () => {
     if (itensParaTransferir.length === 0) return toast.error("Vazio.");
-    if (!await toast.confirm(`Lançar ao RMA?`)) return;
+    const confirmou = await toast.confirm(`Lançar ao RMA?`);
+    if (!confirmou) return;
     try {
       await api.post('/pallets/enviar-rma', { codigosItens: itensParaTransferir, numeroPalletOrigem: pallet?.numero });
       toast.success(`Sucesso!`); setIsModoTransferencia(false); setItensParaTransferir([]); buscarDadosPallet();
@@ -289,15 +402,26 @@ export function usePalletLogic() {
 
   const handleConfirmarDestinoFinal = async (numeroPalletDestino: string) => {
     try {
-      await api.put('/pallets/transferir-lote', { codigosItens: itensParaTransferir, numeroPalletDestino: numeroPalletDestino });
-      toast.success("Concluída!"); setIsModoTransferencia(false); setItensParaTransferir([]); setExibirModalDestino(false); buscarDadosPallet();
-    } catch (error: any) { toast.error(error.response?.data?.error || "Erro."); }
+      const response = await api.put('/pallets/transferir-lote', { codigosItens: itensParaTransferir, numeroPalletDestino: numeroPalletDestino });
+      toast.success("Transferência concluída!"); 
+
+      if (response.data.imprimirNovaEtiqueta && response.data.codigosParaImprimir?.length > 0) {
+        const { imprimirEtiquetasRetriagemLote } = await import('../utils/imprimirEtiqueta');
+        imprimirEtiquetasRetriagemLote(response.data.codigosParaImprimir);
+        toast.success(`Impressão das novas etiquetas iniciada!`);
+      }
+
+      setIsModoTransferencia(false); setItensParaTransferir([]); setExibirModalDestino(false); buscarDadosPallet();
+    } catch (error: any) { 
+      toast.error(error.response?.data?.error || "Erro ao transferir em lote."); 
+    }
   };
 
   const handleExcluirItemLinha = async (codigoItem: string) => {
-    if (!await toast.confirm(`Deseja remover ${codigoItem}?`)) return;
+    const confirmou = await toast.confirm(`Deseja remover ${codigoItem}?`);
+    if (!confirmou) return;
     try {
-      await api.post('/pallets/bipar', { palletId: id, codigoItem, acao: 'SAIDA', versao: pallet?.versao });
+      await api.post('/pallets/bipar', { palletId: id, codigoItem, acao: 'SAIDA' });
       tocarSom('SAIDA'); 
       setPallet((prev) => {
         if(!prev) return prev;
@@ -309,13 +433,14 @@ export function usePalletLogic() {
     }
   };
 
-  const produtosFiltradosVisuais = pallet ? pallet.produtos.filter(p => !exclusoesPendentes.includes(p.codigoItem)) : [];
+  const produtosVisuais = pallet ? pallet.produtos : [];
+  const quantidadeAtiva = pallet ? pallet.produtos.length - exclusoesPendentes.length : 0;
 
   return {
-    pallet: pallet ? { ...pallet, produtos: produtosFiltradosVisuais } : null,
-    activeUsers, exclusoesPendentes, exibirModalExclusaoLote, acao, setAcao, codigoBipado, setCodigoBipado, mensagemStatus, setMensagemStatus, isModoTransferencia, setIsModoTransferencia, itensParaTransferir, setItensParaTransferir, palletsDestino, exibirModalDestino, setExibirModalDestino, carregandoDestinos, inputBipRef, carregandoRetriagem, qtdEtiquetas, setQtdEtiquetas, isEntrada: acao === 'ENTRADA', totalUnidades: produtosFiltradosVisuais.length, navigate, manterFocoNoInput, handleBipSubmit, handleGerarEtiquetaRetriagem, handleAdicionarTodoOPalletNoLote, handleFinalizerColetaTransferencia, handleLancarAoRMA, handleConfirmarDestinoFinal, handleExcluirItemLinha, handleDesfazerExclusaoItem, handleConfirmarExclusaoEmLote, handleDescartarExclusoesCache, handleTentarSairDaTela,
-    
-    // 🚀 EXPORTANDO AS FUNÇÕES DO MODAL
-    exibirModalRastreabilidade, setExibirModalRastreabilidade, itemRastreabilidade, historicoData, carregandoHistorico, handleAbrirRastreabilidade
+    pallet: pallet ? { ...pallet, produtos: produtosVisuais } : null,
+    activeUsers, exclusoesPendentes, exibirModalExclusaoLote, acao, setAcao, codigoBipado, setCodigoBipado, mensagemStatus, setMensagemStatus, isModoTransferencia, setIsModoTransferencia, itensParaTransferir, setItensParaTransferir, palletsDestino, exibirModalDestino, setExibirModalDestino, carregandoDestinos, inputBipRef, carregandoRetriagem, qtdEtiquetas, setQtdEtiquetas, isEntrada: acao === 'ENTRADA', totalUnidades: quantidadeAtiva, navigate, manterFocoNoInput, handleBipSubmit, handleGerarEtiquetaRetriagem, handleAdicionarTodoOPalletNoLote, handleFinalizerColetaTransferencia, handleLancarAoRMA, handleConfirmarDestinoFinal, handleExcluirItemLinha, handleDesfazerExclusaoItem, handleConfirmarExclusaoEmLote, handleDescartarExclusoesCache, handleTentarSairDaTela,
+    exibirModalRastreabilidade, setExibirModalRastreabilidade, itemRastreabilidade, historicoData, carregandoHistorico, handleAbrirRastreabilidade,
+    modalNovaEtiqueta, cancelarNovaEtiqueta, dadosRetriagem, novaEtiquetaBipada, setNovaEtiquetaBipada, handleBiparNovaEtiquetaSubmit, inputNovaEtiquetaRef,
+    exibirModalPuxar, setExibirModalPuxar, codigoPuxar, setCodigoPuxar, handlePuxarItemSubmit, inputPuxarRef
   };
 }

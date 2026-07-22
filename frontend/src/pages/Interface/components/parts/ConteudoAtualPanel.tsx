@@ -1,4 +1,3 @@
-// src/pages/Interface/components/parts/ConteudoAtualPanel.tsx
 import type { PalletData } from "../types/types";
 
 interface ConteudoAtualPanelProps {
@@ -9,7 +8,7 @@ interface ConteudoAtualPanelProps {
   handleExcluirItemLinha: (codigo: string) => void;
   exclusoesPendentes: string[];
   handleDesfazerExclusaoItem: (codigo: string) => void;
-  handleAbrirRastreabilidade: (codigo: string) => void; // Nova Prop
+  handleAbrirRastreabilidade: (codigo: string) => void; 
 }
 
 export default function ConteudoAtualPanel({
@@ -48,17 +47,29 @@ export default function ConteudoAtualPanel({
                 key={produto.codigoItem}
                 className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
                   isPendente 
-                    ? 'border-rose-300 bg-rose-50/50' 
+                    // 🔄 ALTERAÇÃO: Fundo mais suave e harmônico para itens excluídos
+                    ? 'border-rose-200 bg-rose-50/50' 
                     : isModoTransferencia && isSelecionadoTransf
                     ? 'border-blue-400 bg-blue-50'
                     : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'
                 }`}
               >
-                <div>
-                  <span className={`font-mono text-sm font-bold block ${isPendente ? 'text-rose-700 line-through' : 'text-slate-800'}`}>
-                    {produto.codigoItem}
-                  </span>
-                  <span className="text-[10px] font-medium text-slate-400 mt-1 block">
+                {/* 🔄 ALTERAÇÃO: Organização em coluna para agrupar melhor os elementos textuais */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2.5">
+                    {/* 🔄 ALTERAÇÃO: Texto cinza com risco vermelho delicado */}
+                    <span className={`font-mono text-sm font-bold block ${isPendente ? 'text-slate-400 line-through decoration-rose-400' : 'text-slate-800'}`}>
+                      {produto.codigoItem}
+                    </span>
+                    {/* 🔄 ALTERAÇÃO: Badge limpo, em fundo branco com borda rosa */}
+                    {isPendente && (
+                      <span className="text-[9px] font-bold uppercase tracking-wider bg-white border border-rose-200 text-rose-600 px-2 py-0.5 rounded-md shadow-sm">
+                        Exclusão
+                      </span>
+                    )}
+                  </div>
+                  {/* 🔄 ALTERAÇÃO: Data fica mais transparente se o item estiver excluído */}
+                  <span className={`text-[10px] font-medium ${isPendente ? 'text-rose-300' : 'text-slate-400'}`}>
                     {new Date(produto.bipadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
                 </div>
@@ -66,15 +77,18 @@ export default function ConteudoAtualPanel({
                 {!isModoTransferencia && (
                   <div className="flex items-center gap-2">
                     {isPendente ? (
+                      // 🔄 ALTERAÇÃO: Botão Neutro (Slate/Branco) com ícone. Fica verde apenas ao passar o mouse.
                       <button
                         onClick={() => handleDesfazerExclusaoItem(produto.codigoItem)}
-                        className="text-[10px] font-bold uppercase text-emerald-600 hover:text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+                        className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-600 hover:text-emerald-700 bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-all shadow-sm group"
                       >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 transition-colors">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                        </svg>
                         Desfazer
                       </button>
                     ) : (
                       <>
-                        {/* Botão Histórico (Rastreabilidade) */}
                         <button
                           onClick={() => handleAbrirRastreabilidade(produto.codigoItem)}
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -84,7 +98,6 @@ export default function ConteudoAtualPanel({
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                           </svg>
                         </button>
-                        {/* Botão Excluir */}
                         <button
                           onClick={() => handleExcluirItemLinha(produto.codigoItem)}
                           className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
