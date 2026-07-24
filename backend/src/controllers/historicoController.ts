@@ -3,18 +3,20 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export const buscarHistoricoItem = async (req: Request, res: Response) => {
-  const { codigoItem } = req.params;
+export const buscarHistoricoItem = async (req: Request, res: Response): Promise<Response | void> => {
+  const { codigoItem } = req.params; 
+  
   try {
+    const codigoFormatado = String(codigoItem).trim().toUpperCase();
+
     const historico = await prisma.historicoMovimentacao.findMany({
-      where: { codigoItem: String(codigoItem) },
-      orderBy: { bipadoEm: 'desc' },
-      include: {
-        usuario: {
-          select: { username: true }
-        }
-      }
+      where: { codigoItem: codigoFormatado },
+      orderBy: { bipadoEm: 'desc' }
     });
+    
+    if (!historico || historico.length === 0) {
+      return res.status(200).json([]);
+    }
     
     return res.status(200).json(historico);
   } catch (error) {

@@ -10,6 +10,7 @@ import MetricasPanel from './components/parts/MetricasPanel';
 import MalhaEnderecamento from './components/parts/MalhaEnderecamento';
 import ModalCriarPallet from './components/parts/ModalCriarPallet';
 import ModalExportarExcel from './components/parts/ModalExportarExcel';
+import ModalRastreabilidade from './components/parts/ModalRastreabilidade'; // 🚀 IMPORT DO MODAL DE HISTÓRICO
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -37,6 +38,8 @@ export default function Home() {
   const [palletSelecionado, setPalletSelecionado] = useState('');
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [carregandoExcel, setCarregandoExcel] = useState(false);
+  
+  const [isRastreabilidadeOpen, setIsRastreabilidadeOpen] = useState(false); // 🚀 ESTADO PARA O MODAL DE HISTÓRICO
 
   const totalPallets = palletsFiltrados.length;
   const palletsOcupados = palletsFiltrados.filter(p => (p._count?.produtos || 0) >= 140).length;
@@ -147,12 +150,26 @@ export default function Home() {
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-8">
         <HomeHeader setIsExcelModalOpen={setIsExcelModalOpen} setIsModalOpen={setIsModalOpen} />
 
-        <ScannerBar
-          handleQrBipado={handleQrBipado}
-          qrCodeBipado={qrCodeBipado}
-          setQrCodeBipado={setQrCodeBipado}
-          qrInputRef={qrInputRef}
-        />
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch">
+          <div className="flex-1">
+            <ScannerBar
+              handleQrBipado={handleQrBipado}
+              qrCodeBipado={qrCodeBipado}
+              setQrCodeBipado={setQrCodeBipado}
+              qrInputRef={qrInputRef}
+            />
+          </div>
+          
+          <button
+            onClick={() => setIsRastreabilidadeOpen(true)}
+            className="flex items-center justify-center gap-2 px-6 py-4 sm:py-0 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-xl font-semibold text-sm transition-all shadow-sm"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            Rastrear Item
+          </button>
+        </div>
 
         <MetricasPanel totalPallets={totalPallets} palletsOcupados={palletsOcupados} palletsVazios={palletsVazios} />
 
@@ -183,6 +200,12 @@ export default function Home() {
           carregandoExcel={carregandoExcel}
           handleExportarExcel={handleExportarExcel}
           palletsFiltrados={palletsFiltrados}
+        />
+
+        {/* RENDERIZAÇÃO DO COMPONENTE DO MODAL */}
+        <ModalRastreabilidade 
+          isOpen={isRastreabilidadeOpen} 
+          onClose={() => setIsRastreabilidadeOpen(false)} 
         />
       </div>
     </div>
