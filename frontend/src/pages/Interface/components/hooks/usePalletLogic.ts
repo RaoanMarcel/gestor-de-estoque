@@ -432,6 +432,61 @@ export function usePalletLogic() {
     }
   };
 
+  const handleLancarPalletNovo = async () => {
+    if (!pallet || pallet.produtos.length === 0) {
+      return toast.error("O pallet de novos está vazio. Não há itens para lançar.");
+    }
+
+    const confirmou = await toast.confirm(`Confirmar o lançamento e fechamento de lote para ${pallet.produtos.length} item(ns)?`);
+    if (!confirmou) return;
+
+    const senha = await toast.promptPassword("Insira a sua senha de operador para autorizar o lançamento do lote e limpar a posição.");
+    if (!senha) return; 
+
+    const toastLoading = toast.loading("Validando senha e gerando relatório Excel...");
+
+    try {
+      const response = await api.post('/pallets/lancar-novo', {
+        palletId: pallet.id,
+        senha: senha 
+      }, {
+        responseType: 'blob' 
+      });
+
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Fechamento_Lote_${pallet.numero}_${new Date().getTime()}.xlsx`;
+      
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.dismiss(toastLoading);
+      tocarSom('SAIDA'); 
+      toast.success("Lançamento autorizado, baixa executada e relatório gerado com sucesso!");
+      
+      buscarDadosPallet(); 
+    } catch (error: any) {
+      toast.dismiss(toastLoading);
+      tocarSom('ERRO');
+      
+      if (error.response?.data instanceof Blob) {
+        const text = await error.response.data.text();
+        try {
+          const jsonError = JSON.parse(text);
+          toast.error(jsonError.error || 'Erro ao processar lançamento.');
+        } catch {
+          toast.error('Erro desconhecido ao processar lançamento.');
+        }
+      } else {
+        toast.error(error.response?.data?.error || 'Erro interno de servidor.');
+      }
+    }
+  };
+
   const produtosVisuais = pallet ? pallet.produtos : [];
   const quantidadeAtiva = pallet ? pallet.produtos.length - exclusoesPendentes.length : 0;
 
@@ -440,6 +495,6 @@ export function usePalletLogic() {
     activeUsers, exclusoesPendentes, exibirModalExclusaoLote, acao, setAcao, codigoBipado, setCodigoBipado, mensagemStatus, setMensagemStatus, isModoTransferencia, setIsModoTransferencia, itensParaTransferir, setItensParaTransferir, palletsDestino, exibirModalDestino, setExibirModalDestino, carregandoDestinos, inputBipRef, carregandoRetriagem, qtdEtiquetas, setQtdEtiquetas, isEntrada: acao === 'ENTRADA', totalUnidades: quantidadeAtiva, navigate, manterFocoNoInput, handleBipSubmit, handleGerarEtiquetaRetriagem, handleAdicionarTodoOPalletNoLote, handleFinalizerColetaTransferencia, handleLancarAoRMA, handleConfirmarDestinoFinal, handleExcluirItemLinha, handleDesfazerExclusaoItem, handleConfirmarExclusaoEmLote, handleDescartarExclusoesCache, handleTentarSairDaTela,
     exibirModalRastreabilidade, setExibirModalRastreabilidade, itemRastreabilidade, historicoData, carregandoHistorico, handleAbrirRastreabilidade,
     modalNovaEtiqueta, cancelarNovaEtiqueta, dadosRetriagem, novaEtiquetaBipada, setNovaEtiquetaBipada, handleBiparNovaEtiquetaSubmit, inputNovaEtiquetaRef,
-    exibirModalPuxar, setExibirModalPuxar, codigoPuxar, setCodigoPuxar, handlePuxarItemSubmit, inputPuxarRef
+    exibirModalPuxar, setExibirModalPuxar, codigoPuxar, setCodigoPuxar, handlePuxarItemSubmit, inputPuxarRef, handleLancarPalletNovo
   };
 }

@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { SocketService } from '../services/SocketService.js';
+import bcrypt from 'bcryptjs';
+import ExcelJS from 'exceljs';
 
 const prisma = new PrismaClient();
 
@@ -496,5 +498,96 @@ export const biparItemEmLote = async (req: Request, res: Response): Promise<Resp
     return res.status(400).json({ error: 'Ação inválida.' });
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao processar lote.' });
+  }
+};
+
+// 🚀 NOVA ROTA EXCLUSIVA DE LANÇAMENTO (Validação de Senha + Baixa + Relatório)
+export const lancarPalletNovo = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const { palletId, senha } = req.body;
+    const usuarioId = (req as any).usuario?.id;
+
+    if (!palletId || !senha) {
+      return res.status(400).json({ error: 'Identificador do pallet e senha do operador são obrigatórios.' });
+    }
+
+    // 1. Validar Senha do Operador
+    const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+    if (!usuario) {
+      return res.status(404).json({ error: 'Sessão de usuário inválida.' });
+    }
+    const senhaValida = await bcrypt.compare(senha, usuario.senha);
+    if (!senhaValida) {
+      return res.status(401).json({ error: 'Senha incorreta! Operação de lançamento bloqueada.' });
+    }
+
+    // 2. Buscar Pallet e verificar disponibilidade
+    const pallet = await prisma.pallet.findUnique({
+      where: { id: Number(palletId) },
+      include: { produtos: true }
+    });
+
+    if (!pallet) return res.status(404).json({ error: 'Pallet não encontrado.' });
+    if (pallet.produtos.length === 0) return res.status(400).json({ error: 'O pallet não possui produtos para serem lançados.' });
+    if (pallet.tipo !== 'NOVO') return res.status(400).json({ error: 'Esta ação só é permitida em Pallets do tipo NOVO.' });
+
+    const codigosLançados = pallet.produtos.map(p => p.codigoItem);
+
+    // 3. Efetuar as baixas no banco de dados e Registrar no Histórico em Lote
+    await prisma.$transaction(async (tx) => {
+      // Deleta todos os produtos
+      await tx.produtoPallet.deleteMany({ where: { palletId: pallet.id } });
+
+      // Gera os registros de saída
+      const logsData = codigosLançados.map(codigo => ({
+        codigoItem: String(codigo),
+        acao: 'LANCAMENTO_LOTE_NOVO',
+        palletAlvo: pallet.numero,
+        palletOrigem: pallet.numero,
+        usuarioId: usuarioId
+      }));
+      await tx.historicoMovimentacao.createMany({ data: logsData as any });
+    });
+
+    // 4. Criação dinâmica da Planilha de Excel usando exceljs
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(`Relatório - ${pallet.numero}`);
+
+    worksheet.columns = [
+      { header: 'Código de Triagem', key: 'codigo', width: 25 },
+      { header: 'Posição (Pallet)', key: 'pallet', width: 20 },
+      { header: 'Operador Responsável', key: 'operador', width: 30 },
+      { header: 'Data do Lançamento', key: 'data', width: 25 },
+    ];
+
+    // Formatação de destaque para o cabeçalho
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; // Cor da sua paleta WMS
+
+    const dataHoraBrasil = new Date().toLocaleString('pt-BR');
+    
+    codigosLançados.forEach(codigo => {
+      worksheet.addRow({
+        codigo: codigo,
+        pallet: pallet.numero,
+        operador: usuario.username.toUpperCase(),
+        data: dataHoraBrasil
+      });
+    });
+
+    // Configurando os cabeçalhos de resposta para download binário (Blob)
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=Fechamento_${pallet.numero}.xlsx`);
+
+    await workbook.xlsx.write(res);
+    res.end(); // Finaliza a resposta binária
+
+    // 5. Comunica a mudança aos demais operadores (Sockets)
+    const socketId = getSocketId(req);
+    SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: pallet.id }, socketId);
+    SocketService.getInstance().emitToPallet(pallet.numero, 'pallet:refresh', {}, socketId); // Manda quem estiver na tela dar refresh (esvaziar tudo)
+
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Erro interno no servidor ao processar lançamento de lote.' });
   }
 };

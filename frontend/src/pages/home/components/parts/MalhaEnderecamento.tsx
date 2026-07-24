@@ -16,14 +16,16 @@ interface MalhaEnderecamentoProps {
 const OPCOES_FILTRO = [
   { id: 'PADRAO', titulo: 'Padrão / Triagem' },
   { id: 'DEFEITO', titulo: 'Defeitos / Avarias'},
-  { id: 'RETRIAGEM', titulo: 'Retriagem / Novo'},
+  { id: 'RETRIAGEM', titulo: 'Retriagem'},
+  { id: 'NOVO', titulo: 'Novos'}, 
   { id: 'DESCARTE', titulo: 'Descarte'},
 ];
 
 const getFilterActiveStyle = (id: string) => {
   switch (id) {
     case 'DEFEITO': return 'bg-rose-100 text-rose-800 border-rose-300';
-    case 'RETRIAGEM': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    case 'RETRIAGEM':
+    case 'NOVO': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
     case 'DESCARTE': return 'bg-slate-200 text-slate-800 border-slate-400';
     case 'PADRAO': return 'bg-amber-100 text-amber-900 border-amber-300';
     default: return 'bg-blue-100 text-blue-800 border-blue-300';
@@ -63,12 +65,15 @@ export default function MalhaEnderecamento({
   const [paginasAtuais, setPaginasAtuais] = useState<Record<string, number>>({});
 
   const palletsAgrupados = useMemo(() => {
-    const grupos: Record<string, Pallet[]> = { PADRAO: [], DEFEITO: [], RETRIAGEM: [], DESCARTE: [], OUTROS: [] };
+    const grupos: Record<string, Pallet[]> = { PADRAO: [], DEFEITO: [], RETRIAGEM: [], NOVO: [], DESCARTE: [], OUTROS: [] };
+    
     palletsFiltrados.forEach((pallet) => {
       const tipo = pallet.tipo?.toUpperCase() || 'PADRAO';
+      
       if (tipo.includes('DEFEITO')) grupos.DEFEITO.push(pallet);
       else if (tipo.includes('DESCARTE')) grupos.DESCARTE.push(pallet);
-      else if (tipo.includes('RETRIAGEM') || tipo.includes('NOVO') || tipo.includes('RETORNO')) grupos.RETRIAGEM.push(pallet);
+      else if (tipo.includes('NOVO')) grupos.NOVO.push(pallet); 
+      else if (tipo.includes('RETRIAGEM') || tipo.includes('RETORNO')) grupos.RETRIAGEM.push(pallet);
       else if (tipo.includes('PADRAO') || tipo.includes('GERAL')) grupos.PADRAO.push(pallet);
       else grupos.OUTROS.push(pallet);
     });
@@ -82,14 +87,14 @@ export default function MalhaEnderecamento({
   const getCardStyle = (tipo: string) => {
     if (tipo === 'DEFEITO') return 'bg-gradient-to-br from-white/95 to-rose-50/60 border-rose-100 hover:border-rose-300 hover:shadow-rose-200';
     if (tipo === 'DESCARTE') return 'bg-gradient-to-br from-white/95 to-slate-100/80 border-slate-200 hover:border-slate-400 hover:shadow-slate-300';
-    if (tipo === 'RETRIAGEM') return 'bg-gradient-to-br from-white/95 to-emerald-50/60 border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-200';
+    if (tipo === 'RETRIAGEM' || tipo === 'NOVO') return 'bg-gradient-to-br from-white/95 to-emerald-50/60 border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-200';
     return 'bg-gradient-to-br from-white/95 to-amber-50/60 border-amber-100/80 hover:border-amber-300 hover:shadow-amber-200';
   };
 
   const getTopBarStyle = (tipo: string) => {
     if (tipo === 'DEFEITO') return 'bg-rose-400';
     if (tipo === 'DESCARTE') return 'bg-slate-700';
-    if (tipo === 'RETRIAGEM') return 'bg-emerald-400';
+    if (tipo === 'RETRIAGEM' || tipo === 'NOVO') return 'bg-emerald-400';
     return 'bg-amber-400';
   };
 

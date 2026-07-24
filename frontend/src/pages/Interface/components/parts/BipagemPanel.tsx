@@ -97,22 +97,25 @@ export default function BipagemPanel({
 
       {!isModoTransferencia ? (
         <div className="grid grid-cols-2 gap-3">
+          {/* Botão de Entrada - Tom Verde Esmeralda Vibrante */}
           <button
             onClick={() => setAcao('ENTRADA')}
-            className={`p-4 rounded-xl text-xs font-semibold uppercase tracking-[0.15em] border transition-all flex items-center justify-center gap-2 ${
-              isEntrada ? 'bg-emerald-50 border-emerald-500/60 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+            className={`p-4 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] border transition-all flex items-center justify-center gap-2 ${
+              isEntrada ? 'bg-emerald-50/70 border-emerald-500 text-emerald-700 shadow-sm ring-1 ring-emerald-500/20' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${isEntrada ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+            <span className={`h-2 w-2 rounded-full ${isEntrada ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
             Entrada de Produtos
           </button>
+          
+          {/* Botão de Saída - Tom Vermelho Rose Vibrante */}
           <button
             onClick={() => setAcao('SAIDA')}
-            className={`p-4 rounded-xl text-xs font-semibold uppercase tracking-[0.15em] border transition-all flex items-center justify-center gap-2 ${
-              !isEntrada ? 'bg-rose-50 border-rose-500/60 text-rose-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+            className={`p-4 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] border transition-all flex items-center justify-center gap-2 ${
+              !isEntrada ? 'bg-rose-50/70 border-rose-500 text-rose-700 shadow-sm ring-1 ring-rose-500/20' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${!isEntrada ? 'bg-rose-500' : 'bg-slate-300'}`} />
+            <span className={`h-2 w-2 rounded-full ${!isEntrada ? 'bg-rose-500 animate-pulse' : 'bg-slate-300'}`} />
             Exclusão / Saída
           </button>
         </div>
@@ -128,17 +131,18 @@ export default function BipagemPanel({
           Aponte o leitor de código de barras
         </label>
         
+        {/* Input dinâmico refletindo perfeitamente a cor selecionada */}
         <input
           ref={inputBipRef}
           type="text"
           maxLength={maxLen}
           placeholder={placeholderInput}
-          className={`w-full p-6 rounded-xl font-mono text-2xl text-center font-semibold tracking-wider transition-all border-2 focus:outline-none focus:ring-4 ${
+          className={`w-full p-6 rounded-xl font-mono text-2xl text-center font-bold tracking-wider transition-all border-2 focus:outline-none focus:ring-4 ${
             isModoTransferencia
-              ? 'bg-blue-50/60 border-blue-500/50 text-blue-800 placeholder-blue-400/60 focus:ring-blue-500/15 focus:border-blue-500'
+              ? 'bg-blue-50/40 border-blue-400 text-blue-600 placeholder-blue-400/70 focus:ring-blue-500/20'
               : isEntrada
-              ? 'bg-emerald-50/60 border-emerald-500/50 text-emerald-800 placeholder-emerald-400/60 focus:ring-emerald-500/15 focus:border-emerald-500'
-              : 'bg-rose-50/60 border-rose-500/50 text-rose-800 placeholder-rose-400/60 focus:ring-rose-500/15 focus:border-rose-500'
+              ? 'bg-emerald-50/5ular border-emerald-500 text-emerald-700 placeholder-emerald-400/70 focus:ring-emerald-500/20'
+              : 'bg-rose-50/50 border-rose-500 text-rose-700 placeholder-rose-400/70 focus:ring-rose-500/20'
           }`}
           value={codigoBipado}
           onChange={(e) => {

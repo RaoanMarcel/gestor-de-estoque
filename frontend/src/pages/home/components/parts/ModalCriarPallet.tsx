@@ -47,6 +47,7 @@ export default function ModalCriarPallet({
               <option value="DEFEITO"> Pallet de Defeito / Avariados</option>
               <option value="RETRIAGEM"> Pallet de Retorno</option>
               <option value="DESCARTE">Pallet de Descarte</option>
+              <option value="NOVO">Pallet de Novos</option>
             </select>
           </div>
 

@@ -74,12 +74,12 @@ export default function PalletHeader({
         {!isModoTransferencia ? (
           <div className="flex items-center gap-2">
             {onAbrirModalPuxar && (
-              <button onClick={onAbrirModalPuxar} className="px-4 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold tracking-wider uppercase transition-all shadow-sm">
+              <button onClick={onAbrirModalPuxar} className="px-4 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 text-[11px] font-bold tracking-wider uppercase transition-all shadow-sm">
                 Puxar Item
               </button>
             )}
             <button onClick={() => { setIsModoTransferencia(true); setMensagemStatus({ texto: 'Selecione os itens do lote.', erro: false }); }}
-              className="px-4 h-9 rounded-lg border border-blue-200 bg-white hover:bg-blue-50 text-blue-600 text-xs font-semibold tracking-wider uppercase transition-all shadow-sm">
+              className="px-4 h-9 rounded-lg border border-blue-300 bg-white hover:bg-blue-50 text-blue-600 text-[11px] font-bold tracking-wider uppercase transition-all shadow-sm">
                Transferir Lote
             </button>
           </div>

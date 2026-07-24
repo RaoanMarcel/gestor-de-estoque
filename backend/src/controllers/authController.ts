@@ -133,5 +133,29 @@ export const authController = {
       console.error('🔥 [ERRO CRÍTICO - CADASTRAR USUÁRIO]:', error);
       return res.status(500).json({ error: 'Erro ao criar usuário' });
     }
+  },
+
+  async validarSenhaOperacao(req: Request, res: Response): Promise<Response | void> {
+    const usuarioId = (req as any).usuario?.id; 
+    const { senha } = req.body;
+
+    if (!usuarioId || !senha) {
+      return res.status(400).json({ error: 'Dados insuficientes para validação.' });
+    }
+
+    try {
+      const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+      if (!usuario) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
+      const senhaValida = await bcrypt.compare(senha, usuario.senha);
+      
+      if (!senhaValida) {
+        return res.status(401).json({ error: 'Senha incorreta. Ação bloqueada.' });
+      }
+
+      return res.status(200).json({ mensagem: 'Autenticação validada com sucesso.' });
+    } catch (error) {
+      return res.status(500).json({ error: 'Erro interno ao validar a senha.' });
+    }
   }
 };
