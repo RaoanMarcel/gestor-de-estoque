@@ -98,6 +98,6 @@ export function usePallets() {
   return {
     palletsFiltrados, presenceData, busca, setBusca, isModalOpen, setIsModalOpen,
     form, setForm, qrCodeBipado, setQrCodeBipado, qrInputRef, handleQrBipado, handleCriarPallet,
-    carregarPallets // 🚀 AGORA EXPORTAMOS A FUNÇÃO PARA FORÇAR A ATUALIZAÇÃO LOCAL
+    carregarPallets 
   };
 }

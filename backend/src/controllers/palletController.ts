@@ -1,4 +1,3 @@
-// src/controllers/palletController.ts
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { SocketService } from '../services/SocketService.js';
@@ -9,7 +8,6 @@ const getSocketId = (req: Request): string | undefined => {
   return req.headers['x-socket-id'] as string | undefined;
 };
 
-// 🚀 REGRA DE OURO INTELIGENTE (Agora lê a Descrição do Pallet também!)
 const getRegrasPallet = (pallet: any) => {
   const tipo = pallet?.tipo?.toUpperCase() || '';
   const desc = pallet?.descricao?.toUpperCase() || '';
@@ -47,7 +45,7 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
     if (!pallet) return res.status(404).json({ error: 'Pallet inexistente.' });
 
     const idInterno = pallet.id;
-    const regras = getRegrasPallet(pallet); // 🚀 Passando o objeto completo
+    const regras = getRegrasPallet(pallet); 
 
     if (acao === 'ENTRADA') {
       const totalAtual = await prisma.produtoPallet.count({ where: { palletId: idInterno } });
@@ -383,7 +381,6 @@ export const enviarParaRMA = async (req: Request, res: Response): Promise<Respon
   }
 };
 
-// 🚀 CORREÇÃO DO ERRO 404: Agora o sistema busca tanto pelo ID Numérico quanto pela String PL-99
 export const excluirPallet = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { identificador } = req.params;

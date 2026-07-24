@@ -1,4 +1,3 @@
-// components/parts/MetricasPanel.tsx
 interface MetricasPanelProps {
   totalPallets: number;
   palletsOcupados: number;

@@ -1,8 +1,6 @@
-// src/contexts/toastContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Toaster, toast, type Toast } from 'react-hot-toast';
 
-// 1. Tipagem das funções que estarão disponíveis no sistema
 interface ToastContextType {
   success: (message: string) => void;
   error: (message: string) => void;
@@ -13,15 +11,12 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-const DURATION = 5000; // Tempo de duração exato em milissegundos
+const DURATION = 4000; 
 
-// --- COMPONENTE DO TOAST CUSTOMIZADO (VISUAL MODERNIZADO) ---
 const CustomToastWithTimer = ({ t, message, type }: { t: Toast; message: string; type: 'success' | 'error' }) => {
   const [life, setLife] = useState(100);
 
   useEffect(() => {
-    // 🚀 ALTERAÇÃO: Removido o 'toastInternal.paused'. 
-    // O relógio agora é absoluto e não se importa com o mouse do usuário.
     const startTime = Date.now();
     
     const interval = setInterval(() => {
@@ -31,14 +26,14 @@ const CustomToastWithTimer = ({ t, message, type }: { t: Toast; message: string;
       if (progress <= 0) {
         setLife(0);
         clearInterval(interval);
-        toast.dismiss(t.id); // Força a morte do alerta ao zerar
+        toast.dismiss(t.id); 
       } else {
         setLife(progress);
       }
     }, 10);
 
     return () => clearInterval(interval);
-  }, [t.id]); // 🚀 O SEGREDO: Depender apenas do ID do toast, e não do objeto inteiro!
+  }, [t.id]); 
 
   return (
     <div
@@ -96,10 +91,8 @@ interface ToastProviderProps {
   children: React.ReactNode;
 }
 
-// 2. O Provider que vai gerenciar o Toaster global e o estilo
 export const ToastProvider = ({ children }: ToastProviderProps) => {
-  
-  // Modal modular de confirmação (Visual modernizado)
+ 
   const showConfirm = (message: string): Promise<boolean> => {
     return new Promise((resolve) => {
       toast.custom(

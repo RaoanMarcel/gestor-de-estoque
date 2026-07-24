@@ -1,4 +1,3 @@
-// components/parts/ModalCriarPallet.tsx
 import type { FormEvent } from "react";
 import type { CriarPalletInput } from "../../../../types/pallet";
 import Button from "../ui/Button";

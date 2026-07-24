@@ -1,4 +1,3 @@
-// src/pages/Interface/components/parts/BipagemPanel.tsx
 import type { FormEvent, RefObject } from "react";
 import type { PalletData } from "../types/types";
 
@@ -48,7 +47,6 @@ export default function BipagemPanel({
   const descPallet = pallet?.descricao?.toUpperCase() || '';
   const numPallet = pallet?.numero?.toUpperCase() || '';
   
-  // 🚀 LÓGICA INTELIGENTE DE PREFIXOS E MÁSCARAS (Junta a string toda para achar o padrão)
   const textoBusca = `${tipoPallet} ${descPallet} ${numPallet}`;
 
   let prefixo = '000';
@@ -73,7 +71,7 @@ export default function BipagemPanel({
     nomeOperacao = 'DEVOLUÇÃO';
   } else if (textoBusca.includes('RETRIAGEM')) {
     prefixo = '000';
-    isEspecial = true; // Retriagem pura permite a geração de etiquetas no padrão '000'
+    isEspecial = true;
     maxLen = 8;
     nomeOperacao = 'RETRIAGEM';
   }

@@ -6,7 +6,6 @@ import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
 import ProtectedRoute from './pages/home/components/ProtectedRoute.js';
 
-// Função determinística para gerar cores consistentes para o avatar do usuário
 const getAvatarColor = (name: string) => {
   const colors = [
     'bg-rose-500', 'bg-blue-600', 'bg-emerald-600', 

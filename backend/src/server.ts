@@ -53,10 +53,8 @@ publicAuthRouter.post('/admin/cadastrar', authController.cadastrarUsuario);
 
 app.use('/api/auth', publicAuthRouter);
 
-// ROTAS PROTEGIDAS DA APLICAÇÃO
 app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.alterarSenhaAutenticado);
 
-// CORREÇÃO AQUI: Removido o 'autenticarToken' global, pois o palletRoutes já o implementa internamente[cite: 1]
 app.use('/api', palletRoutes);
 
 httpServer.listen(PORT, '0.0.0.0', () => {

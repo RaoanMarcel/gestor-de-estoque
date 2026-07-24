@@ -1,4 +1,3 @@
-// components/parts/ModalExportarExcel.tsx
 import type { FormEvent } from "react";
 import type { Pallet } from "../../../../types/pallet";
 import Button from "../ui/Button";

@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 
 type Face = 'login' | 'trocar';
 
-// Tipagem estrita adicionada para mapear exatamente o payload do AuthController
 interface LoginResponse {
   token: string;
   refreshToken: string;
@@ -37,7 +36,6 @@ export default function Login() {
     setErro(''); 
     setCarregando(true);
     try {
-      // Tipagem aplicada na chamada do axios
       const { data } = await api.post<LoginResponse>('/auth/login', { username, senha });
       
       if (data.precisaMudarSenha) {
@@ -46,7 +44,6 @@ export default function Login() {
         return;
       }
 
-      // CORREÇÃO CRÍTICA: Salvando o Refresh Token para a integridade da sessão
       localStorage.setItem('wms_token', data.token);
       localStorage.setItem('wms_refresh_token', data.refreshToken);
       localStorage.setItem('wms_user', data.username || username);

@@ -1,11 +1,10 @@
-// src/pages/Interface/PalletInterface.tsx
 import { usePalletLogic } from "./components/hooks/usePalletLogic";
 import PalletHeader from "./components/parts/PalletHeader";
 import BipagemPanel from "./components/parts/BipagemPanel";
 import ConteudoAtualPanel from "./components/parts/ConteudoAtualPanel";
 import ModalDestino from "./components/parts/ModalDestino";
 import ModalNovaEtiqueta from "./components/parts/ModalNovaEtiqueta";
-import ModalRastreabilidade from "./components/parts/ModalRastreabilidade"; // 🚀 IMPORT DO MODAL DO HISTÓRICO
+import ModalRastreabilidade from "./components/parts/ModalRastreabilidade"; 
 
 export default function PalletInterface() {
   const {
@@ -51,7 +50,7 @@ export default function PalletInterface() {
     itemRastreabilidade,
     historicoData,
     carregandoHistorico,
-    handleAbrirRastreabilidade, // 🚀 RECUPERANDO A FUNÇÃO DE ABRIR O HISTÓRICO
+    handleAbrirRastreabilidade, 
     
     // Estados do Modal Puxar
     exibirModalPuxar,
@@ -129,7 +128,7 @@ export default function PalletInterface() {
             handleExcluirItemLinha={handleExcluirItemLinha}
             exclusoesPendentes={exclusoesPendentes}
             handleDesfazerExclusaoItem={handleDesfazerExclusaoItem}
-            handleAbrirRastreabilidade={handleAbrirRastreabilidade} // 🚀 REPASSANDO A FUNÇÃO PARA OS BOTÕES
+            handleAbrirRastreabilidade={handleAbrirRastreabilidade}
           />
         </div>
 

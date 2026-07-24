@@ -85,7 +85,6 @@ export default function ModalLinhaTempo({ isOpen, onClose, codigoItem }: ModalLi
           ) : historico.length === 0 ? (
             <div className="text-center text-slate-500 py-10 text-sm">Nenhum histórico registrado.</div>
           ) : (
-            // 🔄 ALTERAÇÃO: Estrutura da Timeline refatorada para nunca quebrar a linha
             <div className="relative pl-6 space-y-6">
               
               {/* Linha vertical contínua posicionada de forma absoluta */}

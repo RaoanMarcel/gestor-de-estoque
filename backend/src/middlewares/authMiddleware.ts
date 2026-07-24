@@ -8,7 +8,6 @@ export interface TokenPayload {
   username: string;
 }
 
-// Estendendo a interface Request do Express de forma segura e sem usar 'any'
 export interface AuthRequest extends Request {
   usuario?: TokenPayload;
 }
@@ -23,7 +22,6 @@ export const autenticarToken = (req: Request, res: Response, next: NextFunction)
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
-    // Injeta os dados do usuário autenticado no request
     (req as AuthRequest).usuario = decoded;
     next();
   } catch (error: unknown) {

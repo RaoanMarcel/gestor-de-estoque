@@ -30,7 +30,7 @@ export default function Home() {
     qrInputRef,
     handleQrBipado,
     handleCriarPallet,
-    carregarPallets // 🚀 INJETANDO A FUNÇÃO DE RECARREGAMENTO
+    carregarPallets 
   } = usePallets();
 
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
@@ -67,7 +67,6 @@ export default function Home() {
 
       toast.success(resultado.mensagem || "Posição removida com sucesso!");
       
-      // 🚀 ATUALIZAÇÃO IMEDIATA: Força o recarregamento na tela de quem clicou
       carregarPallets(); 
     } catch {
       toast.error("Erro de conexão ao tentar excluir a posição.");

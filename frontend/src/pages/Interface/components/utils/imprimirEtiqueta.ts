@@ -1,6 +1,3 @@
-// utils/imprimirEtiqueta.ts
-// Função utilitária de impressão da etiqueta (60x40mm - Horizontal).
-
 const ESTILOS_ETIQUETA = `
   @page { size: 60mm 40mm; margin: 0; }
   * { 
@@ -76,7 +73,6 @@ const ESTILOS_ETIQUETA = `
   }
 `;
 
-// 🚀 LÓGICA DE TÍTULO DINÂMICO
 const getTituloEtiqueta = (codigo: string) => {
   if (codigo.startsWith('CR-')) return 'DEVOLUÇÃO';
   if (codigo.startsWith('R-')) return 'RETORNO DE CAMPO';

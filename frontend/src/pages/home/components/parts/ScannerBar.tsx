@@ -1,4 +1,3 @@
-// components/parts/ScannerBar.tsx
 import type { FormEvent, RefObject } from "react";
 
 interface ScannerBarProps {

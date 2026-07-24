@@ -145,7 +145,6 @@ export default function MalhaEnderecamento({
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {listaPaginada.map((p) => {
-                    // 🔄 ALTERADO: Busca no socket usando o "numero" em vez do "id", pois a nossa rota mudou para /pallet/99
                     const usuariosNestePallet = presenceData[String(p.numero)] || [];
 
                     return (

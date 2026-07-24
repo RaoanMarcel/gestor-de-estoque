@@ -211,7 +211,6 @@ export function usePalletLogic() {
     const codigoLimpo = codigoBipado.trim().toUpperCase();
     if (!codigoLimpo) return;
 
-    // 🚀 BLINDAGEM DE ACORDO COM AS NOVAS REGRAS DE DESCRIÇÃO
     const tipoPallet = pallet?.tipo?.toUpperCase() || '';
     const descPallet = pallet?.descricao?.toUpperCase() || '';
     const numPallet = pallet?.numero?.toUpperCase() || '';

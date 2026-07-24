@@ -1,4 +1,3 @@
-// src/pages/Interface/components/parts/PalletHeader.tsx
 import type { PalletData } from "../types/types";
 
 interface PalletHeaderProps {
@@ -32,7 +31,6 @@ export default function PalletHeader({
   pallet, isModoTransferencia, setIsModoTransferencia, setMensagemStatus, itensParaTransferir, setItensParaTransferir, handleAdicionarTodoOPalletNoLote, navigate, activeUsers = [], onAbrirModalPuxar
 }: PalletHeaderProps) {
 
-  // 🚀 LÓGICA DE TAGS VISUAIS INTELIGENTE
   const tipoUpper = pallet.tipo?.toUpperCase() || '';
 
   return (

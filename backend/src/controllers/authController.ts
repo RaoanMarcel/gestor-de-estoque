@@ -43,7 +43,6 @@ export const authController = {
         username: usuario.username
       });
     } catch (error: unknown) {
-      // 🚀 ALTERAÇÃO: Log explícito para revelar o real motivo do Erro 500 no terminal do Backend
       console.error('🔥 [ERRO CRÍTICO - POST /login]:', error);
       return res.status(500).json({ error: 'Erro interno no servidor de login. Verifique os logs do backend.' });
     }

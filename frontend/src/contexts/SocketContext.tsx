@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useToast } from './toastContext';
 
@@ -24,10 +24,8 @@ export const SocketProvider = ({ children }: SocketProviderProps) => {
   useEffect(() => {
     const token = localStorage.getItem('wms_token');
     
-    // Evita tentar conectar se o usuário sequer estiver logado
     if (!token) return;
 
-    // Remove o /api (com ou sem barra no final) de forma segura usando Regex
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
     const socketUrl = apiUrl.replace(/\/api\/?$/, ''); 
 
@@ -56,13 +54,12 @@ export const SocketProvider = ({ children }: SocketProviderProps) => {
 
     setSocket(socketInstance);
 
-    // Cleanup: desconecta e limpa o estado quando o provider for desmontado
     return () => {
       socketInstance.disconnect();
       setSocket(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Mantemos o array vazio para inicializar o socket apenas uma vez no ciclo de vida
+  }, []); // Iniciar o socket uma vez apenas em seu ciclo
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>

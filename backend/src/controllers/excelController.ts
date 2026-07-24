@@ -9,7 +9,6 @@ export const exportarHistoricoExcel = async (req: Request, res: Response) => {
     const { palletAlvo, nomeArquivo } = req.body;
     if (!palletAlvo) return res.status(400).json({ error: "É necessário selecionar um pallet para exportar." });
 
-    // 1. Busca os logs rastreando Origem ou Destino + Quem operou
     const logs = await prisma.historicoMovimentacao.findMany({
       where: {
         OR: [
@@ -21,7 +20,6 @@ export const exportarHistoricoExcel = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    // 2. Busca o Pallet atual para extrair a DESCRIÇÃO
     const palletInfo = await prisma.pallet.findUnique({
       where: { numero: String(palletAlvo) },
       select: { descricao: true }
@@ -46,7 +44,6 @@ export const exportarHistoricoExcel = async (req: Request, res: Response) => {
     headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1E3A8A' } };
 
-    // 3. Alimenta blindando erros nulos
     logs.forEach((log) => {
       worksheet.addRow({
         id: log.id,
@@ -55,7 +52,7 @@ export const exportarHistoricoExcel = async (req: Request, res: Response) => {
         acao: log.acao,
         palletOrigem: log.palletOrigem || '-',
         palletDestino: log.palletDestino || '-',
-        descricao: descricaoPallet, // Injecão da descrição
+        descricao: descricaoPallet,
         createdAt: log.createdAt ? new Date(log.createdAt).toLocaleString('pt-BR') : '-'
       });
     });
@@ -82,7 +79,6 @@ export const exportarRelatorioRMA = async (req: Request, res: Response) => {
 
     if (registrosRMA.length === 0) return res.status(404).json({ error: 'Nenhum registro de RMA encontrado.' });
 
-    // Busca as descrições dos pallets que tiveram itens enviados ao RMA
     const palletsNomes = [...new Set(registrosRMA.map(r => r.palletOrigem).filter(Boolean))] as string[];
     const palletsDb = await prisma.pallet.findMany({
       where: { numero: { in: palletsNomes } },
