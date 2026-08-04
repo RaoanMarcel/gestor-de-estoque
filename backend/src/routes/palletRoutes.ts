@@ -3,10 +3,10 @@ import {
   criarPallet, buscarPalletPorIdentificador, listarPallets, biparItem, 
   transferirUm, transferirEmLote, enviarParaRMA, excluirPallet, biparItemEmLote, lancarPalletNovo 
 } from '../controllers/palletController.js';
-import { exportarHistoricoExcel, exportarRelatorioRMA } from '../controllers/excelController.js';
+
+import { exportarHistoricoExcel, exportarRelatorioRMA, exportarRelatorioGeralItens } from '../controllers/excelController.js';
 
 import { buscarHistoricoItem } from '../controllers/historicoController.js'; 
-
 import { autenticarToken } from '../middlewares/authMiddleware.js'; 
 
 const router = Router();
@@ -17,6 +17,7 @@ router.get('/pallets/:identificador', autenticarToken, buscarPalletPorIdentifica
 
 router.get('/historico/exportar-rma', autenticarToken, exportarRelatorioRMA);
 router.post('/historico/exportar', autenticarToken, exportarHistoricoExcel);
+router.get('/historico/exportar-geral', autenticarToken, exportarRelatorioGeralItens); 
 
 router.post('/pallets/lancar-novo', autenticarToken, lancarPalletNovo);
 

@@ -4,7 +4,7 @@ import ExcelJS from 'exceljs';
 
 const prisma = new PrismaClient();
 
-export const exportarHistoricoExcel = async (req: Request, res: Response) => {
+export const exportarHistoricoExcel = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { palletAlvo, nomeArquivo } = req.body;
     if (!palletAlvo) return res.status(400).json({ error: "É necessário selecionar um pallet para exportar." });
@@ -69,7 +69,7 @@ export const exportarHistoricoExcel = async (req: Request, res: Response) => {
   }
 };
 
-export const exportarRelatorioRMA = async (req: Request, res: Response) => {
+export const exportarRelatorioRMA = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const registrosRMA = await prisma.historicoMovimentacao.findMany({
       where: { acao: 'ENVIADO_RMA' },
@@ -124,5 +124,66 @@ export const exportarRelatorioRMA = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Erro ao gerar planilha de RMA:", error);
     return res.status(500).json({ error: 'Erro interno ao gerar relatório de RMA.' });
+  }
+};
+
+// 🚀 EXPORTAÇÃO ESTRITA: Puxa do DB apenas itens em pallets do tipo PADRAO
+export const exportarRelatorioGeralItens = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const produtos = await prisma.produtoPallet.findMany({
+      where: {
+        pallet: {
+          OR: [
+            { tipo: 'PADRAO' },
+            { tipo: null },
+            { tipo: '' }
+          ]
+        }
+      },
+      include: {
+        pallet: {
+          select: { numero: true, rua: true, estrutura: true, nivel: true, tipo: true }
+        }
+      },
+      orderBy: { bipadoEm: 'desc' }
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Triagem Padrão');
+
+    worksheet.columns = [
+      { header: 'Código do Item', key: 'codigo', width: 25 },
+      { header: 'Pallet / Posição', key: 'pallet', width: 20 },
+      { header: 'Tipo de Posição', key: 'tipo', width: 20 },
+      { header: 'Rua', key: 'rua', width: 10 },
+      { header: 'Estrutura', key: 'estrutura', width: 15 },
+      { header: 'Nível', key: 'nivel', width: 10 },
+      { header: 'Data de Entrada', key: 'data', width: 25 },
+    ];
+
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+
+    produtos.forEach((p) => {
+      worksheet.addRow({
+        codigo: p.codigoItem,
+        pallet: p.pallet?.numero || 'N/A',
+        tipo: p.pallet?.tipo || 'PADRAO',
+        rua: p.pallet?.rua || '-',
+        estrutura: p.pallet?.estrutura || '-',
+        nivel: p.pallet?.nivel || '-',
+        data: p.bipadoEm ? new Date(p.bipadoEm).toLocaleString('pt-BR') : '-'
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Relatorio_Triagem.xlsx');
+
+    await workbook.xlsx.write(res);
+    return res.end();
+  } catch (error) {
+    console.error('Erro ao gerar relatório geral:', error);
+    return res.status(500).json({ error: 'Erro ao gerar relatório geral de itens.' });
   }
 };

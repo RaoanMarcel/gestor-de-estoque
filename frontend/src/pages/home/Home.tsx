@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FormEvent, MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/toastContext'; 
@@ -10,7 +10,7 @@ import MetricasPanel from './components/parts/MetricasPanel';
 import MalhaEnderecamento from './components/parts/MalhaEnderecamento';
 import ModalCriarPallet from './components/parts/ModalCriarPallet';
 import ModalExportarExcel from './components/parts/ModalExportarExcel';
-import ModalRastreabilidade from './components/parts/ModalRastreabilidade'; // 🚀 IMPORT DO MODAL DE HISTÓRICO
+import ModalRastreabilidade from './components/parts/ModalRastreabilidade'; 
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -38,8 +38,33 @@ export default function Home() {
   const [palletSelecionado, setPalletSelecionado] = useState('');
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [carregandoExcel, setCarregandoExcel] = useState(false);
+  const [isRastreabilidadeOpen, setIsRastreabilidadeOpen] = useState(false); 
   
-  const [isRastreabilidadeOpen, setIsRastreabilidadeOpen] = useState(false); // 🚀 ESTADO PARA O MODAL DE HISTÓRICO
+  const [totalItensEstoque, setTotalItensEstoque] = useState(0);
+
+  // 🚀 KPI RESTRITO: Calcula apenas se o pallet for PADRAO (Ignora tudo que for exceção)
+  useEffect(() => {
+    const buscarTotalAbsoluto = async () => {
+      try {
+        const token = localStorage.getItem('wms_token');
+        const res = await fetch(`${API_URL}/pallets`, { headers: { 'Authorization': `Bearer ${token}` }});
+        if (res.ok) {
+          const data = await res.json();
+          const somaTriagem = data.reduce((acc: number, p: any) => {
+            const tipoPallet = p.tipo?.toUpperCase() || 'PADRAO';
+            if (tipoPallet === 'PADRAO' || tipoPallet === '') {
+              return acc + (p._count?.produtos || 0);
+            }
+            return acc;
+          }, 0);
+          setTotalItensEstoque(somaTriagem);
+        }
+      } catch (error) {
+        console.error("Erro ao calcular total", error);
+      }
+    };
+    buscarTotalAbsoluto();
+  }, [palletsFiltrados]); 
 
   const totalPallets = palletsFiltrados.length;
   const palletsOcupados = palletsFiltrados.filter(p => (p._count?.produtos || 0) >= 140).length;
@@ -56,9 +81,7 @@ export default function Home() {
 
       const response = await fetch(`${API_URL}/pallets/${numeroPallet}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       const resultado = await response.json();
@@ -69,7 +92,6 @@ export default function Home() {
       }
 
       toast.success(resultado.mensagem || "Posição removida com sucesso!");
-      
       carregarPallets(); 
     } catch {
       toast.error("Erro de conexão ao tentar excluir a posição.");
@@ -97,12 +119,10 @@ export default function Home() {
 
       if (palletSelecionado === 'FLUXO_RMA_SISTEMA') {
         urlEndpoint = `${API_URL}/historico/exportar-rma`;
-        configuracaoFetch = { 
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        };
+        configuracaoFetch = { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } };
+      } else if (palletSelecionado === 'TODOS_ITENS_GERAL') {
+        urlEndpoint = `${API_URL}/historico/exportar-geral`;
+        configuracaoFetch = { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } };
       }
 
       const response = await fetch(urlEndpoint, configuracaoFetch);
@@ -119,6 +139,8 @@ export default function Home() {
       
       if (palletSelecionado === 'FLUXO_RMA_SISTEMA') {
         a.download = nomeArquivo ? `${nomeArquivo}.xlsx` : `relatorio-estoque-fantasma-rma.xlsx`;
+      } else if (palletSelecionado === 'TODOS_ITENS_GERAL') {
+        a.download = nomeArquivo ? `${nomeArquivo}.xlsx` : `relatorio-geral-estoque.xlsx`;
       } else {
         a.download = nomeArquivo ? `${nomeArquivo}.xlsx` : `historico-${palletSelecionado}.xlsx`;
       }
@@ -171,7 +193,7 @@ export default function Home() {
           </button>
         </div>
 
-        <MetricasPanel totalPallets={totalPallets} palletsOcupados={palletsOcupados} palletsVazios={palletsVazios} />
+        <MetricasPanel totalPallets={totalPallets} palletsOcupados={palletsOcupados} palletsVazios={palletsVazios} totalItensEstoque={totalItensEstoque} />
 
         <MalhaEnderecamento
           busca={busca}
@@ -202,7 +224,6 @@ export default function Home() {
           palletsFiltrados={palletsFiltrados}
         />
 
-        {/* RENDERIZAÇÃO DO COMPONENTE DO MODAL */}
         <ModalRastreabilidade 
           isOpen={isRastreabilidadeOpen} 
           onClose={() => setIsRastreabilidadeOpen(false)} 
