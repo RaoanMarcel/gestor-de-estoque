@@ -1,50 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model Pallet {
   id        Int             @id @default(autoincrement())
-  numero    String          @unique 
-  rua       String?         
-  estrutura String?         
-  nivel     String?         
-  tipo      String? 
-  descricao String?        
+  numero    String          @unique
+  rua       String?
+  estrutura String?
+  nivel     String?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
-  produtos  ProdutoPallet[] 
-  
+  descricao String?
+  tipo      String?
+  produtos  ProdutoPallet[]
 }
 
 model ProdutoPallet {
-  id         Int            @id @default(autoincrement())
-  codigoItem String         @unique 
+  id         Int      @id @default(autoincrement())
+  codigoItem String   @unique
   palletId   Int
-  pallet     Pallet         @relation(fields: [palletId], references: [id], onDelete: Cascade)
-  bipadoEm   DateTime       @default(now())
+  bipadoEm   DateTime @default(now())
+  pallet     Pallet   @relation(fields: [palletId], references: [id], onDelete: Cascade)
 }
 
 model HistoricoMovimentacao {
-  id         Int            @id @default(autoincrement())
-  codigoItem String   
-  acao       String   
-  palletAlvo String   
-  bipadoEm   DateTime?      
+  id         Int       @id @default(autoincrement())
+  codigoItem String
+  acao       String
+  palletAlvo String
+  bipadoEm   DateTime?
 }
 
 model Usuario {
-  id                 Int      @id @default(autoincrement())
-  username           String   @unique
-  senha              String
-  precisaMudarSenha  Boolean  @default(true)
-  createdAt          DateTime @default(now())
+  id                Int      @id @default(autoincrement())
+  username          String   @unique
+  senha             String
+  precisaMudarSenha Boolean  @default(true)
+  createdAt         DateTime @default(now())
 }
-
 
 model Contador {
   id    Int    @id @default(autoincrement())
