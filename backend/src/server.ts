@@ -1,55 +1,67 @@
-// server.ts
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
-import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import palletRoutes from './routes/palletRoutes.js';
 import { authController } from './controllers/authController.js';
 import { autenticarToken } from './middlewares/authMiddleware.js';
+import { SocketService } from './services/SocketService.js';
 
 dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
-  }
-});
+
+SocketService.getInstance().init(httpServer);
 
 const prisma = new PrismaClient();
 const PORT = Number(process.env.PORT) || 3001;
+const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 
 app.use(cors());
 app.use(express.json());
 
-app.set('io', io);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Backend-Version', APP_VERSION);
+  if (req.path === '/api/status') return next();
 
-io.on('connection', (socket) => {
-  socket.on('join_pallet_room', (data: { palletId: string }) => {
-    socket.join(`pallet_${data.palletId}`);
-  });
+  const clientVersion = req.headers['x-app-version'] as string | undefined;
+  if (clientVersion) {
+    const clientMajor = clientVersion.split('.')[0];
+    const serverMajor = APP_VERSION.split('.')[0];
+    if (clientMajor !== serverMajor) {
+      return res.status(426).json({ 
+        error: 'Upgrade Required', 
+        mensagem: 'O sistema foi atualizado para uma versão incompatível. É necessário recarregar.'
+      });
+    }
+  }
+  next();
 });
 
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'API Rodando perfeitamente!', timestamp: new Date() });
+app.get('/api/status', (req: Request, res: Response) => {
+  res.json({ status: 'API Rodando!', versao: APP_VERSION, timestamp: new Date() });
 });
 
-app.post('/api/auth/login', authController.login);
-app.post('/api/auth/alterar-senha', authController.alterarSenha);
-app.post('/api/auth/admin/cadastrar', authController.cadastrarUsuario);
+// ROTAS PÚBLICAS
+const publicAuthRouter = express.Router();
+publicAuthRouter.post('/login', authController.login);
+publicAuthRouter.post('/refresh', authController.refreshToken); 
+publicAuthRouter.post('/alterar-senha', authController.alterarSenha); 
+publicAuthRouter.post('/admin/cadastrar', authController.cadastrarUsuario);
 
-app.use('/api', autenticarToken, palletRoutes);
+app.use('/api/auth', publicAuthRouter);
+
+app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.alterarSenhaAutenticado);
+
+app.use('/api', palletRoutes);
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor ativo e pronto para WebSockets na porta ${PORT}`);
+  console.log(`🚀 Servidor ativo na porta ${PORT} | Versão: ${APP_VERSION}`);
 });
 
 const gracefulShutdown = async () => {
-  console.log('Encerrando conexões graciosamente...');
   await prisma.$disconnect();
   process.exit(0);
 };

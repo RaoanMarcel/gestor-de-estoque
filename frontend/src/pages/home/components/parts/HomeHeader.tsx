@@ -1,4 +1,3 @@
-// components/parts/HomeHeader.tsx
 import Button from "../ui/Button";
 
 interface HomeHeaderProps {

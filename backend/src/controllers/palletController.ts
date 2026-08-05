@@ -1,63 +1,448 @@
-// backend\src\controllers\palletController.ts
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { SocketService } from '../services/SocketService.js';
+import bcrypt from 'bcryptjs';
+import ExcelJS from 'exceljs';
 
-const prisma: any = new PrismaClient();
+const prisma = new PrismaClient();
 
-const PREFIXO_SEQUENCIAL = 'CR-';
-const DIGITOS_SEQUENCIAL = 5;
-const CHAVE_CONTADOR = 'PRODUTO';
+const getSocketId = (req: Request): string | undefined => {
+  return req.headers['x-socket-id'] as string | undefined;
+};
 
-// Helper reutilizável para emitir eventos WebSocket sem duplicar código
-const notificarMudanca = (req: Request, palletId?: number | string) => {
-  const io = req.app.get('io');
-  if (!io) return;
+const getRegrasPallet = (pallet: any) => {
+  const tipo = pallet?.tipo?.toUpperCase() || '';
+  const desc = pallet?.descricao?.toUpperCase() || '';
+  const num = pallet?.numero?.toUpperCase() || '';
+  const textoBusca = `${tipo} ${desc} ${num}`;
 
-  // Atualiza a tela de listagem geral (Dashboard / Visão Geral)
-  io.emit('global_map_refresh');
+  if (textoBusca.includes('RETORNO') || num.startsWith('R-')) {
+    return { prefixo: 'R-', chaveBanco: 'PRODUTO_RETORNO', digitos: 5, isTransformacao: true };
+  } else if (textoBusca.includes('NOVO') || num.startsWith('N-')) {
+    return { prefixo: 'N-', chaveBanco: 'PRODUTO_NOVO', digitos: 5, isTransformacao: true };
+  } else if (textoBusca.includes('DEVOLUCAO') || num.startsWith('CR-')) {
+    return { prefixo: 'CR-', chaveBanco: 'PRODUTO_CR', digitos: 5, isTransformacao: true };
+  } else if (textoBusca.includes('RETRIAGEM')) {
+    return { prefixo: '000', chaveBanco: 'PRODUTO_TRIAGEM', digitos: 5, isTransformacao: true };
+  }
+  
+  return { prefixo: '000', chaveBanco: 'PRODUTO_TRIAGEM', digitos: 5, isTransformacao: true };
+};
 
-  // Se houver um pallet específico modificado, avisa a sala dele
-  if (palletId) {
-    io.to(`pallet_${palletId}`).emit('pallet_updated', { palletId: Number(palletId) });
+const gerarProximoCodigoSequencial = async (tx: any, regras: any): Promise<string> => {
+  const contador = await tx.contador.upsert({
+    where: { chave: regras.chaveBanco },
+    update: { valor: { increment: 1 } },
+    create: { chave: regras.chaveBanco, valor: 1 }
+  });
+  return `${regras.prefixo}${String(contador.valor).padStart(regras.digitos, '0')}`;
+};
+
+export const biparItem = async (req: Request, res: Response): Promise<Response | void> => {
+  const { palletId, codigoItem, acao, gerarSequencial, novoCodigoBipado } = req.body;
+  const numeroPallet = String(palletId); 
+
+  try {
+    const pallet = await prisma.pallet.findUnique({ where: { numero: numeroPallet } });
+    if (!pallet) return res.status(404).json({ error: 'Pallet inexistente.' });
+
+    const idInterno = pallet.id;
+    const regras = getRegrasPallet(pallet); 
+
+    if (acao === 'ENTRADA') {
+      const totalAtual = await prisma.produtoPallet.count({ where: { palletId: idInterno } });
+      if (totalAtual >= 140) return res.status(400).json({ error: 'Alerta de Lotação!' });
+
+      if (gerarSequencial) {
+        const itemGerado = await prisma.$transaction(async (tx) => {
+          const codigoFinal = await gerarProximoCodigoSequencial(tx, regras);
+          return tx.produtoPallet.create({ 
+            data: { palletId: idInterno, codigoItem: codigoFinal } 
+          });
+        });
+
+        await prisma.historicoMovimentacao.create({
+          data: { 
+            codigoItem: itemGerado.codigoItem, 
+            acao: 'ENTRADA', 
+            palletAlvo: pallet.numero, 
+            palletDestino: pallet.numero, 
+            usuarioId: (req as any).usuario?.id 
+          } as any
+        });
+
+        const socketId = getSocketId(req);
+        SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: idInterno }, socketId);
+        SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: itemGerado }, socketId);
+
+        return res.status(200).json({ mensagem: 'Item gerado com sucesso!', item: itemGerado });
+      }
+
+      const codigoFormatado = String(codigoItem).trim().toUpperCase();
+      
+      const itemExistente = await prisma.produtoPallet.findUnique({
+        where: { codigoItem: codigoFormatado },
+        include: { pallet: true }
+      });
+
+      const precisaTransformar = regras.isTransformacao && regras.prefixo !== '' && !codigoFormatado.startsWith(regras.prefixo);
+
+      if (precisaTransformar) {
+        
+        if (!novoCodigoBipado) {
+          return res.status(200).json({
+            requerNovaBipagem: true,
+            codigoOriginal: codigoFormatado,
+            prefixoEsperado: regras.prefixo
+          });
+        }
+
+        const codigoFinalBipado = String(novoCodigoBipado).trim().toUpperCase();
+
+        if (!codigoFinalBipado.startsWith(regras.prefixo)) {
+          return res.status(400).json({ error: `Ops! A nova etiqueta colada DEVE iniciar com ${regras.prefixo}` });
+        }
+
+        const checkNovoExiste = await prisma.produtoPallet.findUnique({ where: { codigoItem: codigoFinalBipado } });
+        if (checkNovoExiste) {
+          return res.status(400).json({ error: `A etiqueta ${codigoFinalBipado} já está vinculada a outro produto na malha!` });
+        }
+
+        if (itemExistente) {
+          const novoItem = await prisma.$transaction(async (tx) => {
+            await tx.produtoPallet.delete({ where: { id: itemExistente.id } });
+            const criado = await tx.produtoPallet.create({ data: { palletId: idInterno, codigoItem: codigoFinalBipado } });
+
+            await tx.historicoMovimentacao.create({
+              data: {
+                codigoItem: codigoFinalBipado,
+                codigoAnterior: itemExistente.codigoItem,
+                acao: 'RETRIAGEM_CONFIRMADA',
+                palletOrigem: itemExistente.pallet.numero,
+                palletDestino: pallet.numero,
+                palletAlvo: pallet.numero,
+                usuarioId: (req as any).usuario?.id
+              } as any
+            });
+            return criado;
+          });
+
+          const socketId = getSocketId(req);
+          SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'TRANSFERENCIA_RETRIAGEM' }, socketId);
+          SocketService.getInstance().emitToPallet(itemExistente.pallet.numero, 'pallet:updated', { acao: 'SAIDA', codigoItem: itemExistente.codigoItem }, socketId);
+          SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: novoItem }, socketId);
+
+          return res.status(200).json({ mensagem: `Código substituído fisicamente com sucesso!`, item: novoItem });
+        } else {
+          const novoItem = await prisma.$transaction(async (tx) => {
+            const criado = await tx.produtoPallet.create({ data: { palletId: idInterno, codigoItem: codigoFinalBipado } });
+
+            await tx.historicoMovimentacao.create({
+              data: {
+                codigoItem: codigoFinalBipado,
+                codigoAnterior: codigoFormatado, 
+                acao: 'ENTRADA_COM_RETRIAGEM',
+                palletDestino: pallet.numero,
+                palletAlvo: pallet.numero,
+                usuarioId: (req as any).usuario?.id
+              } as any
+            });
+            return criado;
+          });
+
+          const socketId = getSocketId(req);
+          SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: idInterno }, socketId);
+          SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: novoItem }, socketId);
+
+          return res.status(200).json({ mensagem: `Item inédito adicionado sob a nova etiqueta!`, item: novoItem });
+        }
+      }
+
+      if (itemExistente) {
+        const atualizado = await prisma.produtoPallet.update({ where: { id: itemExistente.id }, data: { palletId: idInterno } });
+        
+        await prisma.historicoMovimentacao.create({
+          data: {
+            codigoItem: atualizado.codigoItem,
+            acao: 'TRANSFERENCIA',
+            palletOrigem: itemExistente.pallet.numero,
+            palletDestino: pallet.numero,
+            palletAlvo: pallet.numero,
+            usuarioId: (req as any).usuario?.id
+          } as any
+        });
+
+        const socketId = getSocketId(req);
+        SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'TRANSFERENCIA' }, socketId);
+        SocketService.getInstance().emitToPallet(itemExistente.pallet.numero, 'pallet:updated', { acao: 'SAIDA', codigoItem: itemExistente.codigoItem }, socketId);
+        SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: atualizado }, socketId);
+
+        return res.status(200).json({ mensagem: 'Item transferido com sucesso!', item: atualizado });
+      }
+
+      const item = await prisma.$transaction(async (tx) => {
+        return tx.produtoPallet.create({ 
+          data: { palletId: idInterno, codigoItem: codigoFormatado } 
+        });
+      });
+
+      await prisma.historicoMovimentacao.create({
+        data: { 
+          codigoItem: codigoFormatado, 
+          acao: 'ENTRADA', 
+          palletAlvo: pallet.numero, 
+          palletDestino: pallet.numero, 
+          usuarioId: (req as any).usuario?.id 
+        } as any
+      });
+
+      const socketId = getSocketId(req);
+      SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: idInterno }, socketId);
+      SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item }, socketId);
+
+      return res.status(200).json({ mensagem: 'Item adicionado com sucesso!', item });
+    } 
+    
+    if (acao === 'SAIDA') {
+      const itemExistente = await prisma.produtoPallet.findUnique({ where: { codigoItem: String(codigoItem) } });
+      if (!itemExistente || itemExistente.palletId !== idInterno) {
+        return res.status(400).json({ error: 'Alerta! Este produto não consta neste pallet.' });
+      }
+
+      await prisma.produtoPallet.delete({ where: { codigoItem: String(codigoItem) } });
+
+      await prisma.historicoMovimentacao.create({
+        data: { 
+          codigoItem: String(codigoItem), 
+          acao: 'SAIDA', 
+          palletAlvo: pallet.numero, 
+          palletOrigem: pallet.numero, 
+          usuarioId: (req as any).usuario?.id 
+        } as any
+      });
+
+      const socketId = getSocketId(req);
+      SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: idInterno }, socketId);
+      SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'SAIDA', codigoItem }, socketId);
+
+      return res.status(200).json({ mensagem: 'Item removido do pallet com sucesso!' });
+    }
+
+    return res.status(400).json({ error: 'Ação inválida.' });
+
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Alerta de Duplicidade! Este código de item já existe na malha.' });
+    }
+    return res.status(500).json({ error: 'Erro operacional ao processar bip.' });
   }
 };
 
-// 1. Criar Novo Pallet
-export const criarPallet = async (req: Request, res: Response) => {
+export const transferirUm = async (req: Request, res: Response): Promise<Response | void> => {
   try {
-    const { numero, rua, estrutura, nivel, tipo } = req.body;
-
-    if (!numero) {
-      return res.status(400).json({ error: 'O número do pallet é obrigatório!' });
+    const { codigoItem, numeroPalletDestino } = req.body;
+    if (!codigoItem || !numeroPalletDestino) {
+      return res.status(400).json({ error: 'Dados obrigatórios ausentes.' });
     }
 
-    const novoPallet = await (prisma as any).pallet.create({
-      data: {
-        numero,
-        rua,
-        estrutura,
-        nivel,
-        tipo: tipo || "PADRAO" 
-      }
+    const produtoOrigem = await prisma.produtoPallet.findUnique({ 
+      where: { codigoItem: String(codigoItem) }, 
+      include: { pallet: true } 
+    });
+    if (!produtoOrigem) {
+      return res.status(404).json({ error: 'Produto de origem não encontrado na malha.' });
+    }
+
+    const palletDestino = await prisma.pallet.findUnique({ 
+      where: { numero: String(numeroPalletDestino) }, 
+      include: { produtos: true } 
+    });
+    if (!palletDestino) {
+      return res.status(404).json({ error: `Pallet destino não localizado.` });
+    }
+    if (palletDestino.produtos.length >= 140) {
+      return res.status(400).json({ error: `Alerta de Lotação no destino.` });
+    }
+
+    const regras = getRegrasPallet(palletDestino);
+    const precisaTransformar = regras.isTransformacao && regras.prefixo !== '' && !produtoOrigem.codigoItem.startsWith(regras.prefixo);
+
+    if (precisaTransformar) {
+      return res.status(200).json({
+        requerNovaBipagem: true,
+        codigoOriginal: produtoOrigem.codigoItem,
+        prefixoEsperado: regras.prefixo
+      });
+    }
+
+    const itemFinal = await prisma.$transaction(async (tx) => {
+      const atualizado = await tx.produtoPallet.update({ 
+        where: { id: produtoOrigem.id }, 
+        data: { palletId: palletDestino.id } 
+      });
+      
+      await tx.historicoMovimentacao.create({ 
+        data: { 
+          codigoItem: produtoOrigem.codigoItem, 
+          acao: 'TRANSFERENCIA', 
+          palletOrigem: produtoOrigem.pallet.numero, 
+          palletDestino: palletDestino.numero, 
+          palletAlvo: palletDestino.numero, 
+          usuarioId: (req as any).usuario?.id 
+        } as any
+      });
+      
+      return atualizado;
     });
 
-    // Notifica o mapa que um novo espaço surgiu
-    notificarMudanca(req);
+    const socketId = getSocketId(req);
+    SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'TRANSFERENCIA' }, socketId);
+    SocketService.getInstance().emitToPallet(produtoOrigem.pallet.numero, 'pallet:updated', { acao: 'SAIDA', codigoItem: produtoOrigem.codigoItem }, socketId);
+    SocketService.getInstance().emitToPallet(palletDestino.numero, 'pallet:updated', { acao: 'ENTRADA', item: itemFinal }, socketId);
 
+    return res.status(200).json({ mensagem: `Item ${codigoItem} puxado com sucesso!`, item: itemFinal });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Erro ao processar a transferência unitária.' });
+  }
+};
+
+export const transferirEmLote = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const { codigosItens, numeroPalletDestino } = req.body;
+    if (!codigosItens || codigosItens.length === 0 || !numeroPalletDestino) {
+      return res.status(400).json({ error: 'Dados ausentes.' });
+    }
+
+    const primeiroItem = await prisma.produtoPallet.findUnique({ where: { codigoItem: String(codigosItens[0]) }, include: { pallet: true } });
+    if(!primeiroItem) return res.status(404).json({ error: 'Itens não encontrados' });
+
+    const palletDestino = await prisma.pallet.findUnique({ where: { numero: String(numeroPalletDestino) }, include: { produtos: true } });
+    if (!palletDestino) return res.status(404).json({ error: `Pallet destino não encontrado.` });
+    if (codigosItens.length > (140 - palletDestino.produtos.length)) {
+      return res.status(400).json({ error: `Espaço insuficiente no destino.` });
+    }
+
+    const regras = getRegrasPallet(palletDestino);
+    const itensOriginais = await prisma.produtoPallet.findMany({ where: { codigoItem: { in: codigosItens } } });
+    const temTransformacaoPendente = itensOriginais.some(item => regras.isTransformacao && regras.prefixo !== '' && !item.codigoItem.startsWith(regras.prefixo));
+
+    if (temTransformacaoPendente) {
+      return res.status(400).json({ error: `Atenção: A Transferência em Lote foi bloqueada porque o Pallet de destino exige a troca das etiquetas físicas por etiquetas que iniciem com (${regras.prefixo}). Acesse a tela do pallet de destino e faça as transferências bipando item a item com suas novas etiquetas.` });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.produtoPallet.updateMany({ where: { codigoItem: { in: codigosItens } }, data: { palletId: palletDestino.id } });
+      const logsData = codigosItens.map((codigo: string) => ({ 
+        codigoItem: String(codigo), 
+        acao: 'TRANSFERENCIA_LOTE', 
+        palletAlvo: palletDestino.numero, 
+        palletOrigem: primeiroItem.pallet.numero, 
+        palletDestino: palletDestino.numero, 
+        usuarioId: (req as any).usuario?.id 
+      }));
+      await tx.historicoMovimentacao.createMany({ data: logsData as any });
+    });
+
+    const socketId = getSocketId(req);
+    SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'TRANSFERENCIA_LOTE' }, socketId);
+    SocketService.getInstance().emitToPallet(primeiroItem.pallet.numero, 'pallet:updated', { acao: 'SAIDA_LOTE', codigosItens: codigosItens }, socketId);
+    SocketService.getInstance().emitToPallet(palletDestino.numero, 'pallet:refresh', {}, socketId); 
+
+    return res.status(200).json({ mensagem: 'Lote transferido com sucesso!' });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Erro ao transferir em lote.' });
+  }
+};
+
+export const enviarParaRMA = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const { codigosItens, numeroPalletOrigem } = req.body;
+    if (!codigosItens || codigosItens.length === 0) return res.status(400).json({ error: 'Nenhum item selecionado.' });
+
+    const primeiroItem = await prisma.produtoPallet.findUnique({ where: { codigoItem: String(codigosItens[0]) }, include: { pallet: true } });
+    if (!primeiroItem) return res.status(400).json({ error: 'Erro ao localizar itens.' });
+
+    await prisma.produtoPallet.deleteMany({ where: { codigoItem: { in: codigosItens } } });
+
+    const logsRMA = codigosItens.map((codigo: string) => ({ 
+      codigoItem: String(codigo), 
+      acao: 'ENVIADO_RMA', 
+      palletAlvo: String(numeroPalletOrigem), 
+      palletOrigem: String(numeroPalletOrigem), 
+      usuarioId: (req as any).usuario?.id 
+    }));
+    await prisma.historicoMovimentacao.createMany({ data: logsRMA as any });
+
+    const socketId = getSocketId(req);
+    SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: primeiroItem.palletId }, socketId);
+    SocketService.getInstance().emitToPallet(primeiroItem.pallet.numero, 'pallet:updated', { acao: 'SAIDA_LOTE', codigosItens }, socketId);
+
+    return res.status(200).json({ mensagem: `Enviado para RMA com sucesso.` });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Erro ao processar envio para o RMA.' });
+  }
+};
+
+export const excluirPallet = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const { identificador } = req.params;
+    const isNumeric = !isNaN(Number(identificador));
+
+    const palletNoBanco = await prisma.pallet.findFirst({ 
+      where: { 
+        OR: [
+          { numero: String(identificador) },
+          ...(isNumeric ? [{ id: Number(identificador) }] : [])
+        ]
+      }, 
+      include: { produtos: true } 
+    });
+
+    if (!palletNoBanco) return res.status(404).json({ error: 'Pallet não localizado.' });
+    if (palletNoBanco.produtos.length > 0) return res.status(400).json({ error: `Esvazie o pallet antes de excluir.` });
+
+    await prisma.pallet.delete({ where: { id: palletNoBanco.id } });
+
+    await prisma.historicoMovimentacao.create({ 
+      data: { 
+        codigoItem: 'SISTEMA', 
+        acao: 'EXCLUSAO_PALLET', 
+        palletAlvo: String(palletNoBanco.numero), 
+        palletOrigem: String(palletNoBanco.numero), 
+        usuarioId: (req as any).usuario?.id 
+      } as any
+    });
+
+    const socketId = getSocketId(req);
+    SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'EXCLUIDO', palletId: palletNoBanco.id }, socketId);
+    SocketService.getInstance().emitToPallet(palletNoBanco.numero, 'pallet:deleted', { palletId: palletNoBanco.id });
+
+    return res.status(200).json({ mensagem: `Pallet removido com sucesso.` });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Erro ao tentar excluir a posição.' });
+  }
+};
+
+export const criarPallet = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const { numero, rua, estrutura, nivel, tipo, descricao } = req.body;
+    if (!numero) return res.status(400).json({ error: 'O número do pallet é obrigatório!' });
+
+    const novoPallet = await prisma.pallet.create({
+      data: { numero, rua, estrutura, nivel, descricao, tipo: tipo || "PADRAO" }
+    });
+
+    SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'CRIADO', pallet: novoPallet }, getSocketId(req));
     return res.status(201).json(novoPallet);
   } catch (error: any) {
     return res.status(500).json({ error: 'Erro ao criar pallet.' });
   }
 };
 
-// 2. Listar Todos os Pallets
-export const listarPallets = async (_req: Request, res: Response) => {
+export const listarPallets = async (_req: Request, res: Response): Promise<Response | void> => {
   try {
     const pallets = await prisma.pallet.findMany({
-      include: { 
-        _count: { select: { produtos: true } },
-        produtos: { select: { codigoItem: true } }
-      }
+      include: { _count: { select: { produtos: true } }, produtos: { select: { codigoItem: true } } }
     });
     return res.status(200).json(pallets);
   } catch (error) {
@@ -65,12 +450,11 @@ export const listarPallets = async (_req: Request, res: Response) => {
   }
 };
 
-// 3. Buscar um Pallet Específico
-export const buscarPalletPorId = async (req: Request, res: Response) => {
-  const { id } = req.params;
+export const buscarPalletPorIdentificador = async (req: Request, res: Response): Promise<Response | void> => {
+  const { identificador } = req.params;
   try {
     const pallet = await prisma.pallet.findUnique({
-      where: { id: Number(id) },
+      where: { numero: String(identificador) },
       include: { produtos: { orderBy: { bipadoEm: 'desc' } } }
     });
     
@@ -81,347 +465,129 @@ export const buscarPalletPorId = async (req: Request, res: Response) => {
   }
 };
 
-const gerarProximoCodigoSequencial = async (tx: any): Promise<string> => {
-  const contador = await tx.contador.upsert({
-    where: { chave: CHAVE_CONTADOR },
-    update: { valor: { increment: 1 } },
-    create: { chave: CHAVE_CONTADOR, valor: 1 }
-  });
-
-  return `${PREFIXO_SEQUENCIAL}${String(contador.valor).padStart(DIGITOS_SEQUENCIAL, '0')}`;
-};
-
-// 4. Bipar Item (Entrada / Saída Individual)
-export const biparItem = async (req: Request, res: Response) => {
-  const { palletId, codigoItem, acao, gerarSequencial } = req.body;
-
-  try {
-    const pallet = await prisma.pallet.findUnique({ where: { id: Number(palletId) } });
-    if (!pallet) return res.status(404).json({ error: 'Pallet inexistente.' });
-
-    if (acao === 'ENTRADA') {
-      const totalAtual = await prisma.produtoPallet.count({
-        where: { palletId: Number(palletId) }
-      });
-
-      if (totalAtual >= 140) {
-        return res.status(400).json({ 
-          error: 'Alerta de Lotação! Este pallet atingiu o limite máximo de 140 volumes.' 
-        });
-      }
-
-      let item;
-
-      if (gerarSequencial) {
-        item = await prisma.$transaction(async (tx: any) => {
-          const codigoGerado = await gerarProximoCodigoSequencial(tx);
-          return tx.produtoPallet.create({
-            data: {
-              palletId: Number(palletId),
-              codigoItem: codigoGerado
-            }
-          });
-        });
-      } else {
-        item = await prisma.produtoPallet.create({
-          data: { 
-            palletId: Number(palletId), 
-            codigoItem: String(codigoItem) 
-          }
-        });
-      }
-
-      await prisma.historicoMovimentacao.create({
-        data: {
-          codigoItem: item.codigoItem,
-          acao: 'ENTRADA',
-          palletAlvo: pallet.numero || `Pallet #${pallet.id}`
-        }
-      });
-
-      // Dispara tempo real para as telas conectadas
-      notificarMudanca(req, palletId);
-
-      return res.status(200).json({ mensagem: 'Item adicionado com sucesso!', item });
-    } 
-    
-    if (acao === 'SAIDA') {
-      const itemExistente = await prisma.produtoPallet.findUnique({
-        where: { codigoItem: String(codigoItem) }
-      });
-
-      if (!itemExistente || itemExistente.palletId !== Number(palletId)) {
-        return res.status(400).json({ error: 'Alerta! Este produto não consta neste pallet.' });
-      }
-
-      await prisma.produtoPallet.delete({
-        where: { codigoItem: String(codigoItem) }
-      });
-
-      await prisma.historicoMovimentacao.create({
-        data: {
-          codigoItem: String(codigoItem),
-          acao: 'SAIDA',
-          palletAlvo: pallet.numero || `Pallet #${pallet.id}`
-        }
-      });
-
-      // Dispara tempo real para as telas conectadas
-      notificarMudanca(req, palletId);
-
-      return res.status(200).json({ mensagem: 'Item removido do pallet com sucesso!' });
-    }
-
-    return res.status(400).json({ error: 'Ação inválida. Use ENTRADA ou SAIDA.' });
-
-  } catch (error: any) {
-    if (error.code === 'P2002') {
-      return res.status(400).json({ 
-        error: 'Alerta de Duplicidade! Esta triagem já foi utilizado!'});
-    }
-    console.error("Erro no servidor:", error);
-    return res.status(500).json({ error: 'Erro operacional ao processar bip.' });
-  }
-};
-
-// 5. Transferência Individual
-export const transferirUm = async (req: Request, res: Response) => {
-  try {
-    const { codigoItem, numeroPalletDestino } = req.body;
-
-    if (!codigoItem || !numeroPalletDestino) {
-      return res.status(400).json({ error: 'Código do item e pallet de destino são obrigatórios.' });
-    }
-
-    const produtoOrigem = await (prisma as any).produtoPallet.findUnique({
-      where: { codigoItem: String(codigoItem) }
-    });
-
-    if (!produtoOrigem) {
-      return res.status(404).json({ error: 'Produto de origem não encontrado.' });
-    }
-
-    const palletDestino = await (prisma as any).pallet.findUnique({
-      where: { numero: String(numeroPalletDestino) },
-      include: { produtos: true }
-    });
-
-    if (!palletDestino) {
-      return res.status(404).json({ error: `Pallet de destino "${numeroPalletDestino}" não foi localizado.` });
-    }
-
-    if (palletDestino.produtos.length >= 140) {
-      return res.status(400).json({ 
-        error: `Alerta de Lotação! O pallet destino "${numeroPalletDestino}" já atingiu o limite de 140 volumes.` 
-      });
-    }
-
-    const produtoAtualizado = await (prisma as any).produtoPallet.update({
-      where: { codigoItem: String(codigoItem) },
-      data: { palletId: palletDestino.id }
-    });
-
-    await (prisma as any).historicoMovimentacao.create({
-      data: {
-        codigoItem: String(codigoItem),
-        acao: 'TRANSFERENCIA',
-        palletAlvo: String(numeroPalletDestino)
-      }
-    });
-
-    // Atualiza tanto o pallet de onde saiu (origem) quanto o que recebeu (destino)
-    notificarMudanca(req, produtoOrigem.palletId);
-    notificarMudanca(req, palletDestino.id);
-
-    return res.status(200).json({ 
-      mensagem: 'Produto transferido com sucesso!', 
-      item: produtoAtualizado 
-    });
-
-  } catch (error: any) {
-    console.error(error);
-    return res.status(500).json({ error: 'Erro interno ao processar a transferência individual.' });
-  }
-};
-
-// 6. Transferência em Lote
-export const transferirEmLote = async (req: Request, res: Response) => {
-  try {
-    const { codigosItens, numeroPalletDestino } = req.body;
-
-    if (!codigosItens || !Array.isArray(codigosItens) || codigosItens.length === 0) {
-      return res.status(400).json({ error: 'Nenhum item selecionado para transferência.' });
-    }
-
-    if (!numeroPalletDestino) {
-      return res.status(400).json({ error: 'Pallet de destino não informado.' });
-    }
-
-    // Pega o id do pallet de origem usando o primeiro item como referência antes de atualizar
-    const primeiroItem = await (prisma as any).produtoPallet.findUnique({
-      where: { codigoItem: String(codigosItens[0]) }
-    });
-
-    const palletDestino = await (prisma as any).pallet.findUnique({
-      where: { numero: String(numeroPalletDestino) },
-      include: { produtos: true }
-    });
-
-    if (!palletDestino) {
-      return res.status(404).json({ error: `Pallet de destino "${numeroPalletDestino}" não encontrado.` });
-    }
-
-    const espacoDisponivel = 140 - palletDestino.produtos.length;
-    if (codigosItens.length > espacoDisponivel) {
-      return res.status(400).json({ 
-        error: `Espaço insuficiente no pallet "${numeroPalletDestino}". Vagas restantes: ${espacoDisponivel}. Você tentou transferir: ${codigosItens.length} itens.` 
-      });
-    }
-
-    await (prisma as any).produtoPallet.updateMany({
-      where: { codigoItem: { in: codigosItens } },
-      data: { palletId: palletDestino.id }
-    });
-
-    const logsData = codigosItens.map((codigo: string) => ({
-      codigoItem: String(codigo),
-      acao: 'TRANSFERENCIA_LOTE',
-      palletAlvo: String(numeroPalletDestino)
-    }));
-
-    await (prisma as any).historicoMovimentacao.createMany({ data: logsData });
-
-    // Força atualização em massa dos envolvidos
-    if (primeiroItem) notificarMudanca(req, primeiroItem.palletId);
-    notificarMudanca(req, palletDestino.id);
-
-    return res.status(200).json({ 
-      mensagem: `${codigosItens.length} produtos transferidos para o pallet "${numeroPalletDestino}" com sucesso!` 
-    });
-
-  } catch (error: any) {
-    console.error(error);
-    return res.status(500).json({ error: 'Erro interno ao processar a transferência em lote.' });
-  }
-};
-
-// 7. Lançar ao RMA (Exclusivo Pallets Defeito)
-export const enviarParaRMA = async (req: Request, res: Response) => {
-  try {
-    const { codigosItens, numeroPalletOrigem } = req.body;
-
-    if (!codigosItens || !Array.isArray(codigosItens) || codigosItens.length === 0) {
-      return res.status(400).json({ error: 'Nenhum item selecionado para o RMA.' });
-    }
-
-    const primeiroItem = await (prisma as any).produtoPallet.findUnique({
-      where: { codigoItem: String(codigosItens[0]) }
-    });
-
-    await (prisma as any).produtoPallet.deleteMany({
-      where: { codigoItem: { in: codigosItens } }
-    });
-
-    const logsRMA = codigosItens.map((codigo: string) => ({
-      codigoItem: String(codigo),
-      acao: 'ENVIADO_RMA',
-      palletAlvo: String(numeroPalletOrigem)
-    }));
-
-    await (prisma as any).historicoMovimentacao.createMany({ data: logsRMA });
-
-    // Notifica a saída do pallet de origem
-    if (primeiroItem) notificarMudanca(req, primeiroItem.palletId);
-
-    return res.status(200).json({
-      mensagem: `Sucesso! ${codigosItens.length} volumes foram despachados para o sistema de RMA e removidos do pallet físico.`
-    });
-
-  } catch (error: any) {
-    console.error(error);
-    return res.status(500).json({ error: 'Erro interno ao processar envio para o RMA.' });
-  }
-};
-
-// 8. Excluir Pallet da Malha
-export const excluirPallet = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const palletAlvo = await (prisma as any).pallet.findUnique({
-      where: { id: Number(id) },
-      include: { produtos: true }
-    });
-
-    if (!palletAlvo) {
-      return res.status(404).json({ error: 'Pallet não localizado no sistema.' });
-    }
-
-    if (palletAlvo.produtos && palletAlvo.produtos.length > 0) {
-      return res.status(400).json({ 
-        error: `Bloqueio de Segurança! O pallet "${palletAlvo.numero}" possui ${palletAlvo.produtos.length} produtos armazenados. Esvazie-o antes de excluir.` 
-      });
-    }
-
-    await (prisma as any).pallet.delete({
-      where: { id: Number(id) }
-    });
-
-    await (prisma as any).historicoMovimentacao.create({
-      data: {
-        codigoItem: 'SISTEMA',
-        acao: 'EXCLUSAO_PALLET',
-        palletAlvo: String(palletAlvo.numero)
-      }
-    });
-
-    // Avisa a malha inteira que uma vaga sumiu do painel principal
-    notificarMudanca(req, palletAlvo.id);
-    return res.status(200).json({ mensagem: `O pallet "${palletAlvo.numero}" foi removido da malha com sucesso.` });
-
-  } catch (error: any) {
-    console.error(error);
-    return res.status(500).json({ error: 'Erro interno ao tentar excluir a posição do mapa.' });
-  }
-};
-
-// 9. Bipar Item em Lote (Cache do Front-end)
-export const biparItemEmLote = async (req: Request, res: Response) => {
+export const biparItemEmLote = async (req: Request, res: Response): Promise<Response | void> => {
   const { palletId, codigosItens, acao } = req.body;
+  const numeroPallet = String(palletId);
 
-  if (!codigosItens || !Array.isArray(codigosItens) || codigosItens.length === 0) {
-    return res.status(400).json({ error: 'Nenhum item enviado para exclusão em lote.' });
-  }
+  if (!codigosItens || codigosItens.length === 0) return res.status(400).json({ error: 'Nenhum item enviado.' });
 
   try {
-    const pallet = await prisma.pallet.findUnique({ where: { id: Number(palletId) } });
+    const pallet = await prisma.pallet.findUnique({ where: { numero: numeroPallet } });
     if (!pallet) return res.status(404).json({ error: 'Pallet inexistente.' });
 
+    const idInterno = pallet.id;
+
     if (acao === 'SAIDA') {
-      await prisma.produtoPallet.deleteMany({
-        where: {
-          palletId: Number(palletId),
-          codigoItem: { in: codigosItens.map(String) }
-        }
-      });
+      await prisma.produtoPallet.deleteMany({ where: { palletId: idInterno, codigoItem: { in: codigosItens.map(String) } } });
 
-      const logsData = codigosItens.map((codigo: string) => ({
-        codigoItem: String(codigo),
-        acao: 'SAIDA',
-        palletAlvo: pallet.numero || `Pallet #${pallet.id}`
+      const logsData = codigosItens.map((codigo: string) => ({ 
+        codigoItem: String(codigo), 
+        acao: 'SAIDA', 
+        palletAlvo: pallet.numero, 
+        palletOrigem: pallet.numero, 
+        usuarioId: (req as any).usuario?.id 
       }));
+      await prisma.historicoMovimentacao.createMany({ data: logsData as any });
 
-      await prisma.historicoMovimentacao.createMany({ data: logsData });
-
-      // Atualiza o tempo real para todos na sala correspondente
-      notificarMudanca(req, palletId);
+      const socketId = getSocketId(req);
+      SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: idInterno }, socketId);
+      SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'SAIDA_LOTE', codigosItens }, socketId);
 
       return res.status(200).json({ mensagem: `${codigosItens.length} itens removidos com sucesso!` });
     }
-
-    return res.status(400).json({ error: 'Ação inválida para lote temporário.' });
+    return res.status(400).json({ error: 'Ação inválida.' });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Erro operacional ao processar lote de exclusão.' });
+    return res.status(500).json({ error: 'Erro ao processar lote.' });
+  }
+};
+
+// 🚀 NOVA ROTA EXCLUSIVA DE LANÇAMENTO (Validação de Senha + Baixa + Relatório)
+export const lancarPalletNovo = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const { palletId, senha } = req.body;
+    const usuarioId = (req as any).usuario?.id;
+
+    if (!palletId || !senha) {
+      return res.status(400).json({ error: 'Identificador do pallet e senha do operador são obrigatórios.' });
+    }
+
+    // 1. Validar Senha do Operador
+    const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+    if (!usuario) {
+      return res.status(404).json({ error: 'Sessão de usuário inválida.' });
+    }
+    const senhaValida = await bcrypt.compare(senha, usuario.senha);
+    if (!senhaValida) {
+      return res.status(401).json({ error: 'Senha incorreta! Operação de lançamento bloqueada.' });
+    }
+
+    // 2. Buscar Pallet e verificar disponibilidade
+    const pallet = await prisma.pallet.findUnique({
+      where: { id: Number(palletId) },
+      include: { produtos: true }
+    });
+
+    if (!pallet) return res.status(404).json({ error: 'Pallet não encontrado.' });
+    if (pallet.produtos.length === 0) return res.status(400).json({ error: 'O pallet não possui produtos para serem lançados.' });
+    if (pallet.tipo !== 'NOVO') return res.status(400).json({ error: 'Esta ação só é permitida em Pallets do tipo NOVO.' });
+
+    const codigosLançados = pallet.produtos.map(p => p.codigoItem);
+
+    // 3. Efetuar as baixas no banco de dados e Registrar no Histórico em Lote
+    await prisma.$transaction(async (tx) => {
+      // Deleta todos os produtos
+      await tx.produtoPallet.deleteMany({ where: { palletId: pallet.id } });
+
+      // Gera os registros de saída
+      const logsData = codigosLançados.map(codigo => ({
+        codigoItem: String(codigo),
+        acao: 'LANCAMENTO_LOTE_NOVO',
+        palletAlvo: pallet.numero,
+        palletOrigem: pallet.numero,
+        usuarioId: usuarioId
+      }));
+      await tx.historicoMovimentacao.createMany({ data: logsData as any });
+    });
+
+    // 4. Criação dinâmica da Planilha de Excel usando exceljs
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(`Relatório - ${pallet.numero}`);
+
+    worksheet.columns = [
+      { header: 'Código de Triagem', key: 'codigo', width: 25 },
+      { header: 'Posição (Pallet)', key: 'pallet', width: 20 },
+      { header: 'Operador Responsável', key: 'operador', width: 30 },
+      { header: 'Data do Lançamento', key: 'data', width: 25 },
+    ];
+
+    // Formatação de destaque para o cabeçalho
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; // Cor da sua paleta WMS
+
+    const dataHoraBrasil = new Date().toLocaleString('pt-BR');
+    
+    codigosLançados.forEach(codigo => {
+      worksheet.addRow({
+        codigo: codigo,
+        pallet: pallet.numero,
+        operador: usuario.username.toUpperCase(),
+        data: dataHoraBrasil
+      });
+    });
+
+    // Configurando os cabeçalhos de resposta para download binário (Blob)
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=Fechamento_${pallet.numero}.xlsx`);
+
+    await workbook.xlsx.write(res);
+    res.end(); // Finaliza a resposta binária
+
+    // 5. Comunica a mudança aos demais operadores (Sockets)
+    const socketId = getSocketId(req);
+    SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: pallet.id }, socketId);
+    SocketService.getInstance().emitToPallet(pallet.numero, 'pallet:refresh', {}, socketId); // Manda quem estiver na tela dar refresh (esvaziar tudo)
+
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Erro interno no servidor ao processar lançamento de lote.' });
   }
 };

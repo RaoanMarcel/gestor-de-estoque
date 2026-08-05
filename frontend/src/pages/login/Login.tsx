@@ -4,21 +4,27 @@ import axios from 'axios';
 import api from '../../services/api.js';
 import Button from '../home/components/ui/Button.js';
 import Input from '../home/components/ui/Input.js';
+import toast from 'react-hot-toast';
 
 type Face = 'login' | 'trocar';
+
+interface LoginResponse {
+  token: string;
+  refreshToken: string;
+  precisaMudarSenha: boolean;
+  username: string;
+}
 
 export default function Login() {
   const navigate = useNavigate();
 
   const [face, setFace] = useState<Face>('login');
 
-  // ---- LOGIN ----
   const [username, setUsername] = useState('');
   const [senha, setSenha] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
-  // ---- TROCA DE SENHA ----
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarNovaSenha, setConfirmarNovaSenha] = useState('');
@@ -30,18 +36,16 @@ export default function Login() {
     setErro(''); 
     setCarregando(true);
     try {
-      const { data } = await api.post('/auth/login', { username, senha });
+      const { data } = await api.post<LoginResponse>('/auth/login', { username, senha });
       
-      // INTERCEPTAÇÃO DE PRIMEIRO ACESSO:
-      // Se o backend retornar que precisa mudar a senha, joga para a face traseira do card
       if (data.precisaMudarSenha) {
-        setSenhaAtual(senha); // Já preenche a atual com a que ele acabou de digitar
+        setSenhaAtual(senha); 
         setFace('trocar');
         return;
       }
 
-      // Se não precisar, segue o fluxo normal salvando os tokens
       localStorage.setItem('wms_token', data.token);
+      localStorage.setItem('wms_refresh_token', data.refreshToken);
       localStorage.setItem('wms_user', data.username || username);
       
       navigate('/');
@@ -63,9 +67,8 @@ export default function Login() {
     setSalvando(true);
     try {
       await api.post('/auth/alterar-senha', { username, novaSenha });
-      alert('Senha atualizada com sucesso! Agora faça o login com as novas credenciais.');
+      toast.success('Senha atualizada com sucesso! Agora faça o login com as novas credenciais.');
       
-      // Reseta os estados e volta para a face de login
       setFace('login');
       setSenha(''); setSenhaAtual(''); setNovaSenha(''); setConfirmarNovaSenha('');
     } catch (err) {
@@ -81,7 +84,6 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden flex items-center justify-center px-4 py-10">
-      {/* ============ FUNDO LIMPO (Sem as linhas de grade) ============ */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0" style={{
           background:
@@ -105,7 +107,6 @@ export default function Login() {
             transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
-          {/* FACE FRONTAL: LOGIN */}
           <CardFace>
             <Header eyebrow="Acesso restrito"
                     title="Entrar na plataforma"
@@ -134,7 +135,6 @@ export default function Login() {
             </form>
           </CardFace>
 
-          {/* FACE TRASEIRA: TROCA DE SENHA OBRIGATÓRIA */}
           <CardFace back>
             <Header eyebrow="Segurança obrigatória"
                     title="Definir Nova Senha"

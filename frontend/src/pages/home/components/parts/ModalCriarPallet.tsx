@@ -1,4 +1,3 @@
-// components/parts/ModalCriarPallet.tsx
 import type { FormEvent } from "react";
 import type { CriarPalletInput } from "../../../../types/pallet";
 import Button from "../ui/Button";
@@ -47,6 +46,8 @@ export default function ModalCriarPallet({
               <option value="PADRAO"> Pallet Padrão (Armazenagem Geral)</option>
               <option value="DEFEITO"> Pallet de Defeito / Avariados</option>
               <option value="RETRIAGEM"> Pallet de Retorno</option>
+              <option value="DESCARTE">Pallet de Descarte</option>
+              <option value="NOVO">Pallet de Novos</option>
             </select>
           </div>
 

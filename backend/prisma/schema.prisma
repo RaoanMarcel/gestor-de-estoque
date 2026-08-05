@@ -15,9 +15,7 @@ model Pallet {
   nivel     String?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
-  descricao String?
-  tipo      String?
-  produtos  ProdutoPallet[]
+  produtos  ProdutoPallet[] 
 }
 
 model ProdutoPallet {
@@ -29,19 +27,26 @@ model ProdutoPallet {
 }
 
 model HistoricoMovimentacao {
-  id         Int       @id @default(autoincrement())
-  codigoItem String
-  acao       String
-  palletAlvo String
-  bipadoEm   DateTime?
+  id             Int      @id @default(autoincrement())
+  codigoItem     String   
+  codigoAnterior String?  
+  acao           String   
+  palletOrigem   String?  
+  palletDestino  String?  
+  palletAlvo     String?
+  usuarioId      Int?
+  usuario        Usuario? @relation(fields: [usuarioId], references: [id])
+  bipadoEm       DateTime @default(now())
+  createdAt      DateTime @default(now())
 }
 
 model Usuario {
-  id                Int      @id @default(autoincrement())
-  username          String   @unique
+  id                Int                     @id @default(autoincrement())
+  username          String                  @unique
   senha             String
-  precisaMudarSenha Boolean  @default(true)
-  createdAt         DateTime @default(now())
+  precisaMudarSenha Boolean                 @default(true)
+  createdAt         DateTime                @default(now())
+  historicos        HistoricoMovimentacao[]
 }
 
 model Contador {
