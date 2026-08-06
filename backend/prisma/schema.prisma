@@ -13,6 +13,8 @@ model Pallet {
   rua       String?
   estrutura String?
   nivel     String?
+  descricao String?         // <-- REINCLUÍDO PARA NÃO PERDER DADOS
+  tipo      String?         // <-- REINCLUÍDO PARA NÃO PERDER DADOS
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   produtos  ProdutoPallet[] 
@@ -47,10 +49,47 @@ model Usuario {
   precisaMudarSenha Boolean                 @default(true)
   createdAt         DateTime                @default(now())
   historicos        HistoricoMovimentacao[]
+  inbounds          InboundFull[]           // Relacionamento com os Inbounds (Cargas Mercado Livre)
 }
 
 model Contador {
   id    Int    @id @default(autoincrement())
   chave String @unique
   valor Int    @default(0)
+}
+
+// ==========================================
+// NOVOS MODELOS: GESTOR DE ENVIOS FULL
+// ==========================================
+
+model InboundFull {
+  id          Int          @id @default(autoincrement())
+  numeroFrete String?      // Ex: 72595700 (Caso queira extrair e buscar depois)
+  nomePallet  String       // Nome lógico dado pelo operador no app (Ex: Pallet Eletrônicos Sul)
+  status      String       @default("PENDENTE") // Pode ser: PENDENTE, BIPANDO, CONCLUIDO
+  
+  usuarioId   Int?
+  usuario     Usuario?     @relation(fields: [usuarioId], references: [id])
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  skus        InboundSku[] // Relacionamento com os SKUs deste envio
+}
+
+model InboundSku {
+  id               Int         @id @default(autoincrement())
+  
+  inboundId        Int
+  inbound          InboundFull @relation(fields: [inboundId], references: [id], onDelete: Cascade)
+  
+  sku              String      // Código do SKU extraído do PDF
+  descricao        String      // Descrição do produto
+  quantidadeTotal  Int         // Total solicitado pelo Mercado Livre
+  quantidadeBipada Int         @default(0) // Contador de quantos já foram bipados
+  
+  status           String      @default("PENDENTE") // PENDENTE ou CONCLUIDO
+  
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 }

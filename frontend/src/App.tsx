@@ -1,10 +1,13 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { ToastProvider, useToast } from './contexts/toastContext'; 
 import Home from './pages/home/Home.js';
 import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
 import ProtectedRoute from './pages/home/components/ProtectedRoute.js';
+
+// 1. IMPORTAÇÃO DA NOVA TELA
+import GestorEnviosFull from './pages/mercadoFull/GestorEnviosFull';
 
 function LayoutComum({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -15,7 +18,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   const inicialUsuario = usuarioLogado.charAt(0).toUpperCase();
 
   // Estados de controle de UI
-  // 🚀 ALTERAÇÃO: Inicializa a sidebar como fechada (false) por padrão
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -91,7 +93,7 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
         <div className={`w-64 shrink-0 flex items-center px-6 transition-colors duration-300 ${isSidebarOpen ? 'bg-[#0f172a] text-white border-b border-slate-800/80' : 'bg-white text-slate-800 border-b border-slate-200'}`}>
           <div className="flex items-center gap-3 cursor-pointer select-none group" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
             
-            {/* ÍCONE DE TOGGLE (Altera a cor entre o Dark e o Soft Light) */}
+            {/* ÍCONE DE TOGGLE */}
             <div className={`flex items-center justify-center shrink-0 transition-all duration-300 ${
               isSidebarOpen 
                 ? 'h-8 w-8 rounded-lg bg-blue-600 text-white shadow-sm' 
@@ -167,12 +169,13 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               <div className="h-px w-6 bg-slate-200 my-4 mx-auto" />
             )}
             
-            <a href="/" title="Visão do Armazém" className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3 bg-blue-600 text-white shadow-sm hover:bg-blue-700' : 'justify-center bg-blue-50 border border-blue-100/60 text-blue-600 hover:bg-blue-100'} py-2.5 rounded-lg transition-all duration-300`}>
+            {/* LINK HOME ATUALIZADO */}
+            <Link to="/" title="Visão do Armazém" className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3 bg-blue-600 text-white shadow-sm hover:bg-blue-700' : 'justify-center bg-blue-50 border border-blue-100/60 text-blue-600 hover:bg-blue-100'} py-2.5 rounded-lg transition-all duration-300`}>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 shrink-0">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
               </svg>
               {isSidebarOpen && <span className="text-[13px] font-semibold whitespace-nowrap animate-in fade-in duration-300">Visão do Armazém</span>}
-            </a>
+            </Link>
 
             {isSidebarOpen ? (
               <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 mt-8 animate-in fade-in duration-300">Operações Externas</p>
@@ -180,12 +183,13 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               <div className="h-px w-6 bg-slate-200 my-6 mx-auto" />
             )}
             
-            <a href="#" title="Mercado Full" className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3 text-slate-400 hover:text-slate-100 hover:bg-slate-800' : 'justify-center text-slate-400 hover:text-blue-600 hover:bg-slate-50'} py-2.5 rounded-lg transition-colors group`}>
+            {/* 3. LINK DO MERCADO FULL ATUALIZADO */}
+            <Link to="/mercado-full" title="Mercado Full" className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3 text-slate-400 hover:text-slate-100 hover:bg-slate-800' : 'justify-center text-slate-400 hover:text-blue-600 hover:bg-slate-50'} py-2.5 rounded-lg transition-colors group`}>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 shrink-0 group-hover:text-amber-400 transition-colors">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
               </svg>
               {isSidebarOpen && <span className="text-[13px] font-semibold whitespace-nowrap animate-in fade-in duration-300">Mercado Full</span>}
-            </a>
+            </Link>
           </nav>
         </aside>
 
@@ -261,10 +265,14 @@ function App() {
         <LayoutComum>
           <Routes>
             <Route path="/login" element={<Login />} />
+            
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Home />} />
               <Route path="/pallet/:id" element={<PalletInterface />} />
+              {/* 2. NOVA ROTA ADICIONADA AQUI (Protegida) */}
+              <Route path="/mercado-full" element={<GestorEnviosFull />} />
             </Route>
+            
           </Routes>
         </LayoutComum>
       </ToastProvider>

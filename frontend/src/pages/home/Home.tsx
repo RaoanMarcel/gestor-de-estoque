@@ -42,7 +42,6 @@ export default function Home() {
   
   const [totalItensEstoque, setTotalItensEstoque] = useState(0);
 
-  // 🚀 KPI RESTRITO: Calcula apenas se o pallet for PADRAO (Ignora tudo que for exceção)
   useEffect(() => {
     const buscarTotalAbsoluto = async () => {
       try {
