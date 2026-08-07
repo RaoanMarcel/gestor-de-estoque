@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5"
+  },
+  "devDependencies": {
+    "@types/multer": "^2.2.0",
+    "@types/pdf-parse": "^1.1.5"
+  }
+}

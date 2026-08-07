@@ -7,11 +7,13 @@ import palletRoutes from './routes/palletRoutes.js';
 import { authController } from './controllers/authController.js';
 import { autenticarToken } from './middlewares/authMiddleware.js';
 import { SocketService } from './services/SocketService.js';
+import inboundRoutes from './routes/inboundRoutes.js'; // Importação com extensão corrigida
 
 dotenv.config();
 
+// A variável 'app' é criada aqui, então só podemos usar app.use() daqui para baixo!
 const app = express();
-const httpServer = createServer(app);
+const httpServer = createServer(app); 
 
 SocketService.getInstance().init(httpServer);
 
@@ -55,7 +57,9 @@ app.use('/api/auth', publicAuthRouter);
 
 app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.alterarSenhaAutenticado);
 
+// ROTAS DA APLICAÇÃO
 app.use('/api', palletRoutes);
+app.use('/api/inbounds', inboundRoutes); // Rota inserida corretamente!
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor ativo na porta ${PORT} | Versão: ${APP_VERSION}`);
