@@ -1,4 +1,4 @@
-// PalletInterface.tsx
+import { useToast } from "../../contexts/toastContext"; // 🚀 Importado
 import { usePalletLogic } from "./components/hooks/usePalletLogic";
 import PalletHeader from "./components/parts/PalletHeader";
 import BipagemPanel from "./components/parts/BipagemPanel";
@@ -6,6 +6,8 @@ import ConteudoAtualPanel from "./components/parts/ConteudoAtualPanel";
 import ModalDestino from "./components/parts/ModalDestino";
 
 export default function PalletInterface() {
+  const toast = useToast(); // 🚀 Inicializado
+
   const {
     pallet,
     exclusoesPendentes,
@@ -45,7 +47,6 @@ export default function PalletInterface() {
     handleDescartarExclusoesCache,
     handleTentarSairDaTela,
 
-    // Modais de suporte e rastreabilidade
     handleAbrirRastreabilidade,
     exibirModalRastreabilidade,
     setExibirModalRastreabilidade,
@@ -69,22 +70,32 @@ export default function PalletInterface() {
     inputPuxarRef
   } = usePalletLogic();
 
+  // 🚀 NOVA FUNÇÃO: Aciona a confirmação assíncrona antes de processar as baixas do cache
+  const handleConfirmarSaidasPendentes = async () => {
+    const confirmou = await toast.confirm(`Deseja efetivar a exclusão e dar baixa de ${exclusoesPendentes.length} itens do estoque?`);
+    if (confirmou) {
+      handleConfirmarExclusaoEmLote();
+    }
+  };
+
   if (!pallet) {
     return (
-      <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center text-slate-400 text-xs font-mono tracking-[0.2em] uppercase">
+      <div className="min-h-screen bg-slate-200 flex items-center justify-center text-slate-400 text-xs font-mono tracking-[0.2em] uppercase">
         Carregando dados do Pallet...
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-[#F6F8FC] text-slate-800 antialiased overflow-hidden" onClick={manterFocoNoInput}>
+    <div className="relative min-h-screen bg-slate-200 text-slate-800 antialiased overflow-hidden" onClick={manterFocoNoInput}>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.14),transparent_70%)] blur-3xl" />
         <div className="absolute top-1/3 -right-52 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.10),transparent_70%)] blur-3xl" />
       </div>
 
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+        
+        {/* 🚀 Passando as novas propriedades para o Header */}
         <PalletHeader
           pallet={pallet}
           isModoTransferencia={isModoTransferencia}
@@ -95,6 +106,8 @@ export default function PalletInterface() {
           handleAdicionarTodoOPalletNoLote={handleAdicionarTodoOPalletNoLote}
           navigate={(rota) => handleTentarSairDaTela(String(rota))}
           onAbrirModalPuxar={() => setExibirModalPuxar(true)}
+          exclusoesPendentesCount={exclusoesPendentes.length}
+          onConfirmarExclusoes={handleConfirmarSaidasPendentes}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -131,7 +144,6 @@ export default function PalletInterface() {
               handleAbrirRastreabilidade={handleAbrirRastreabilidade}
             />
 
-            {/* Painel de Lançamento para Pallets do Tipo NOVO */}
             {pallet.tipo === 'NOVO' && (
               <div className="bg-white border-2 border-emerald-100 rounded-xl p-5 shadow-sm space-y-3 animate-enter">
                 <div className="flex items-center gap-2.5 text-emerald-600">
@@ -168,7 +180,7 @@ export default function PalletInterface() {
         />
       </div>
 
-      {/* MODAL DE EXCLUSÕES PENDENTES */}
+      {/* MODAL DE EXCLUSÕES PENDENTES (Mantido inalterado) */}
       {exibirModalExclusaoLote && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
           <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4">
@@ -218,7 +230,7 @@ export default function PalletInterface() {
         </div>
       )}
 
-      {/* MODAL DE RASTREABILIDADE (Padrão exato corporativo) */}
+      {/* Demais Modais... (Rastreabilidade, Etiqueta, Puxar) */}
       {exibirModalRastreabilidade && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setExibirModalRastreabilidade(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -285,7 +297,6 @@ export default function PalletInterface() {
         </div>
       )}
 
-      {/* MODAL DE NOVA ETIQUETA */}
       {modalNovaEtiqueta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in" onClick={cancelarNovaEtiqueta}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
@@ -315,7 +326,6 @@ export default function PalletInterface() {
         </div>
       )}
 
-      {/* MODAL DE PUXAR ITEM */}
       {exibirModalPuxar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in" onClick={() => setExibirModalPuxar(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>

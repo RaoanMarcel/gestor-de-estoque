@@ -1,12 +1,10 @@
 import { BrowserRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { ToastProvider, useToast } from './contexts/toastContext'; 
 import Home from './pages/home/Home.js';
 import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
 import ProtectedRoute from './pages/home/components/ProtectedRoute.js';
-
-// 1. IMPORTAÇÃO DA NOVA TELA
 import GestorEnviosFull from './pages/mercadoFull/GestorEnviosFull';
 
 function LayoutComum({ children }: { children: React.ReactNode }) {
@@ -15,29 +13,18 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   
   const esconderHeader = location.pathname === '/login';
   const usuarioLogado = localStorage.getItem('wms_user') || 'Operador';
+  
+  // Pegando a inicial do usuário para o avatar
   const inicialUsuario = usuarioLogado.charAt(0).toUpperCase();
 
   // Estados de controle de UI
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   // Estados para alteração de senha
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [carregandoSenha, setCarregandoSenha] = useState(false);
-
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const handleLogout = () => {
     localStorage.clear();
@@ -86,13 +73,16 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col h-screen bg-[#F6F8FC] antialiased overflow-hidden">
       
-      {/* 🚀 HEADER SUPERIOR: LINHA FIXA */}
+      {/* 🚀 HEADER SUPERIOR: LINHA FIXA TOTALMENTE LIMPA */}
       <header className="flex h-16 shrink-0 z-50">
         
         {/* BLOCO SUPERIOR ESQUERDO: LARGURA FIXA E TRAVADA (Não encolhe) */}
-        <div className={`w-64 shrink-0 flex items-center px-6 transition-colors duration-300 ${isSidebarOpen ? 'bg-[#0f172a] text-white border-b border-slate-800/80' : 'bg-white text-slate-800 border-b border-slate-200'}`}>
-          <div className="flex items-center gap-3 cursor-pointer select-none group" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-            
+        <div 
+          onMouseEnter={() => setIsSidebarOpen(true)}
+          onMouseLeave={() => setIsSidebarOpen(false)}
+          className={`w-64 shrink-0 flex items-center px-6 transition-colors duration-300 border-b ${isSidebarOpen ? 'bg-[#0f172a] text-white border-slate-800/80' : 'bg-white text-slate-800 border-slate-200'}`}
+        >
+          <div className="flex items-center gap-3 select-none group">
             {/* ÍCONE DE TOGGLE */}
             <div className={`flex items-center justify-center shrink-0 transition-all duration-300 ${
               isSidebarOpen 
@@ -109,58 +99,22 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* BLOCO SUPERIOR DIREITO: MENU DE USUÁRIO */}
-        <div className="flex-1 bg-white/90 backdrop-blur-xl border-b border-slate-200 flex items-center justify-end px-6 transition-all duration-300">
-          
-          <div className="relative" ref={dropdownRef}>
-            <button 
-              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} 
-              className={`flex items-center gap-2.5 bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1.5 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${isUserMenuOpen ? 'bg-slate-100 ring-2 ring-blue-500/10' : 'hover:bg-slate-100'}`}
-            >
-              <div className="h-6 w-6 rounded-md bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold font-mono shadow-inner">
-                {inicialUsuario}
-              </div>
-              <span className="text-xs font-semibold text-slate-700 font-mono tracking-tight max-w-[120px] truncate">
-                {usuarioLogado}
-              </span>
-              <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-              </svg>
-            </button>
-
-            {/* Menu Flutuante (Dropdown) */}
-            {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                <button 
-                  onClick={() => { setIsUserMenuOpen(false); setIsPasswordModalOpen(true); }} 
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-slate-400">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-                  </svg>
-                  Alterar Senha
-                </button>
-                <div className="h-px bg-slate-100 my-1 mx-2"></div>
-                <button 
-                  onClick={handleLogout} 
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-rose-500">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-                  </svg>
-                  Sair da Conta
-                </button>
-              </div>
-            )}
-          </div>
+        {/* BLOCO SUPERIOR DIREITO: COMPLETAMENTE LIMPO */}
+        <div className="flex-1 bg-white/90 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-6 transition-all duration-300">
+          {/* Header limpo - O menu de usuário desceu para a sidebar! */}
         </div>
       </header>
 
       {/* ÁREA DE CONTEÚDO PRINCIPAL INFERIOR */}
       <div className="flex flex-1 overflow-hidden">
         
-        {/* 🚀 SIDEBAR NAV (Esta é a única parte que encolhe) */}
-        <aside className={`transition-all duration-300 ease-in-out flex flex-col shrink-0 z-40 ${isSidebarOpen ? 'w-64 bg-[#0f172a] text-slate-300' : 'w-20 bg-white text-slate-600 border-r border-slate-200'}`}>
+        {/* 🚀 SIDEBAR NAV COM PERFIL E CONFIGURAÇÕES NA BASE */}
+        <aside 
+          onMouseEnter={() => setIsSidebarOpen(true)}
+          onMouseLeave={() => setIsSidebarOpen(false)}
+          className={`transition-all duration-300 ease-in-out flex flex-col shrink-0 z-40 ${isSidebarOpen ? 'w-64 bg-[#0f172a] text-slate-300' : 'w-20 bg-white text-slate-600 border-r border-slate-200'}`}
+        >
+          {/* NAVEGAÇÃO PRINCIPAL */}
           <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-2 scrollbar-hide">
             
             {isSidebarOpen ? (
@@ -169,7 +123,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               <div className="h-px w-6 bg-slate-200 my-4 mx-auto" />
             )}
             
-            {/* LINK HOME ATUALIZADO */}
             <Link to="/" title="Visão do Armazém" className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3 bg-blue-600 text-white shadow-sm hover:bg-blue-700' : 'justify-center bg-blue-50 border border-blue-100/60 text-blue-600 hover:bg-blue-100'} py-2.5 rounded-lg transition-all duration-300`}>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 shrink-0">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
@@ -183,7 +136,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               <div className="h-px w-6 bg-slate-200 my-6 mx-auto" />
             )}
             
-            {/* 3. LINK DO MERCADO FULL ATUALIZADO */}
             <Link to="/mercado-full" title="Mercado Full" className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3 text-slate-400 hover:text-slate-100 hover:bg-slate-800' : 'justify-center text-slate-400 hover:text-blue-600 hover:bg-slate-50'} py-2.5 rounded-lg transition-colors group`}>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 shrink-0 group-hover:text-amber-400 transition-colors">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
@@ -191,6 +143,66 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               {isSidebarOpen && <span className="text-[13px] font-semibold whitespace-nowrap animate-in fade-in duration-300">Mercado Full</span>}
             </Link>
           </nav>
+
+          {/* 🚀 BASE DA SIDEBAR (Módulos Soltos + Perfil do Usuário) */}
+          <div className={`mt-auto border-t transition-colors duration-300 ${isSidebarOpen ? 'border-slate-800/80' : 'border-slate-100'} p-3 flex flex-col gap-1`}>
+            
+            {/* BOTÃO CONFIGURAÇÕES (Fora de modal, solto na base) */}
+            <button 
+              onClick={() => setIsPasswordModalOpen(true)}
+              title="Configurações"
+              className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3 text-slate-400 hover:text-slate-100 hover:bg-slate-800' : 'justify-center text-slate-400 hover:text-blue-600 hover:bg-slate-50'} py-2.5 rounded-lg transition-colors group`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 shrink-0 group-hover:rotate-45 transition-transform duration-300">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {isSidebarOpen && <span className="text-[13px] font-semibold whitespace-nowrap animate-in fade-in duration-300">Configurações</span>}
+            </button>
+
+            {/* BOTÃO SAIR DO SISTEMA (Fora de modal, solto na base) */}
+            <button 
+              onClick={handleLogout}
+              title="Sair do Sistema"
+              className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10' : 'justify-center text-rose-500 hover:text-rose-600 hover:bg-rose-50'} py-2.5 rounded-lg transition-colors group`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+              </svg>
+              {isSidebarOpen && <span className="text-[13px] font-semibold whitespace-nowrap animate-in fade-in duration-300">Sair do Sistema</span>}
+            </button>
+
+            {/* DIVISOR DO PERFIL */}
+            <div className={`h-px transition-colors duration-300 ${isSidebarOpen ? 'bg-slate-800/80' : 'bg-slate-200'} my-2 mx-2`} />
+
+            {/* PERFIL DO USUÁRIO (Apenas Avatar, Nome e Sininho) */}
+            <div className={`flex items-center ${isSidebarOpen ? 'justify-between px-2' : 'justify-center'} py-1.5`}>
+              <div className="flex items-center gap-3">
+                {/* Avatar Limpo (Fundo branco e texto escuro idêntico à sua imagem) */}
+                <div className="h-[34px] w-[34px] rounded-full bg-white border border-slate-200 text-slate-800 flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
+                  {inicialUsuario}A
+                </div>
+                
+                {/* Nome do Operador */}
+                {isSidebarOpen && (
+                  <div className="flex flex-col items-start animate-in fade-in duration-300">
+                    <span className="text-[13px] font-semibold text-white tracking-wide truncate max-w-[120px]">{usuarioLogado}</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Sininho de Notificação */}
+              {isSidebarOpen && (
+                <div className="relative p-1 text-slate-400 hover:text-white transition-colors cursor-pointer animate-in fade-in duration-300">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-[18px] h-[18px]">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                  </svg>
+                  <span className="absolute top-0.5 right-1 h-2 w-2 rounded-full bg-rose-500 border-[1.5px] border-[#0f172a]"></span>
+                </div>
+              )}
+            </div>
+
+          </div>
         </aside>
 
         {/* CONTAINER DINÂMICO ONDE AS TELAS SÃO RENDERIZADAS */}
@@ -269,7 +281,6 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Home />} />
               <Route path="/pallet/:id" element={<PalletInterface />} />
-              {/* 2. NOVA ROTA ADICIONADA AQUI (Protegida) */}
               <Route path="/mercado-full" element={<GestorEnviosFull />} />
             </Route>
             

@@ -160,12 +160,14 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#F6F8FC] text-slate-800 antialiased overflow-hidden">
+    // 🎨 ALTERAÇÃO: Trocado para bg-slate-200
+    <div className="relative min-h-screen bg-slate-200 text-slate-800 antialiased overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.14),transparent_70%)] blur-3xl" />
         <div className="absolute top-1/3 -right-52 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.10),transparent_70%)] blur-3xl" />
         <div className="absolute -bottom-52 left-1/4 w-[650px] h-[650px] rounded-full bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.10),transparent_70%)] blur-3xl" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,rgba(246,248,252,0.6))]" />
+        {/* 🎨 ALTERAÇÃO: Gradiente base harmonizado com o Slate-200 (rgba(226, 232, 240)) */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,rgba(226,232,240,0.8))]" />
       </div>
 
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-8">
