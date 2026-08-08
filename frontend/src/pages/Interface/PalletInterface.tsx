@@ -1,4 +1,5 @@
-import { useToast } from "../../contexts/toastContext"; // 🚀 Importado
+import { useToast } from "../../contexts/toastContext"; 
+import { useTheme } from '../../contexts/themeContext'; 
 import { usePalletLogic } from "./components/hooks/usePalletLogic";
 import PalletHeader from "./components/parts/PalletHeader";
 import BipagemPanel from "./components/parts/BipagemPanel";
@@ -6,8 +7,9 @@ import ConteudoAtualPanel from "./components/parts/ConteudoAtualPanel";
 import ModalDestino from "./components/parts/ModalDestino";
 
 export default function PalletInterface() {
-  const toast = useToast(); // 🚀 Inicializado
-
+  const toast = useToast(); 
+  const { theme } = useTheme(); 
+  
   const {
     pallet,
     exclusoesPendentes,
@@ -70,7 +72,6 @@ export default function PalletInterface() {
     inputPuxarRef
   } = usePalletLogic();
 
-  // 🚀 NOVA FUNÇÃO: Aciona a confirmação assíncrona antes de processar as baixas do cache
   const handleConfirmarSaidasPendentes = async () => {
     const confirmou = await toast.confirm(`Deseja efetivar a exclusão e dar baixa de ${exclusoesPendentes.length} itens do estoque?`);
     if (confirmou) {
@@ -80,22 +81,25 @@ export default function PalletInterface() {
 
   if (!pallet) {
     return (
-      <div className="min-h-screen bg-slate-200 flex items-center justify-center text-slate-400 text-xs font-mono tracking-[0.2em] uppercase">
+      <div className="min-h-screen bg-transparent flex items-center justify-center text-[var(--text-muted)] text-xs font-mono tracking-[0.2em] uppercase">
         Carregando dados do Pallet...
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-200 text-slate-800 antialiased overflow-hidden" onClick={manterFocoNoInput}>
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.14),transparent_70%)] blur-3xl" />
-        <div className="absolute top-1/3 -right-52 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.10),transparent_70%)] blur-3xl" />
-      </div>
+    <div className="relative min-h-screen bg-transparent text-[var(--text-main)] antialiased overflow-hidden" onClick={manterFocoNoInput}>
+      
+      {/* 🚀 Oculta gradientes nos temas escuros[cite: 6] */}
+      {theme === 'ocean' && (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.14),transparent_70%)] blur-3xl" />
+          <div className="absolute top-1/3 -right-52 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.10),transparent_70%)] blur-3xl" />
+        </div>
+      )}
 
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-6">
         
-        {/* 🚀 Passando as novas propriedades para o Header */}
         <PalletHeader
           pallet={pallet}
           isModoTransferencia={isModoTransferencia}
@@ -145,17 +149,17 @@ export default function PalletInterface() {
             />
 
             {pallet.tipo === 'NOVO' && (
-              <div className="bg-white border-2 border-emerald-100 rounded-xl p-5 shadow-sm space-y-3 animate-enter">
-                <div className="flex items-center gap-2.5 text-emerald-600">
-                  <div className="bg-emerald-100 p-1.5 rounded-lg text-emerald-600">
+              <div className="bg-[var(--bg-panel)] border border-emerald-500/30 bg-gradient-to-br from-[var(--bg-panel)] to-emerald-500/10 rounded-xl p-5 shadow-sm space-y-3 animate-enter">
+                <div className="flex items-center gap-2.5 text-emerald-500">
+                  <div className="bg-emerald-500/20 p-1.5 rounded-lg text-emerald-500">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
                       <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-bold uppercase tracking-tight text-slate-800">Lançar Itens</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-tight text-[var(--text-main)]">Lançar Itens</h3>
                 </div>
-                <p className="text-[13px] text-slate-500 font-medium leading-relaxed">
-                  Valida os códigos e exige sua <strong className="text-slate-700">senha de operador</strong> para dar baixa no estoque e gerar o relatório final.
+                <p className="text-[13px] text-[var(--text-muted)] font-medium leading-relaxed">
+                  Valida os códigos e exige sua <strong className="text-[var(--text-main)]">senha de operador</strong> para dar baixa no estoque e gerar o relatório final.
                 </p>
                 <button
                   onClick={handleLancarPalletNovo}
@@ -180,27 +184,26 @@ export default function PalletInterface() {
         />
       </div>
 
-      {/* MODAL DE EXCLUSÕES PENDENTES (Mantido inalterado) */}
       {exibirModalExclusaoLote && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
-          <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[var(--bg-panel)] rounded-xl border border-[var(--border-color)] p-6 max-w-md w-full shadow-xl space-y-4">
             <div className="text-center">
               <span className="text-3xl">⚠️</span>
-              <h3 className="text-base font-bold text-slate-900 uppercase tracking-wider mt-2">
+              <h3 className="text-base font-bold text-[var(--text-main)] uppercase tracking-wider mt-2">
                 Exclusões Pendentes
               </h3>
               <div className="mt-3 text-left">
-                <p className="text-xs text-slate-500 mb-3">
+                <p className="text-xs text-[var(--text-muted)] mb-3">
                   Os seguintes códigos estão aguardando confirmação de baixa:
                 </p>
 
-                <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50">
+                <div className="max-h-56 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)]">
                   {exclusoesPendentes.map((codigo) => (
                     <div
                       key={codigo}
-                      className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 border-slate-200"
+                      className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 border-[var(--border-color)]"
                     >
-                      <span className="font-mono text-sm font-semibold text-slate-800">
+                      <span className="font-mono text-sm font-semibold text-[var(--text-main)]">
                         {codigo}
                       </span>
 
@@ -221,7 +224,7 @@ export default function PalletInterface() {
               </button>
               <button
                 onClick={handleDescartarExclusoesCache}
-                className="w-full py-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium text-xs tracking-wider uppercase transition-all"
+                className="w-full py-3 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 font-medium text-xs tracking-wider uppercase transition-all border border-rose-500/20"
               >
                  Descartar Operações e Sair
               </button>
@@ -230,56 +233,55 @@ export default function PalletInterface() {
         </div>
       )}
 
-      {/* Demais Modais... (Rastreabilidade, Etiqueta, Puxar) */}
       {exibirModalRastreabilidade && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setExibirModalRastreabilidade(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setExibirModalRastreabilidade(false)}>
+          <div className="bg-[var(--bg-panel)] rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[85vh] overflow-hidden border border-[var(--border-color)]" onClick={e => e.stopPropagation()}>
             
-            <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">
+            <div className="flex items-start justify-between px-6 py-5 border-b border-[var(--border-color)]">
               <div>
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight">Rastreabilidade do Item</h2>
-                <p className="text-sm text-slate-500 mt-1">Cód: <span className="font-mono">{itemRastreabilidade}</span></p>
+                <h2 className="text-lg font-bold text-[var(--text-main)] tracking-tight">Rastreabilidade do Item</h2>
+                <p className="text-sm text-[var(--text-muted)] mt-1">Cód: <span className="font-mono">{itemRastreabilidade}</span></p>
               </div>
-              <button onClick={() => setExibirModalRastreabilidade(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-1">
+              <button onClick={() => setExibirModalRastreabilidade(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto bg-slate-50 flex-1">
+            <div className="p-6 overflow-y-auto bg-[var(--bg-main)] flex-1">
               {carregandoHistorico ? (
-                <p className="text-center text-sm font-medium text-slate-400 py-10">Buscando rastros...</p>
+                <p className="text-center text-sm font-medium text-[var(--text-muted)] py-10">Buscando rastros...</p>
               ) : historicoData.length === 0 ? (
                 <div className="text-center py-10">
                   <span className="text-3xl">👻</span>
-                  <p className="text-sm font-medium text-slate-500 mt-2">Nenhum rastro encontrado.</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)] mt-2">Nenhum rastro encontrado.</p>
                 </div>
               ) : (
-                <div className="relative border-l-2 border-slate-200 ml-3 space-y-6 pb-2">
+                <div className="relative border-l-2 border-[var(--border-color)] ml-3 space-y-6 pb-2">
                   {historicoData.map((evento, idx) => (
                     <div key={evento.id || idx} className="relative pl-6">
-                      <div className="absolute -left-[9px] top-4 h-4 w-4 rounded-full border-2 border-slate-50 bg-blue-500" />
+                      <div className="absolute -left-[9px] top-4 h-4 w-4 rounded-full border-2 border-[var(--bg-main)] bg-blue-500" />
                       
-                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3">
+                      <div className="bg-[var(--bg-panel)] p-4 rounded-xl border border-[var(--border-color)] shadow-sm flex flex-col gap-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-500/10 px-2.5 py-1 rounded-md">
                             {evento.acao.replace(/_/g, ' ')}
                           </span>
-                          <span className="text-xs text-slate-400 font-medium">
+                          <span className="text-xs text-[var(--text-muted)] font-medium">
                             {evento.bipadoEm ? new Date(evento.bipadoEm).toLocaleString('pt-BR') : 'Data não reg.'}
                           </span>
                         </div>
 
-                        <div className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                          Pallet: <span className="bg-slate-100 border border-slate-200 text-slate-800 px-2 py-0.5 rounded text-xs">{evento.palletAlvo || 'Sistema'}</span>
+                        <div className="text-sm font-semibold text-[var(--text-main)] flex items-center gap-2">
+                          Pallet: <span className="bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-main)] px-2 py-0.5 rounded text-xs">{evento.palletAlvo || 'Sistema'}</span>
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs font-medium text-slate-500 pt-2 border-t border-slate-50">
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-slate-400">
+                        <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-muted)] pt-2 border-t border-[var(--border-color)]">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 opacity-70">
                             <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
                           </svg>
-                          Operação por: <strong className="text-slate-700">{evento.usuario?.username || 'Sistema'}</strong>
+                          Operação por: <strong className="text-[var(--text-main)]">{evento.usuario?.username || 'Sistema'}</strong>
                         </div>
                       </div>
                     </div>
@@ -288,8 +290,8 @@ export default function PalletInterface() {
               )}
             </div>
 
-            <div className="p-4 border-t border-slate-100 bg-white">
-              <button onClick={() => setExibirModalRastreabilidade(false)} className="w-full py-3.5 bg-[#131B2A] hover:bg-slate-900 text-white text-xs font-bold tracking-wider uppercase rounded-xl transition-colors shadow-md">
+            <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-panel)]">
+              <button onClick={() => setExibirModalRastreabilidade(false)} className="w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold tracking-wider uppercase rounded-xl transition-colors shadow-md">
                 Fechar Rastreamento
               </button>
             </div>
@@ -298,14 +300,14 @@ export default function PalletInterface() {
       )}
 
       {modalNovaEtiqueta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in" onClick={cancelarNovaEtiqueta}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={cancelarNovaEtiqueta}>
+          <div className="bg-[var(--bg-panel)] rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-[var(--border-color)]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 text-amber-500">
               <span className="text-3xl">🏷️</span>
-              <h2 className="text-base font-bold text-slate-900 leading-tight">Retriagem Obrigatória</h2>
+              <h2 className="text-base font-bold text-[var(--text-main)] leading-tight">Retriagem Obrigatória</h2>
             </div>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              O item <strong className="font-mono text-slate-900">{dadosRetriagem?.codigoOriginal}</strong> precisa receber uma nova etiqueta que comece com <strong className="text-amber-600">{dadosRetriagem?.prefixoEsperado}</strong>.
+            <p className="text-sm text-[var(--text-muted)] leading-relaxed">
+              O item <strong className="font-mono text-[var(--text-main)]">{dadosRetriagem?.codigoOriginal}</strong> precisa receber uma nova etiqueta que comece com <strong className="text-amber-600">{dadosRetriagem?.prefixoEsperado}</strong>.
             </p>
             <form onSubmit={handleBiparNovaEtiquetaSubmit} className="space-y-3 pt-2">
               <input
@@ -314,11 +316,11 @@ export default function PalletInterface() {
                 value={novaEtiquetaBipada}
                 onChange={(e) => setNovaEtiquetaBipada(e.target.value.toUpperCase())}
                 placeholder={`Bipe a nova etiqueta ${dadosRetriagem?.prefixoEsperado}...`}
-                className="w-full border border-slate-300 rounded-lg px-4 py-3 text-sm font-mono focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none uppercase"
+                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-main)] rounded-lg px-4 py-3 text-sm font-mono focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none uppercase"
                 autoFocus
               />
               <div className="flex gap-2">
-                <button type="button" onClick={cancelarNovaEtiqueta} className="flex-1 px-4 py-2 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200">Cancelar</button>
+                <button type="button" onClick={cancelarNovaEtiqueta} className="flex-1 px-4 py-2 bg-[var(--bg-main)] text-[var(--text-main)] border border-[var(--border-color)] text-xs font-bold rounded-lg hover:opacity-80">Cancelar</button>
                 <button type="submit" disabled={!novaEtiquetaBipada} className="flex-1 px-4 py-2 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-600 disabled:opacity-50">Vincular</button>
               </div>
             </form>
@@ -327,21 +329,21 @@ export default function PalletInterface() {
       )}
 
       {exibirModalPuxar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in" onClick={() => setExibirModalPuxar(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 className="text-base font-bold text-slate-900">Puxar Item</h2>
-              <button onClick={() => setExibirModalPuxar(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={() => setExibirModalPuxar(false)}>
+          <div className="bg-[var(--bg-panel)] rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-[var(--border-color)]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
+              <h2 className="text-base font-bold text-[var(--text-main)]">Puxar Item</h2>
+              <button onClick={() => setExibirModalPuxar(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">✕</button>
             </div>
             <form onSubmit={handlePuxarItemSubmit} className="space-y-4">
-              <p className="text-xs text-slate-500">Bipe o código do item que deseja transferir de outro pallet para este.</p>
+              <p className="text-xs text-[var(--text-muted)]">Bipe o código do item que deseja transferir de outro pallet para este.</p>
               <input
                 ref={inputPuxarRef}
                 type="text"
                 value={codigoPuxar}
                 onChange={(e) => setCodigoPuxar(e.target.value.toUpperCase())}
                 placeholder="CÓDIGO DO ITEM..."
-                className="w-full border border-slate-300 rounded-lg px-4 py-3 text-sm font-mono focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none uppercase"
+                className="w-full bg-[var(--bg-main)] text-[var(--text-main)] border border-[var(--border-color)] rounded-lg px-4 py-3 text-sm font-mono focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none uppercase"
                 autoFocus
               />
               <button type="submit" disabled={!codigoPuxar} className="w-full py-3 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50 uppercase tracking-wider text-xs shadow-sm">Transferir para cá</button>
