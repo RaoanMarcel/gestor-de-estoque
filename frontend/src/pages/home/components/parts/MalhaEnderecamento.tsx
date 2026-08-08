@@ -23,12 +23,12 @@ const OPCOES_FILTRO = [
 
 const getFilterActiveStyle = (id: string) => {
   switch (id) {
-    case 'DEFEITO': return 'bg-rose-100 text-rose-800 border-rose-300';
+    case 'DEFEITO': return 'border-rose-500 text-rose-500 bg-rose-500/10';
     case 'RETRIAGEM':
-    case 'NOVO': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-    case 'DESCARTE': return 'bg-slate-200 text-slate-800 border-slate-400';
-    case 'PADRAO': return 'bg-amber-100 text-amber-900 border-amber-300';
-    default: return 'bg-blue-100 text-blue-800 border-blue-300';
+    case 'NOVO': return 'border-emerald-500 text-emerald-500 bg-emerald-500/10';
+    case 'DESCARTE': return 'border-slate-500 text-slate-500 bg-slate-500/10';
+    case 'PADRAO': return 'border-amber-500 text-amber-500 bg-amber-500/10';
+    default: return 'border-blue-500 text-blue-500 bg-blue-500/10';
   }
 };
 
@@ -84,18 +84,19 @@ export default function MalhaEnderecamento({
     setFiltrosAtivos(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   };
 
+  // 🚀 ADICIONADO: O degradê interno nos cards, fluindo do bg-panel até um fundo colorido translúcido
   const getCardStyle = (tipo: string) => {
-    if (tipo === 'DEFEITO') return 'bg-gradient-to-br from-white/95 to-rose-50/60 border-rose-100 hover:border-rose-300 hover:shadow-rose-200';
-    if (tipo === 'DESCARTE') return 'bg-gradient-to-br from-white/95 to-slate-100/80 border-slate-200 hover:border-slate-400 hover:shadow-slate-300';
-    if (tipo === 'RETRIAGEM' || tipo === 'NOVO') return 'bg-gradient-to-br from-white/95 to-emerald-50/60 border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-200';
-    return 'bg-gradient-to-br from-white/95 to-amber-50/60 border-amber-100/80 hover:border-amber-300 hover:shadow-amber-200';
+    if (tipo === 'DEFEITO') return 'bg-gradient-to-br from-[var(--bg-panel)] to-rose-500/10 border-rose-500/30 hover:border-rose-500/60 shadow-sm';
+    if (tipo === 'DESCARTE') return 'bg-gradient-to-br from-[var(--bg-panel)] to-slate-500/10 border-slate-500/30 hover:border-slate-500/60 shadow-sm';
+    if (tipo === 'RETRIAGEM' || tipo === 'NOVO') return 'bg-gradient-to-br from-[var(--bg-panel)] to-emerald-500/10 border-emerald-500/30 hover:border-emerald-500/60 shadow-sm';
+    return 'bg-gradient-to-br from-[var(--bg-panel)] to-amber-500/10 border-amber-500/30 hover:border-amber-500/60 shadow-sm';
   };
 
   const getTopBarStyle = (tipo: string) => {
-    if (tipo === 'DEFEITO') return 'bg-rose-400';
-    if (tipo === 'DESCARTE') return 'bg-slate-700';
-    if (tipo === 'RETRIAGEM' || tipo === 'NOVO') return 'bg-emerald-400';
-    return 'bg-amber-400';
+    if (tipo === 'DEFEITO') return 'bg-rose-500';
+    if (tipo === 'DESCARTE') return 'bg-slate-500';
+    if (tipo === 'RETRIAGEM' || tipo === 'NOVO') return 'bg-emerald-500';
+    return 'bg-amber-500';
   };
 
   const mudarPagina = (chave: string, novaPagina: number) => {
@@ -106,25 +107,28 @@ export default function MalhaEnderecamento({
     <div className="pt-2 pb-10">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h2 className="text-sm font-bold text-slate-800 shrink-0">Malha de Endereçamento</h2>
+          <h2 className="text-sm font-bold text-[var(--text-main)] shrink-0">Malha de Endereçamento</h2>
           <input 
             type="text" placeholder="Buscar triagem em pallet, rua!" value={busca} 
             onChange={(e) => { setBusca(e.target.value); setPaginasAtuais({}); }}
-            className="w-full sm:w-80 border border-slate-200 rounded-lg px-4 py-2 text-xs text-slate-700 outline-none shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            className="w-full sm:w-80 border border-[var(--border-color)] bg-[var(--bg-panel)] text-[var(--text-main)] placeholder:text-[var(--text-muted)] rounded-lg px-4 py-2 text-xs outline-none shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
           />
         </div>
 
         <div className="flex items-center gap-2 mb-8 overflow-x-auto w-full scrollbar-hide pb-2">
-          <span className="text-xs font-bold text-slate-400 uppercase shrink-0 mr-1">FILTRAR:</span>
+          <span className="text-xs font-bold text-[var(--text-muted)] uppercase shrink-0 mr-1">FILTRAR:</span>
           {OPCOES_FILTRO.map((op) => {
             const qtd = palletsAgrupados[op.id]?.length || 0;
             const ativo = filtrosAtivos.includes(op.id);
             return (
               <button 
                 key={op.id} onClick={() => toggleFiltro(op.id)}
-                className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg border text-xs font-semibold transition-all flex items-center gap-2 ${ativo ? getFilterActiveStyle(op.id) : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg border text-xs font-semibold transition-all flex items-center gap-2 ${ativo ? getFilterActiveStyle(op.id) : 'bg-[var(--bg-panel)] border-[var(--border-color)] text-[var(--text-muted)] hover:opacity-80'}`}
               >
-                {op.titulo} <span className={`px-1.5 py-0.5 rounded text-[10px] ${ativo ? 'bg-white/60 font-bold text-slate-900' : 'bg-slate-100'}`}>{qtd}</span>
+                {op.titulo} 
+                <span className={`px-1.5 py-0.5 rounded text-[10px] ${ativo ? 'bg-[var(--bg-main)] font-bold border border-transparent' : 'bg-[var(--bg-main)] border border-[var(--border-color)]'}`}>
+                  {qtd}
+                </span>
               </button>
             );
           })}
@@ -140,10 +144,10 @@ export default function MalhaEnderecamento({
             const listaPaginada = lista.slice(indexInicio, indexInicio + ITENS_POR_PAGINA);
 
             return (
-              <div key={chave} className="space-y-4 animate-enter border-b border-slate-200/60 pb-8 last:border-0 last:pb-0">
-                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <div key={chave} className="space-y-4 animate-enter border-b border-[var(--border-color)] pb-8 last:border-0 last:pb-0">
+                <h3 className="text-sm font-bold text-[var(--text-main)] flex items-center gap-2">
                   {chave === 'PADRAO' ? 'TRIAGEM' : chave.replace('_', ' ')}
-                  <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-[10px] bg-[var(--bg-panel)] border border-[var(--border-color)] text-[var(--text-muted)] px-2 py-0.5 rounded-full font-medium">
                     {lista.length} {lista.length === 1 ? 'posição' : 'posições'}
                   </span>
                 </h3>
@@ -154,45 +158,42 @@ export default function MalhaEnderecamento({
 
                     return (
                       <div key={p.id} onClick={() => navigate(`/pallet/${p.numero}`)}
-                        className={`group relative rounded-xl p-4 min-h-[130px] flex flex-col justify-between cursor-pointer border transition-all duration-300 hover:scale-[1.03] hover:shadow ${getCardStyle(chave)}`}>
+                        className={`group relative rounded-xl p-4 min-h-[130px] flex flex-col justify-between cursor-pointer border transition-all duration-300 hover:scale-[1.03] ${getCardStyle(chave)}`}>
                         
-                        <div className={`absolute top-0 left-4 h-[2.5px] w-12 rounded-b-full transition-all duration-300 group-hover:w-16 ${getTopBarStyle(chave)}`} />
+                        <div className={`absolute top-0 left-4 h-[3px] w-12 rounded-b-full transition-all duration-300 group-hover:w-16 ${getTopBarStyle(chave)}`} />
                         
                         <div className="flex justify-between items-start">
-                          <h3 className="text-[15px] font-bold text-slate-900 group-hover:text-slate-950">{p.numero}</h3>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/50 border border-slate-200 text-slate-700">{p._count?.produtos || 0} un.</span>
+                          <h3 className="text-[15px] font-bold text-[var(--text-main)]">{p.numero}</h3>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-main)]">{p._count?.produtos || 0} un.</span>
                         </div>
 
-                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{p.descricao || 'Sem descrição'}</p>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">{p.descricao || 'Sem descrição'}</p>
                         
                         <div className="flex justify-between items-end mt-4">
-                          <div className="text-[9px] font-mono bg-white/60 px-2 py-1 rounded border border-slate-200 text-slate-600">R:{p.rua || '-'} • E:{p.estrutura || '-'} • N:{p.nivel || '-'}</div>
+                          <div className="text-[9px] font-mono bg-[var(--bg-main)] px-2 py-1 rounded border border-[var(--border-color)] text-[var(--text-muted)]">R:{p.rua || '-'} • E:{p.estrutura || '-'} • N:{p.nivel || '-'}</div>
                           <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
                             <button onClick={(e) => { e.stopPropagation(); imprimirEtiqueta(p.numero, p.rua??'', p.estrutura??'', p.nivel??'',p.descricao??''); }} className="text-sm">🖨️</button>
                             <button onClick={(e) => handleExcluirPalletCard(e, p.id, p.numero)} className="text-sm">🗑️</button>
                           </div>
                         </div>
 
-                        {/* RENDERIZAÇÃO DOS USUÁRIOS ONLINE (Sockets) */}
                         {usuariosNestePallet.length > 0 && (
-                          <div className="mt-3 flex items-center justify-between border-t border-slate-200/50 pt-3">
+                          <div className="mt-3 flex items-center justify-between border-t border-[var(--border-color)] pt-3">
                             <div className="flex items-center gap-1.5">
                               <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                              <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider">Em uso por:</span>
+                              <span className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Em uso por:</span>
                             </div>
                             <div className="flex -space-x-1.5" title={`${usuariosNestePallet.join(', ')} editando`}>
-                              
                               {usuariosNestePallet.slice(0, 3).map((user, idx) => {
                                 const cor = obterCorAvatar(user);
                                 return (
-                                  <div key={idx} className={`h-6 w-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold uppercase shadow-sm relative z-10 ${cor.bg} ${cor.text}`}>
+                                  <div key={idx} className={`h-6 w-6 rounded-full border-2 border-[var(--bg-panel)] flex items-center justify-center text-[10px] font-bold uppercase shadow-sm relative z-10 ${cor.bg} ${cor.text}`}>
                                     {user.charAt(0).toUpperCase()}
                                   </div>
                                 );
                               })}
-                              
                               {usuariosNestePallet.length > 3 && (
-                                <div className="h-6 w-6 rounded-full bg-slate-100 border-2 border-white text-slate-600 flex items-center justify-center text-[10px] font-bold shadow-sm relative z-0">
+                                <div className="h-6 w-6 rounded-full bg-[var(--bg-main)] border-2 border-[var(--bg-panel)] text-[var(--text-main)] flex items-center justify-center text-[10px] font-bold shadow-sm relative z-0">
                                   +{usuariosNestePallet.length - 3}
                                 </div>
                               )}
@@ -206,9 +207,9 @@ export default function MalhaEnderecamento({
 
                 {totalPaginas > 1 && (
                   <div className="flex items-center justify-center gap-3 mt-4">
-                    <button onClick={() => mudarPagina(chave, paginaAtual - 1)} disabled={paginaAtual === 1} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm">← Anterior</button>
-                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">Página {paginaAtual} de {totalPaginas}</span>
-                    <button onClick={() => mudarPagina(chave, paginaAtual + 1)} disabled={paginaAtual === totalPaginas} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm">Próxima →</button>
+                    <button onClick={() => mudarPagina(chave, paginaAtual - 1)} disabled={paginaAtual === 1} className="px-3 py-1.5 rounded-lg border border-[var(--border-color)] text-xs font-semibold text-[var(--text-main)] bg-[var(--bg-panel)] hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm">← Anterior</button>
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-panel)] border border-[var(--border-color)] px-3 py-1.5 rounded-lg">Página {paginaAtual} de {totalPaginas}</span>
+                    <button onClick={() => mudarPagina(chave, paginaAtual + 1)} disabled={paginaAtual === totalPaginas} className="px-3 py-1.5 rounded-lg border border-[var(--border-color)] text-xs font-semibold text-[var(--text-main)] bg-[var(--bg-panel)] hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm">Próxima →</button>
                   </div>
                 )}
               </div>

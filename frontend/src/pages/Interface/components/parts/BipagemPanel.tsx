@@ -84,38 +84,38 @@ export default function BipagemPanel({
 
   const getTemaGerador = () => {
     switch(prefixo) {
-      case 'R-': return { bg: 'bg-amber-50/60', border: 'border-amber-200', textTitle: 'text-amber-950', textDesc: 'text-amber-700', btn: 'bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400', focus: 'focus:ring-amber-500/40' };
-      case 'N-': return { bg: 'bg-teal-50/60', border: 'border-teal-200', textTitle: 'text-teal-950', textDesc: 'text-teal-700', btn: 'bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400', focus: 'focus:ring-teal-500/40' };
-      case 'CR-': return { bg: 'bg-purple-50/60', border: 'border-purple-200', textTitle: 'text-purple-950', textDesc: 'text-purple-700', btn: 'bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400', focus: 'focus:ring-purple-500/40' };
-      default: return { bg: 'bg-blue-50/60', border: 'border-blue-200', textTitle: 'text-blue-950', textDesc: 'text-blue-600', btn: 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400', focus: 'focus:ring-blue-500/40' };
+      case 'R-': return { bg: 'bg-amber-500/10', border: 'border-amber-500/30', textTitle: 'text-amber-500', textDesc: 'text-[var(--text-muted)]', btn: 'bg-amber-600 hover:bg-amber-700 text-white', focus: 'focus:ring-amber-500/40' };
+      case 'N-': return { bg: 'bg-teal-500/10', border: 'border-teal-500/30', textTitle: 'text-teal-500', textDesc: 'text-[var(--text-muted)]', btn: 'bg-teal-600 hover:bg-teal-700 text-white', focus: 'focus:ring-teal-500/40' };
+      case 'CR-': return { bg: 'bg-purple-500/10', border: 'border-purple-500/30', textTitle: 'text-purple-500', textDesc: 'text-[var(--text-muted)]', btn: 'bg-purple-600 hover:bg-purple-700 text-white', focus: 'focus:ring-purple-500/40' };
+      default: return { bg: 'bg-blue-500/10', border: 'border-blue-500/30', textTitle: 'text-blue-500', textDesc: 'text-[var(--text-muted)]', btn: 'bg-blue-600 hover:bg-blue-700 text-white', focus: 'focus:ring-blue-500/40' };
     }
   };
   const tema = getTemaGerador();
 
   return (
-    <div className="lg:col-span-2 bg-white/85 backdrop-blur-xl rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-6">
+    <div className="lg:col-span-2 bg-[var(--bg-panel)] backdrop-blur-xl rounded-xl border border-[var(--border-color)] shadow-sm p-6 flex flex-col gap-6">
 
       {!isModoTransferencia ? (
         <div className="grid grid-cols-2 gap-3">
-          {/* Botão de Entrada - Tom Verde Esmeralda Vibrante */}
+          {/* Botão de Entrada */}
           <button
             onClick={() => setAcao('ENTRADA')}
             className={`p-4 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] border transition-all flex items-center justify-center gap-2 ${
-              isEntrada ? 'bg-emerald-50/70 border-emerald-500 text-emerald-700 shadow-sm ring-1 ring-emerald-500/20' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50'
+              isEntrada ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-sm ring-1 ring-emerald-500/20' : 'bg-[var(--bg-main)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--text-main)] hover:text-[var(--text-main)]'
             }`}
           >
-            <span className={`h-2 w-2 rounded-full ${isEntrada ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+            <span className={`h-2 w-2 rounded-full ${isEntrada ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
             Entrada de Produtos
           </button>
           
-          {/* Botão de Saída - Tom Vermelho Rose Vibrante */}
+          {/* Botão de Saída */}
           <button
             onClick={() => setAcao('SAIDA')}
             className={`p-4 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] border transition-all flex items-center justify-center gap-2 ${
-              !isEntrada ? 'bg-rose-50/70 border-rose-500 text-rose-700 shadow-sm ring-1 ring-rose-500/20' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50'
+              !isEntrada ? 'bg-rose-500/10 border-rose-500 text-rose-500 shadow-sm ring-1 ring-rose-500/20' : 'bg-[var(--bg-main)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--text-main)] hover:text-[var(--text-main)]'
             }`}
           >
-            <span className={`h-2 w-2 rounded-full ${!isEntrada ? 'bg-rose-500 animate-pulse' : 'bg-slate-300'}`} />
+            <span className={`h-2 w-2 rounded-full ${!isEntrada ? 'bg-rose-500 animate-pulse' : 'bg-slate-400'}`} />
             Exclusão / Saída
           </button>
         </div>
@@ -126,28 +126,27 @@ export default function BipagemPanel({
       )}
 
       <form onSubmit={handleBipSubmit} className="space-y-2">
-        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+        <label className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em] flex items-center gap-2">
           <div className={`h-1.5 w-1.5 rounded-full ${isModoTransferencia ? 'bg-blue-500' : isEntrada ? 'bg-emerald-500' : 'bg-rose-500'}`} />
           Aponte o leitor de código de barras
         </label>
         
-        {/* Input dinâmico refletindo perfeitamente a cor selecionada */}
+        {/* Input adaptado ao tema atual */}
         <input
           ref={inputBipRef}
           type="text"
           maxLength={maxLen}
           placeholder={placeholderInput}
-          className={`w-full p-6 rounded-xl font-mono text-2xl text-center font-bold tracking-wider transition-all border-2 focus:outline-none focus:ring-4 ${
+          className={`w-full p-6 rounded-xl font-mono text-2xl text-center font-bold tracking-wider transition-all border-2 focus:outline-none focus:ring-4 bg-[var(--bg-main)] ${
             isModoTransferencia
-              ? 'bg-blue-50/40 border-blue-400 text-blue-600 placeholder-blue-400/70 focus:ring-blue-500/20'
+              ? 'border-blue-500 text-blue-500 placeholder-blue-400/60 focus:ring-blue-500/20'
               : isEntrada
-              ? 'bg-emerald-50/5ular border-emerald-500 text-emerald-700 placeholder-emerald-400/70 focus:ring-emerald-500/20'
-              : 'bg-rose-50/50 border-rose-500 text-rose-700 placeholder-rose-400/70 focus:ring-rose-500/20'
+              ? 'border-emerald-500 text-emerald-500 placeholder-emerald-400/60 focus:ring-emerald-500/20'
+              : 'border-rose-500 text-rose-500 placeholder-rose-400/60 focus:ring-rose-500/20'
           }`}
           value={codigoBipado}
           onChange={(e) => {
             let valorInjetado = e.target.value.toUpperCase();
-            
             if (prefixo !== '000') {
               setCodigoBipado(valorInjetado.trim());
             } else {
@@ -169,11 +168,11 @@ export default function BipagemPanel({
           }}
         />
         
-        <p className="text-center text-[11px] font-medium text-slate-400">
+        <p className="text-center text-[11px] font-medium text-[var(--text-muted)]">
           {prefixo !== '000' ? (
-            <>O código do item deve iniciar obrigatoriamente com <strong className="text-slate-600">{prefixo}</strong> seguido da numeração.</>
+            <>O código do item deve iniciar obrigatoriamente com <strong className="text-[var(--text-main)]">{prefixo}</strong> seguido da numeração.</>
           ) : (
-            <>O código da triagem deve conter exatamente <strong className="text-slate-600">8 números</strong> e iniciar obrigatoriamente com <strong className="text-slate-600">000</strong>.</>
+            <>O código da triagem deve conter exatamente <strong className="text-[var(--text-main)]">8 números</strong> e iniciar obrigatoriamente com <strong className="text-[var(--text-main)]">000</strong>.</>
           )}
         </p>
       </form>
@@ -191,7 +190,7 @@ export default function BipagemPanel({
 
           <div className="flex items-center gap-2 w-full md:w-auto justify-end" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Qtd</span>
+              <span className="text-[9px] font-bold uppercase text-[var(--text-muted)] tracking-wider">Qtd</span>
               <input
                 type="number"
                 min={1}
@@ -201,7 +200,7 @@ export default function BipagemPanel({
                   const valor = Number(e.target.value);
                   setQtdEtiquetas(valor > 0 ? valor : 1);
                 }}
-                className={`bg-white border border-slate-200 rounded-lg h-11 px-3 text-sm font-semibold text-slate-700 text-center focus:outline-none focus:ring-2 w-[70px] ${tema.focus}`}
+                className={`bg-[var(--bg-main)] border border-[var(--border-color)] rounded-lg h-11 px-3 text-sm font-semibold text-[var(--text-main)] text-center focus:outline-none focus:ring-2 w-[70px] ${tema.focus}`}
               />
             </div>
 
@@ -211,7 +210,7 @@ export default function BipagemPanel({
                 type="button"
                 disabled={carregandoRetriagem}
                 onClick={handleGerarEtiquetaRetriagem}
-                className={`w-full md:w-auto shrink-0 text-white px-5 h-11 text-xs font-bold rounded-lg shadow-sm transition-all tracking-wider uppercase flex items-center justify-center gap-2 ${tema.btn}`}
+                className={`w-full md:w-auto shrink-0 px-5 h-11 text-xs font-bold rounded-lg shadow-sm transition-all tracking-wider uppercase flex items-center justify-center gap-2 ${tema.btn}`}
               >
                 {carregandoRetriagem ? 'Gerando...' : 'Gerar e Imprimir'}
               </button>
@@ -224,10 +223,10 @@ export default function BipagemPanel({
         <div
           className={`p-4 rounded-xl font-medium text-center text-sm border backdrop-blur-xl animate-in fade-in duration-300 ${
             mensagemStatus.erro
-              ? 'bg-rose-50/80 border-rose-200 text-rose-700'
+              ? 'bg-rose-500/10 border-rose-500/30 text-rose-500'
               : isModoTransferencia
-              ? 'bg-blue-50/80 border-blue-200 text-blue-700'
-              : 'bg-emerald-50/80 border-emerald-200 text-emerald-700'
+              ? 'bg-blue-500/10 border-blue-500/30 text-blue-500'
+              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
           }`}
         >
           {mensagemStatus.erro ? '⚠ ' : '✓ '} {mensagemStatus.texto}

@@ -1,6 +1,126 @@
 @import "tailwindcss";
 
-@keyframes aurora {
-  0%,100% { transform: translate3d(0,0,0) scale(1); }
-  50%     { transform: translate3d(40px,-30px,0) scale(1.08); }
+/* =========================================
+   🚀 TRANSIÇÃO SUAVE DE TEMAS (Delay)
+   ========================================= */
+*, ::before, ::after {
+  transition-property: background-color, border-color, color, fill, stroke, width, max-width, opacity, margin, padding;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
 }
+
+/* =========================================
+   🎨 MOTOR DE TEMAS WMS (Variáveis Globais)
+   ========================================= */
+:root {
+  /* TEMA: OCEAN (Padrão/Light) */
+  --bg-main: #F6F8FC;
+  --bg-panel: #ffffff;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: rgba(255, 255, 255, 0.05);
+  --sidebar-text: #94a3b8;
+  --sidebar-text-hover: #ffffff;
+  --sidebar-item-hover: rgba(255, 255, 255, 0.1);
+  --header-bg: rgba(255, 255, 255, 0.85);
+  --header-border: #e2e8f0;
+  --header-text: #64748b;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+}
+
+:root[data-theme="midnight"] {
+  /* TEMA: MIDNIGHT (Dark Mode Profundo) */
+  --bg-main: #0f172a;
+  --bg-panel: #1e293b;
+  --sidebar-bg: #020617;
+  --sidebar-border: rgba(255, 255, 255, 0.03);
+  --sidebar-text: #64748b;
+  --sidebar-text-hover: #f8fafc;
+  --sidebar-item-hover: rgba(255, 255, 255, 0.05);
+  --header-bg: rgba(15, 23, 42, 0.85);
+  --header-border: #1e293b;
+  --header-text: #94a3b8;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+
+:root[data-theme="coffee"] {
+  /* TEMA: COFFEE (Quente/Chocolate) */
+  --bg-main: #FDF8F5;
+  --bg-panel: #ffffff;
+  --sidebar-bg: #3E2723; 
+  --sidebar-border: rgba(255, 255, 255, 0.05);
+  --sidebar-text: #D7CCC8;
+  --sidebar-text-hover: #ffffff;
+  --sidebar-item-hover: rgba(255, 255, 255, 0.08);
+  --header-bg: rgba(253, 248, 245, 0.9);
+  --header-border: #EFEBE9;
+  --header-text: #8D6E63;
+  --text-main: #3E2723;
+  --text-muted: #8D6E63;
+  --border-color: #D7CCC8;
+}
+
+/* =========================================
+   🔒 BLINDAGEM DE CORES INTERNAS DOS COMPONENTES (Para o Dark Mode funcionar)
+   ========================================= */
+:root[data-theme="midnight"] .bg-white,
+:root[data-theme="midnight"] .bg-slate-50,
+:root[data-theme="midnight"] .bg-slate-100 {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+:root[data-theme="midnight"] .text-slate-900,
+:root[data-theme="midnight"] .text-slate-800,
+:root[data-theme="midnight"] .text-slate-700,
+:root[data-theme="midnight"] .text-gray-900,
+:root[data-theme="midnight"] .text-gray-800 {
+  color: #f8fafc !important;
+}
+
+:root[data-theme="midnight"] .text-slate-600,
+:root[data-theme="midnight"] .text-slate-500,
+:root[data-theme="midnight"] .text-gray-600,
+:root[data-theme="midnight"] .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+:root[data-theme="midnight"] .bg-slate-200,
+:root[data-theme="midnight"] .bg-slate-300,
+:root[data-theme="midnight"] .bg-\[\#F6F8FC\] { 
+  background-color: #0f172a !important; 
+  border-color: #1e293b !important; 
+  color: #cbd5e1 !important; 
+}
+
+:root[data-theme="midnight"] .border-slate-100,
+:root[data-theme="midnight"] .border-slate-200,
+:root[data-theme="midnight"] .border-slate-300,
+:root[data-theme="midnight"] .border-gray-200 {
+  border-color: #334155 !important;
+}
+
+/* BLINDAGEM PARA PAINÉIS DE OPERAÇÃO COLORIDOS (Entrada/Saída/RMA) no modo Escuro */
+:root[data-theme="midnight"] .bg-emerald-50, :root[data-theme="midnight"] .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.1) !important; border-color: rgba(16, 185, 129, 0.2) !important; color: #f8fafc !important; }
+:root[data-theme="midnight"] .bg-rose-50, :root[data-theme="midnight"] .bg-rose-100 { background-color: rgba(244, 63, 94, 0.1) !important; border-color: rgba(244, 63, 94, 0.2) !important; color: #f8fafc !important; }
+:root[data-theme="midnight"] .bg-amber-50, :root[data-theme="midnight"] .bg-amber-100 { background-color: rgba(245, 158, 11, 0.1) !important; border-color: rgba(245, 158, 11, 0.2) !important; color: #f8fafc !important; }
+:root[data-theme="midnight"] .bg-blue-50, :root[data-theme="midnight"] .bg-blue-100 { background-color: rgba(59, 130, 246, 0.1) !important; border-color: rgba(59, 130, 246, 0.2) !important; color: #f8fafc !important; }
+:root[data-theme="midnight"] .bg-indigo-50, :root[data-theme="midnight"] .bg-indigo-100 { background-color: rgba(99, 102, 241, 0.1) !important; border-color: rgba(99, 102, 241, 0.2) !important; color: #f8fafc !important; }
+
+/* COFFEE MODE AJUSTES */
+:root[data-theme="coffee"] .bg-blue-600 { background-color: #795548 !important; color: white !important;}
+:root[data-theme="coffee"] .text-blue-600 { color: #795548 !important; }
+:root[data-theme="coffee"] .bg-blue-50 { background-color: #EFEBE9 !important; color: #5D4037 !important; }
+:root[data-theme="coffee"] .border-blue-200, :root[data-theme="coffee"] .border-blue-300 { border-color: #D7CCC8 !important; }
+
+/* =========================================
+   🔲 MOTOR DE BORDAS (Radius)
+   ========================================= */
+:root[data-radius="sharp"] * { border-radius: 0px !important; }
+:root[data-radius="soft"] .rounded-lg,
+:root[data-radius="soft"] .rounded-xl,
+:root[data-radius="soft"] .rounded-2xl { border-radius: 1.75rem !important; }
