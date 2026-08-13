@@ -7,14 +7,45 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==========================================
+// ACESSOS E SEGURANÇA
+// ==========================================
+
+model Cargo {
+  id         Int       @id @default(autoincrement())
+  nome       String    @unique
+  permissoes String[]  @default([]) // Array de strings nativo do PostgreSQL
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  usuarios   Usuario[]
+}
+
+model Usuario {
+  id                 Int                     @id @default(autoincrement())
+  username           String                  @unique
+  senha              String
+  precisaMudarSenha  Boolean                 @default(true)
+  
+  cargoId            Int?
+  cargo              Cargo?                  @relation(fields: [cargoId], references: [id])
+  
+  createdAt          DateTime                @default(now())
+  historicos         HistoricoMovimentacao[]
+  inbounds           InboundFull[]           
+}
+
+// ==========================================
+// MALHA OPERACIONAL E ESTOQUE
+// ==========================================
+
 model Pallet {
   id        Int             @id @default(autoincrement())
   numero    String          @unique
   rua       String?
   estrutura String?
   nivel     String?
-  descricao String?         // <-- REINCLUÍDO PARA NÃO PERDER DADOS
-  tipo      String?         // <-- REINCLUÍDO PARA NÃO PERDER DADOS
+  descricao String?         
+  tipo      String?         
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   produtos  ProdutoPallet[] 
@@ -42,16 +73,6 @@ model HistoricoMovimentacao {
   createdAt      DateTime @default(now())
 }
 
-model Usuario {
-  id                Int                     @id @default(autoincrement())
-  username          String                  @unique
-  senha             String
-  precisaMudarSenha Boolean                 @default(true)
-  createdAt         DateTime                @default(now())
-  historicos        HistoricoMovimentacao[]
-  inbounds          InboundFull[]           // Relacionamento com os Inbounds (Cargas Mercado Livre)
-}
-
 model Contador {
   id    Int    @id @default(autoincrement())
   chave String @unique
@@ -59,7 +80,7 @@ model Contador {
 }
 
 // ==========================================
-// NOVOS MODELOS: GESTOR DE ENVIOS FULL
+// GESTOR DE ENVIOS FULL (MERCADO LIVRE)
 // ==========================================
 
 model InboundFull {
@@ -89,7 +110,7 @@ model InboundSku {
   quantidadeBipada Int         @default(0) // Contador de quantos já foram bipados
   
   status           String      @default("PENDENTE") // PENDENTE ou CONCLUIDO
-  variacoes        Json?       // <-- CAMPO NOVO ADICIONADO PARA GUARDAR OS CÓDIGOS ML
+  variacoes        Json?       // Guarda os códigos ML/EAN
   
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

@@ -1,0 +1,84 @@
+import { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs'; 
+
+const prisma = new PrismaClient();
+
+export const listarUsuarios = async (req: Request, res: Response) => {
+  try {
+    const usuarios = await prisma.usuario.findMany({
+      select: { 
+        id: true, 
+        username: true, 
+        precisaMudarSenha: true, 
+        createdAt: true,
+        // 🚀 ALTERAÇÃO: Adicionado o cargoId para o Frontend conseguir ler qual o cargo atual no select
+        cargoId: true, 
+        cargo: { select: { id: true, nome: true } } 
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(usuarios);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar usuários.' });
+  }
+};
+
+export const criarUsuario = async (req: Request, res: Response) => {
+  try {
+    const { username, senha, cargoId } = req.body;
+
+    if (!username || !senha) {
+      return res.status(400).json({ error: 'Username e senha são obrigatórios.' });
+    }
+
+    const usuarioExistente = await prisma.usuario.findUnique({ where: { username } });
+    if (usuarioExistente) {
+      return res.status(400).json({ error: 'Usuário já existe.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const senhaHash = await bcrypt.hash(senha, salt);
+
+    const novoUsuario = await prisma.usuario.create({
+      data: {
+        username,
+        senha: senhaHash,
+        precisaMudarSenha: true, 
+        cargoId: cargoId ? Number(cargoId) : null
+      },
+      select: { id: true, username: true, cargoId: true, createdAt: true }
+    });
+
+    res.status(201).json({ mensagem: 'Usuário criado com sucesso!', usuario: novoUsuario });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno ao criar usuário.' });
+  }
+};
+
+// 🚀 ALTERAÇÃO: Função mantida para garantir a atualização do cargo do usuário individualmente
+export const atualizarCargoUsuario = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { cargoId } = req.body;
+    
+    await prisma.usuario.update({
+      where: { id: Number(id) },
+      data: { cargoId: cargoId ? Number(cargoId) : null }
+    });
+    
+    res.json({ mensagem: 'Cargo do usuário atualizado com sucesso.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar o cargo do usuário.' });
+  }
+};
+
+export const excluirUsuario = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.usuario.delete({ where: { id: Number(id) } });
+    res.json({ mensagem: 'Usuário excluído com sucesso.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir usuário.' });
+  }
+};

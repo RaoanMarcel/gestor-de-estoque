@@ -7,7 +7,9 @@ import palletRoutes from './routes/palletRoutes.js';
 import { authController } from './controllers/authController.js';
 import { autenticarToken } from './middlewares/authMiddleware.js';
 import { SocketService } from './services/SocketService.js';
-import inboundRoutes from './routes/inboundRoutes.js'; // Importação com extensão corrigida
+import inboundRoutes from './routes/inboundRoutes.js'; 
+import usuarioRoute from './routes/usuarioRoute.js';
+import cargoRoutes from './routes/cargoRoutes.js'; 
 
 dotenv.config();
 
@@ -54,12 +56,14 @@ publicAuthRouter.post('/alterar-senha', authController.alterarSenha);
 publicAuthRouter.post('/admin/cadastrar', authController.cadastrarUsuario);
 
 app.use('/api/auth', publicAuthRouter);
+app.use('/api/usuarios', usuarioRoute);
 
 app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.alterarSenhaAutenticado);
 
 // ROTAS DA APLICAÇÃO
 app.use('/api', palletRoutes);
 app.use('/api/inbounds', inboundRoutes); // Rota inserida corretamente!
+app.use('/api/cargos', cargoRoutes);
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor ativo na porta ${PORT} | Versão: ${APP_VERSION}`);
