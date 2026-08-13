@@ -10,7 +10,10 @@ interface PalletHeaderProps {
   handleAdicionarTodoOPalletNoLote: () => void;
   navigate: (rota: string) => void;
   activeUsers?: string[];
-  onAbrirModalPuxar?: () => void; 
+  onAbrirModalPuxar?: () => void;
+  // 🚀 NOVAS PROPRIEDADES ADICIONADAS
+  exclusoesPendentesCount?: number;
+  onConfirmarExclusoes?: () => void;
 }
 
 const getAvatarColor = (name: string) => {
@@ -28,7 +31,18 @@ const getAvatarColor = (name: string) => {
 };
 
 export default function PalletHeader({
-  pallet, isModoTransferencia, setIsModoTransferencia, setMensagemStatus, itensParaTransferir, setItensParaTransferir, handleAdicionarTodoOPalletNoLote, navigate, activeUsers = [], onAbrirModalPuxar
+  pallet, 
+  isModoTransferencia, 
+  setIsModoTransferencia, 
+  setMensagemStatus, 
+  itensParaTransferir, 
+  setItensParaTransferir, 
+  handleAdicionarTodoOPalletNoLote, 
+  navigate, 
+  activeUsers = [], 
+  onAbrirModalPuxar,
+  exclusoesPendentesCount = 0, // 🚀 Recebe a quantidade
+  onConfirmarExclusoes         // 🚀 Recebe a função de confirmar
 }: PalletHeaderProps) {
 
   const tipoUpper = pallet.tipo?.toUpperCase() || '';
@@ -73,6 +87,23 @@ export default function PalletHeader({
 
         {!isModoTransferencia ? (
           <div className="flex items-center gap-2">
+            
+            {/* 🚀 NOVO BOTÃO DE SALVAR EXCLUSÕES (Aparece apenas se houver pendências) */}
+            {exclusoesPendentesCount > 0 && (
+              <button 
+                onClick={onConfirmarExclusoes} 
+                className="relative px-4 h-9 rounded-lg border border-emerald-400 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold tracking-wider uppercase transition-all shadow-sm flex items-center gap-2"
+              >
+                <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white font-bold shadow-sm">
+                  {exclusoesPendentesCount}
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                Salvar Exclusões
+              </button>
+            )}
+
             {onAbrirModalPuxar && (
               <button onClick={onAbrirModalPuxar} className="px-4 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 text-[11px] font-bold tracking-wider uppercase transition-all shadow-sm">
                 Puxar Item
