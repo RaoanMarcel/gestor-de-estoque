@@ -31,10 +31,9 @@
         const produtosRaw: any[] = [];
 
         for (const bloco of blocos) {
-        // Ignora pedaços que não sejam etiquetas válidas (sem ^XZ no final)
         if (!bloco.includes('^XZ')) continue;
 
-        // 1. Extrai o Código ML (Direto do Código de Barras ^BCN)
+        // 1. Extrai o Código ML
         const matchML = bloco.match(/\^BCN,.*?\^FD([A-Z0-9]+)\^FS/i) || bloco.match(/\^FD([A-Z0-9]{7,15})\^FS/i);
         const ml = matchML ? matchML[1] : 'N/A';
 
@@ -42,16 +41,14 @@
         const matchSKU = bloco.match(/\^FDSKU:\s*([A-Z0-9\-]+)\^FS/i);
         const sku = matchSKU ? matchSKU[1] : 'N/A';
 
-        // 3. Extrai a Quantidade (Tag ^PQ)
+        // 3. Extrai a Quantidade
         const matchQtd = bloco.match(/\^PQ(\d+)/i);
         const quantidade = matchQtd ? parseInt(matchQtd[1], 10) : 1;
 
         // 4. Extrai a Descrição
-        // Pegamos todos os textos soltos dentro de ^FD...^FS
         const todosFDs = Array.from(bloco.matchAll(/\^FD(.*?)\^FS/gi)).map((m: any) => m[1]);
         let descricao = 'Produto (Sem descrição)';
 
-        // Filtramos o que NÃO é ML, nem SKU, nem linha vazia
         const fdValidos = todosFDs.filter(texto => {
             const t = texto.trim();
             if (!t) return false;
@@ -61,7 +58,6 @@
         });
 
         if (fdValidos.length > 0) {
-            // O primeiro texto válido que sobrou é sempre a descrição!
             descricao = decodeZPLText(fdValidos[0].trim());
         }
 
@@ -77,7 +73,7 @@
         const existente = skusExtraidos.find(s => s.sku === p.sku);
         const novaVariacao = {
             codigoML: p.ml,
-            codigoUniversal: p.ean, // O arquivo da Zebra não tem EAN, então fica N/A
+            codigoUniversal: p.ean,
             quantidade: p.quantidade
         };
 
@@ -107,7 +103,7 @@
         // 6. PERSISTÊNCIA NO BANCO
         const novoInbound = await prisma.inboundFull.create({
         data: {
-            numeroFrete: null, // O arquivo ZPL não traz o frete nativamente
+            numeroFrete: null,
             nomePallet,
             status: 'PENDENTE',
             usuarioId: usuarioId ? Number(usuarioId) : null,
@@ -118,7 +114,7 @@
                 quantidadeTotal: item.quantidadeTotal,
                 quantidadeBipada: 0,
                 status: 'PENDENTE',
-                variacoes: item.variacoes
+                variacoes: item.variacoes // <-- VOLTOU! Agora o banco aceita salvar isso.
             }))
             }
         },

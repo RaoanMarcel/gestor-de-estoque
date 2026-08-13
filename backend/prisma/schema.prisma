@@ -89,6 +89,7 @@ model InboundSku {
   quantidadeBipada Int         @default(0) // Contador de quantos já foram bipados
   
   status           String      @default("PENDENTE") // PENDENTE ou CONCLUIDO
+  variacoes        Json?       // <-- CAMPO NOVO ADICIONADO PARA GUARDAR OS CÓDIGOS ML
   
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
