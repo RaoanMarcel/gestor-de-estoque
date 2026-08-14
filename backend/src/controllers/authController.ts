@@ -22,7 +22,12 @@ export const authController = {
         return res.status(400).json({ error: 'Usuário e senha são obrigatórios' });
       }
 
-      const usuario = await prisma.usuario.findUnique({ where: { username } });
+      // 🚀 ALTERAÇÃO: Adicionado o include para trazer o cargo e as permissões do banco
+      const usuario = await prisma.usuario.findUnique({ 
+        where: { username },
+        include: { cargo: true }
+      });
+
       if (!usuario) {
         return res.status(401).json({ error: 'Usuário ou senha incorretos' });
       }
@@ -36,11 +41,14 @@ export const authController = {
       const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
       const refreshToken = jwt.sign({ id: usuario.id }, REFRESH_SECRET, { expiresIn: '7d' });
 
+      // 🚀 ALTERAÇÃO: Adicionado cargo e permissões na resposta da API
       return res.json({
         token,
         refreshToken,
         precisaMudarSenha: usuario.precisaMudarSenha,
-        username: usuario.username
+        username: usuario.username,
+        cargo: usuario.cargo?.nome || '',
+        permissoes: usuario.cargo?.permissoes || []
       });
     } catch (error: unknown) {
       console.error('🔥 [ERRO CRÍTICO - POST /login]:', error);

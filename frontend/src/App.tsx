@@ -1,5 +1,5 @@
-import { BrowserRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { BrowserRouter, Routes, Route, useLocation, Link, Navigate } from 'react-router-dom';
+import { useState, type JSX } from 'react';
 import { ToastProvider } from './contexts/toastContext'; 
 import { ThemeProvider } from './contexts/themeContext'; 
 
@@ -8,16 +8,20 @@ import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
 import ProtectedRoute from './pages/home/components/ProtectedRoute.js';
 import GestorEnviosFull from './pages/mercadoFull/GestorEnviosFull.js';
-
-// 🚀 Adicionada a importação da nova página de configurações
 import Configuracoes from './pages/configuracoes/Configuracoes.js';
 
 function LayoutComum({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  
   const esconderHeader = location.pathname === '/login';
   const usuarioLogado = localStorage.getItem('wms_user') || 'Operador';
   const inicialUsuario = usuarioLogado.charAt(0).toUpperCase();
+  const cargoUsuario = localStorage.getItem('wms_cargo') || '';
+
+  const permissoesSalvas = localStorage.getItem('wms_permissoes');
+  const permissoes: string[] = permissoesSalvas ? JSON.parse(permissoesSalvas) : [];
+
+  const podeVerArmazem = permissoes.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'));
+  const podeVerFull = permissoes.some(p => p.startsWith('full'));
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -54,35 +58,47 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
           </span>
         </div>
 
-        {/* NAVEGAÇÃO */}
+        {/* NAVEGAÇÃO COM CONTROLE DE ACESSO */}
         <nav className="flex-1 flex flex-row md:flex-col items-center md:items-stretch overflow-y-auto py-0 md:py-6 px-3 space-x-2 md:space-x-0 md:space-y-2 scrollbar-hide">
-          <div className={`hidden md:block overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'h-auto opacity-100 mb-3 ml-2' : 'h-0 opacity-0 mb-0 ml-0'}`}>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-70">Principal</p>
-          </div>
-          <div className={`hidden md:block h-px w-6 bg-[var(--sidebar-border)] mx-auto transition-all duration-300 ${isSidebarOpen ? 'my-0 opacity-0 h-0' : 'my-4 opacity-100 h-px'}`} />
           
-          <Link to="/" title="Visão do Armazém" className={`flex items-center justify-center md:justify-start h-11 w-11 md:w-auto px-0 md:px-3 rounded-lg transition-all duration-200 shrink-0 ${isActive('/') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 shrink-0 ${!isSidebarOpen && 'md:mx-auto'}`}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-            </svg>
-            <span className={`hidden md:block text-[13px] font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'w-auto max-w-[150px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
-              Visão do Armazém
-            </span>
-          </Link>
+          {podeVerArmazem && (
+            <>
+              <div className={`hidden md:block overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'h-auto opacity-100 mb-3 ml-2' : 'h-0 opacity-0 mb-0 ml-0'}`}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-70">Principal</p>
+              </div>
+              <div className={`hidden md:block h-px w-6 bg-[var(--sidebar-border)] mx-auto transition-all duration-300 ${isSidebarOpen ? 'my-0 opacity-0 h-0' : 'my-4 opacity-100 h-px'}`} />
+              
+              <Link to="/" title="Visão do Armazém" className={`flex items-center justify-center md:justify-start h-11 w-11 md:w-auto px-0 md:px-3 rounded-lg transition-all duration-200 shrink-0 ${isActive('/') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 shrink-0 ${!isSidebarOpen && 'md:mx-auto'}`}>
+                  <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                  <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                </svg>
+                <span className={`hidden md:block text-[13px] font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'w-auto max-w-[150px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
+                  Triagens
+                </span>
+              </Link>
+            </>
+          )}
 
-          <div className={`hidden md:block overflow-hidden mt-8 transition-all duration-300 ${isSidebarOpen ? 'h-auto opacity-100 mb-3 ml-2' : 'h-0 opacity-0 mb-0 ml-0 mt-0'}`}>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-70">Operações Externas</p>
-          </div>
-          <div className={`hidden md:block h-px w-6 bg-[var(--sidebar-border)] mx-auto transition-all duration-300 ${isSidebarOpen ? 'my-0 opacity-0 h-0' : 'my-6 opacity-100 h-px'}`} />
-          
-          <Link to="/mercado-full" title="Mercado Full" className={`flex items-center justify-center md:justify-start h-11 w-11 md:w-auto px-0 md:px-3 rounded-lg transition-all duration-200 shrink-0 ${isActive('/mercado-full') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 shrink-0 ${!isSidebarOpen && 'md:mx-auto'}`}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
-            </svg>
-            <span className={`hidden md:block text-[13px] font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'w-auto max-w-[150px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
-              Mercado Full
-            </span>
-          </Link>
+          {podeVerFull && (
+            <>
+              <div className={`hidden md:block overflow-hidden mt-8 transition-all duration-300 ${isSidebarOpen ? 'h-auto opacity-100 mb-3 ml-2' : 'h-0 opacity-0 mb-0 ml-0 mt-0'}`}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-70">Operações Externas</p>
+              </div>
+              <div className={`hidden md:block h-px w-6 bg-[var(--sidebar-border)] mx-auto transition-all duration-300 ${isSidebarOpen ? 'my-0 opacity-0 h-0' : 'my-6 opacity-100 h-px'}`} />
+              
+              <Link to="/mercado-full" title="Mercado Full" className={`flex items-center justify-center md:justify-start h-11 w-11 md:w-auto px-0 md:px-3 rounded-lg transition-all duration-200 shrink-0 ${isActive('/mercado-full') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 shrink-0 ${!isSidebarOpen && 'md:mx-auto'}`}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
+                </svg>
+                <span className={`hidden md:block text-[13px] font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'w-auto max-w-[150px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
+                  Mercado Full
+                </span>
+              </Link>
+            </>
+          )}
 
           {/* Divisor Invisível no Mobile para empurrar o resto pra direita */}
           <div className="flex-1 md:hidden"></div>
@@ -107,16 +123,23 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
           </button>
         </nav>
 
-        {/* USUÁRIO LOGADO (Escondido no mobile para poupar espaço na barra inferior) */}
+        {/* USUÁRIO LOGADO (Escondido no mobile) */}
         <div className="hidden md:flex mt-auto border-t border-[var(--sidebar-border)] p-3 flex-col gap-1 overflow-hidden">
-          <div className="flex items-center px-4 py-2 h-12 transition-all duration-300">
+          <div className="flex items-center px-4 py-2 h-14 transition-all duration-300">
             <div className={`flex items-center w-full ${!isSidebarOpen && 'justify-center'}`}>
               <div className="h-[34px] w-[34px] rounded-full bg-white text-slate-800 flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
                 {inicialUsuario}
               </div>
-              <span className={`text-[13px] font-semibold text-[var(--sidebar-text-hover)] tracking-wide truncate overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'w-auto max-w-[120px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
-                {usuarioLogado}
-              </span>
+              <div className={`flex flex-col justify-center overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'w-auto max-w-[120px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
+                <span className="text-[13px] font-semibold text-[var(--sidebar-text-hover)] tracking-wide truncate leading-tight">
+                  {usuarioLogado}
+                </span>
+                {cargoUsuario && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sidebar-text)] opacity-70 truncate mt-0.5 leading-tight">
+                    {cargoUsuario}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -124,13 +147,35 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
 
       {/* ÁREA DIREITA (CONTEÚDO) */}
       <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-main)]">
-        {/* Cabeçalho nativo removido para usar o cabeçalho branco do Gestor de Envios */}
+        {/* Esconde o cabeçalho global se estiver na rota do Mercado Full */}
+        {!isActive('/mercado-full') && (
+          <header className="h-16 shrink-0 flex items-center justify-between px-6 bg-[var(--header-bg)] border-b border-[var(--header-border)] backdrop-blur-xl z-40">
+            <div className="text-[var(--header-text)] text-xs font-semibold tracking-wide uppercase">
+              {isActive('/configuracoes') ? 'Configurações do Sistema' : 'WMS Operacional'}
+            </div>
+          </header>
+        )}
         <main className="flex-1 overflow-y-auto relative scroll-smooth bg-transparent">
           {children}
         </main>
       </div>
     </div>
   );
+}
+
+// 🚀 RouteGuard agora computa dinamicamente a rota correta de fallback para evitar loop de redirects
+function RouteGuard({ permissoesObrigatorias, children }: { permissoesObrigatorias: string[], children: JSX.Element }) {
+  const permissoesSalvas = localStorage.getItem('wms_permissoes');
+  const permissoes: string[] = permissoesSalvas ? JSON.parse(permissoesSalvas) : [];
+
+  const temAcesso = permissoes.some(p => permissoesObrigatorias.some(obrigatoria => p.startsWith(obrigatoria)));
+
+  if (!temAcesso) {
+    if (permissoes.some(x => x.startsWith('full'))) return <Navigate to="/mercado-full" replace />;
+    return <Navigate to="/configuracoes" replace />; 
+  }
+
+  return children;
 }
 
 function App() {
@@ -142,9 +187,25 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route element={<ProtectedRoute />}>
-                <Route path="/" element={<Home />} />
-                <Route path="/pallet/:id" element={<PalletInterface />} />
-                <Route path="/mercado-full" element={<GestorEnviosFull />} />
+                
+                <Route path="/" element={
+                  <RouteGuard permissoesObrigatorias={['malha', 'estoque', 'reports']}>
+                    <Home />
+                  </RouteGuard>
+                } />
+
+                <Route path="/pallet/:id" element={
+                  <RouteGuard permissoesObrigatorias={['malha', 'estoque']}>
+                    <PalletInterface />
+                  </RouteGuard>
+                } />
+
+                <Route path="/mercado-full" element={
+                  <RouteGuard permissoesObrigatorias={['full']}>
+                    <GestorEnviosFull />
+                  </RouteGuard>
+                } />
+
                 <Route path="/configuracoes" element={<Configuracoes />} />
               </Route>
             </Routes>

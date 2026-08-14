@@ -47,6 +47,10 @@ model Usuario {
   username          String                  @unique
   senha             String
   precisaMudarSenha Boolean                 @default(true)
+  
+cargoId            Int?
+cargo              Cargo?                  @relation(fields: [cargoId], references: [id], onDelete: SetNull)
+
   createdAt         DateTime                @default(now())
   historicos        HistoricoMovimentacao[]
   inbounds          InboundFull[]           
@@ -80,7 +84,7 @@ model Veiculo {
 }
 
 // ==========================================
-// GESTOR DE ENVIOS FULL
+// GESTOR DE ENVIOS FULL (MERCADO LIVRE)
 // ==========================================
 
 model InboundFull {
@@ -92,7 +96,6 @@ model InboundFull {
   usuarioId   Int?
   usuario     Usuario?     @relation(fields: [usuarioId], references: [id])
 
-  // Vínculos com a Frota adicionados aqui:
   motoristaId Int?
   motorista   Motorista?   @relation(fields: [motoristaId], references: [id])
 
@@ -116,8 +119,8 @@ model InboundSku {
   quantidadeTotal  Int         
   quantidadeBipada Int         @default(0) 
   
-  status           String      @default("PENDENTE") 
-  variacoes        Json?       
+  status           String      @default("PENDENTE") // PENDENTE ou CONCLUIDO
+  variacoes        Json?       // Guarda os códigos ML/EAN
   
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

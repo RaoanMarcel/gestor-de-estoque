@@ -13,6 +13,8 @@ interface LoginResponse {
   refreshToken: string;
   precisaMudarSenha: boolean;
   username: string;
+  cargo?: string;
+  permissoes?: string[];
 }
 
 export default function Login() {
@@ -47,8 +49,19 @@ export default function Login() {
       localStorage.setItem('wms_token', data.token);
       localStorage.setItem('wms_refresh_token', data.refreshToken);
       localStorage.setItem('wms_user', data.username || username);
+      localStorage.setItem('wms_cargo', data.cargo || '');
+      localStorage.setItem('wms_permissoes', JSON.stringify(data.permissoes || []));
       
-      navigate('/');
+      // 🚀 ALTERAÇÃO: Redirecionamento inteligente baseado na permissão (Resolve o bug do Expedição não logar)
+      const perms = data.permissoes || [];
+      if (perms.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'))) {
+        navigate('/');
+      } else if (perms.some(p => p.startsWith('full'))) {
+        navigate('/mercado-full');
+      } else {
+        navigate('/configuracoes');
+      }
+      
     } catch (err) {
       if (axios.isAxiosError(err)) {
         setErro(err.response?.data?.error ?? 'Credenciais inválidas');
