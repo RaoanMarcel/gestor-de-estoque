@@ -71,10 +71,12 @@ function UserTableRow({
   handleAtualizarCargoUsuario: (id: number, cargoId: string) => Promise<void>, 
   handleExcluirUsuario: (id: number, username: string) => void 
 }) {
-  const [cargoSelecionado, setCargoSelecionado] = useState(u.cargoId ? String(u.cargoId) : '');
+  // 🚀 ALTERAÇÃO: Isolando o valor original para garantir a renderização reativa do botão SALVAR
+  const valorOriginal = u.cargoId ? String(u.cargoId) : '';
+  const [cargoSelecionado, setCargoSelecionado] = useState(valorOriginal);
   const [salvando, setSalvando] = useState(false);
 
-  const mudou = cargoSelecionado !== (u.cargoId ? String(u.cargoId) : '');
+  const mudou = cargoSelecionado !== valorOriginal;
 
   useEffect(() => {
     setCargoSelecionado(u.cargoId ? String(u.cargoId) : '');
@@ -102,21 +104,22 @@ function UserTableRow({
             value={cargoSelecionado} 
             onChange={(e) => setCargoSelecionado(e.target.value)}
             disabled={salvando}
-            className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-main)] bg-[var(--bg-main)] border border-[var(--border-color)] px-2.5 py-1.5 rounded-md focus:outline-none focus:border-blue-500 transition-colors cursor-pointer disabled:opacity-50"
+            className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-main)] bg-[var(--bg-main)] border border-[var(--border-color)] px-2.5 py-1.5 rounded-md focus:outline-none focus:border-blue-500 transition-colors cursor-pointer disabled:opacity-50 min-w-[120px]"
           >
-            <option value="">Sem Cargo</option>
+            <option value="">SEM CARGO</option>
             {cargos.map((c) => (
               <option key={c.id} value={String(c.id)}>{c.nome}</option>
             ))}
           </select>
 
+          {/* 🚀 ALTERAÇÃO: Botão garantido e formatado fielmente ao layout do screenshot */}
           {mudou && (
             <button 
               onClick={onSave}
               disabled={salvando}
               className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider shadow-sm transition-all animate-in fade-in zoom-in disabled:opacity-50"
             >
-              {salvando ? '⏳' : 'Salvar'}
+              {salvando ? '⏳' : 'SALVAR'}
             </button>
           )}
         </div>
@@ -161,14 +164,14 @@ export default function Configuracoes() {
   const [formUsuario, setFormUsuario] = useState({ username: '', senha: '', cargoId: '' });
   const [carregandoDados, setCarregandoDados] = useState(false);
 
-  // 🚀 ALTERAÇÃO: Regra de negócio EXPLÍCITAMENTE forçada para TRUE para resgate do sistema!
-  // const cargoUsuario = localStorage.getItem('wms_cargo') || '';
-  // const isDev = cargoUsuario.toUpperCase() === 'DEV';
-  // const podeGerenciarCargos = isDev;
-  // const podeGerenciarUsuarios = isDev;
+  const cargoUsuario = localStorage.getItem('wms_cargo') || '';
+  const isDev = cargoUsuario.toUpperCase() === 'DEV';
+  
+  const permissoesSalvas = localStorage.getItem('wms_permissoes');
+  const permissoesAtuais: string[] = permissoesSalvas ? JSON.parse(permissoesSalvas) : [];
 
-  const podeGerenciarCargos = true;
-  const podeGerenciarUsuarios = true;
+  const podeGerenciarCargos = isDev || permissoesAtuais.includes('acessos:cargos');
+  const podeGerenciarUsuarios = isDev || permissoesAtuais.includes('acessos:usuarios');
 
   useEffect(() => {
     carregarCargos();
@@ -243,18 +246,22 @@ export default function Configuracoes() {
   const handleAtualizarCargoUsuario = async (usuarioId: number, novoCargoId: string) => {
     try {
       const token = localStorage.getItem('wms_token');
+      
+      // 🚀 ALTERAÇÃO: Tratando a string vinda do frontend e enviando o 'Int' correto exigido pelo Prisma
+      const payloadCargoId = novoCargoId ? parseInt(novoCargoId, 10) : null;
+
       const response = await fetch(`${API_URL}/usuarios/${usuarioId}/cargo`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ cargoId: novoCargoId || null })
+        body: JSON.stringify({ cargoId: payloadCargoId })
       });
       
-      if (!response.ok) throw new Error('O banco de dados rejeitou a atualização. Verifique a rota no Backend.');
+      if (!response.ok) throw new Error('O banco de dados rejeitou a atualização. Verifique a tipagem.');
       
       toast.success('Função do usuário atualizada com sucesso!');
       await carregarUsuariosLista(); 
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erro inesperado.');
+      toast.error(err instanceof Error ? err.message : 'Erro inesperado ao salvar.');
       await carregarUsuariosLista(); 
     }
   };

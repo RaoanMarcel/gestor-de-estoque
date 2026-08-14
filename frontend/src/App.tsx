@@ -35,18 +35,13 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   if (esconderHeader) return <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)]">{children}</div>;
 
   return (
-    // ✨ MÁGICA RESPONSIVA: flex-col no mobile, flex-row no PC (md:)
     <div className="flex flex-col md:flex-row h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] antialiased overflow-hidden">
       
-      {/* SIDEBAR COM EFEITO DESLIZANTE (Bottom Bar no Mobile) */}
       <aside 
         onMouseEnter={() => setIsSidebarOpen(true)}
         onMouseLeave={() => setIsSidebarOpen(false)}
-        className={`flex flex-row md:flex-col shrink-0 z-50 bg-[var(--sidebar-bg)] border-t md:border-t-0 md:border-r border-[var(--sidebar-border)] transition-all duration-300 ease-in-out order-last md:order-none overflow-x-auto md:overflow-x-hidden scrollbar-hide
-          h-16 w-full md:h-full ${isSidebarOpen ? 'md:w-64' : 'md:w-[76px]'}
-        `}
+        className={`flex flex-row md:flex-col shrink-0 z-50 bg-[var(--sidebar-bg)] border-t md:border-t-0 md:border-r border-[var(--sidebar-border)] transition-all duration-300 ease-in-out order-last md:order-none overflow-x-auto md:overflow-x-hidden scrollbar-hide h-16 w-full md:h-full ${isSidebarOpen ? 'md:w-64' : 'md:w-[76px]'}`}
       >
-        {/* LOGO (Escondida no mobile para poupar espaço) */}
         <div className="hidden md:flex h-16 items-center border-b border-[var(--sidebar-border)] shrink-0 px-5 overflow-hidden">
           <div className="flex items-center h-8 w-8 rounded-lg bg-blue-600 text-white shrink-0 justify-center shadow-sm">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-[18px] h-[18px]">
@@ -58,7 +53,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
           </span>
         </div>
 
-        {/* NAVEGAÇÃO COM CONTROLE DE ACESSO */}
         <nav className="flex-1 flex flex-row md:flex-col items-center md:items-stretch overflow-y-auto py-0 md:py-6 px-3 space-x-2 md:space-x-0 md:space-y-2 scrollbar-hide">
           
           {podeVerArmazem && (
@@ -100,12 +94,15 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
             </>
           )}
 
-          {/* Divisor Invisível no Mobile para empurrar o resto pra direita */}
           <div className="flex-1 md:hidden"></div>
+        </nav>
 
+        {/* 🚀 ALTERAÇÃO: Movido os botões "Configurações" e "Sair" para o container inferior (mt-auto) */}
+        <div className="flex flex-row md:flex-col md:mt-auto md:border-t border-[var(--sidebar-border)] md:p-3 items-center md:items-stretch justify-end px-3 md:px-0 gap-2 md:gap-1 overflow-hidden shrink-0">
+          
           <Link to="/configuracoes" title="Configurações" className={`flex items-center justify-center md:justify-start h-11 w-11 md:w-auto px-0 md:px-3 rounded-lg transition-all duration-200 shrink-0 ${isActive('/configuracoes') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 shrink-0 transition-transform ${!isSidebarOpen && 'md:mx-auto'} ${!isActive('/configuracoes') && 'group-hover:rotate-45'}`}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143-.854-.107-1.204l-.527-.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854-.107-1.204l-.527-.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <span className={`hidden md:block text-[13px] font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'w-auto max-w-[150px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
@@ -121,33 +118,32 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               Sair do Sistema
             </span>
           </button>
-        </nav>
 
-        {/* USUÁRIO LOGADO (Escondido no mobile) */}
-        <div className="hidden md:flex mt-auto border-t border-[var(--sidebar-border)] p-3 flex-col gap-1 overflow-hidden">
-          <div className="flex items-center px-4 py-2 h-14 transition-all duration-300">
-            <div className={`flex items-center w-full ${!isSidebarOpen && 'justify-center'}`}>
-              <div className="h-[34px] w-[34px] rounded-full bg-white text-slate-800 flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
-                {inicialUsuario}
-              </div>
-              <div className={`flex flex-col justify-center overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'w-auto max-w-[120px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
-                <span className="text-[13px] font-semibold text-[var(--sidebar-text-hover)] tracking-wide truncate leading-tight">
-                  {usuarioLogado}
-                </span>
-                {cargoUsuario && (
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sidebar-text)] opacity-70 truncate mt-0.5 leading-tight">
-                    {cargoUsuario}
+          {/* PERFIL DO USUÁRIO (Apenas visível no Desktop) */}
+          <div className="hidden md:flex flex-col gap-1 overflow-hidden w-full">
+            <div className="h-px bg-[var(--sidebar-border)] my-2 mx-2" />
+            <div className="flex items-center px-4 py-2 h-14 transition-all duration-300">
+              <div className={`flex items-center w-full ${!isSidebarOpen && 'justify-center'}`}>
+                <div className="h-[34px] w-[34px] rounded-full bg-white text-slate-800 flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
+                  {inicialUsuario}
+                </div>
+                <div className={`flex flex-col justify-center overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'w-auto max-w-[120px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
+                  <span className="text-[13px] font-semibold text-[var(--sidebar-text-hover)] tracking-wide truncate leading-tight">
+                    {usuarioLogado}
                   </span>
-                )}
+                  {cargoUsuario && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sidebar-text)] opacity-70 truncate mt-0.5 leading-tight">
+                      {cargoUsuario}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </aside>
 
-      {/* ÁREA DIREITA (CONTEÚDO) */}
       <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-main)]">
-        {/* Esconde o cabeçalho global se estiver na rota do Mercado Full */}
         {!isActive('/mercado-full') && (
           <header className="h-16 shrink-0 flex items-center justify-between px-6 bg-[var(--header-bg)] border-b border-[var(--header-border)] backdrop-blur-xl z-40">
             <div className="text-[var(--header-text)] text-xs font-semibold tracking-wide uppercase">
@@ -163,7 +159,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   );
 }
 
-// 🚀 RouteGuard agora computa dinamicamente a rota correta de fallback para evitar loop de redirects
 function RouteGuard({ permissoesObrigatorias, children }: { permissoesObrigatorias: string[], children: JSX.Element }) {
   const permissoesSalvas = localStorage.getItem('wms_permissoes');
   const permissoes: string[] = permissoesSalvas ? JSON.parse(permissoesSalvas) : [];

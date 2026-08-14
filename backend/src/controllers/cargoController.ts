@@ -1,3 +1,4 @@
+// src/controllers/cargoController.ts
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 
@@ -19,6 +20,8 @@ export const listarCargosEUsuarios = async (req: Request, res: Response) => {
 
     res.json({ cargos, usuarios });
   } catch (error) {
+    // 🚀 ALTERAÇÃO: Console.error adicionado para debugar falhas invisíveis
+    console.error('[ERRO - GET /cargos]:', error);
     res.status(500).json({ error: 'Erro ao buscar dados de acessos.' });
   }
 };
@@ -33,6 +36,8 @@ export const criarCargo = async (req: Request, res: Response) => {
     });
     res.status(201).json(cargo);
   } catch (error) {
+    // 🚀 ALTERAÇÃO: Console.error adicionado
+    console.error('[ERRO - POST /cargos]:', error);
     res.status(500).json({ error: 'Erro ao criar o cargo.' });
   }
 };
@@ -48,6 +53,8 @@ export const atualizarPermissoes = async (req: Request, res: Response) => {
     });
     res.json(cargo);
   } catch (error) {
+    // 🚀 ALTERAÇÃO: Console.error adicionado
+    console.error('[ERRO - PUT /cargos/:id]:', error);
     res.status(500).json({ error: 'Erro ao atualizar permissões.' });
   }
 };
@@ -60,6 +67,8 @@ export const excluirCargo = async (req: Request, res: Response) => {
     });
     res.json({ mensagem: 'Cargo excluído com sucesso.' });
   } catch (error) {
+    // 🚀 ALTERAÇÃO: Console.error adicionado
+    console.error('[ERRO - DELETE /cargos/:id]:', error);
     res.status(500).json({ error: 'Erro ao excluir o cargo.' });
   }
 };
