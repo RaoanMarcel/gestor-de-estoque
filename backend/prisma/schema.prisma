@@ -42,6 +42,15 @@ model HistoricoMovimentacao {
   createdAt      DateTime @default(now())
 }
 
+model Cargo {
+  id         Int       @id @default(autoincrement())
+  nome       String    @unique
+  permissoes Json      // Guarda a lista de acessos (ex: ["full", "estoque"])
+  usuarios   Usuario[] // Relacionamento com os usuários que possuem este cargo
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
 model Usuario {
   id                Int                     @id @default(autoincrement())
   username          String                  @unique
