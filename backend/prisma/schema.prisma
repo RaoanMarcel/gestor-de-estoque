@@ -13,8 +13,8 @@ model Pallet {
   rua       String?
   estrutura String?
   nivel     String?
-  descricao String?         // <-- REINCLUÍDO PARA NÃO PERDER DADOS
-  tipo      String?         // <-- REINCLUÍDO PARA NÃO PERDER DADOS
+  descricao String?         
+  tipo      String?         
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   produtos  ProdutoPallet[] 
@@ -49,7 +49,7 @@ model Usuario {
   precisaMudarSenha Boolean                 @default(true)
   createdAt         DateTime                @default(now())
   historicos        HistoricoMovimentacao[]
-  inbounds          InboundFull[]           // Relacionamento com os Inbounds (Cargas Mercado Livre)
+  inbounds          InboundFull[]           
 }
 
 model Contador {
@@ -59,22 +59,50 @@ model Contador {
 }
 
 // ==========================================
-// NOVOS MODELOS: GESTOR DE ENVIOS FULL
+// CADASTRO DE ATIVOS (FROTA)
+// ==========================================
+
+model Motorista {
+  id        Int           @id @default(autoincrement())
+  nome      String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  inbounds  InboundFull[] // Histórico de cargas que este motorista trouxe
+}
+
+model Veiculo {
+  id        Int           @id @default(autoincrement())
+  modelo    String        // Ex: Iveco Daily
+  placa     String        @unique // Placas não se repetem
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  inbounds  InboundFull[] // Histórico de cargas que este veículo trouxe
+}
+
+// ==========================================
+// GESTOR DE ENVIOS FULL
 // ==========================================
 
 model InboundFull {
   id          Int          @id @default(autoincrement())
-  numeroFrete String?      // Ex: 72595700 (Caso queira extrair e buscar depois)
-  nomePallet  String       // Nome lógico dado pelo operador no app (Ex: Pallet Eletrônicos Sul)
-  status      String       @default("PENDENTE") // Pode ser: PENDENTE, BIPANDO, CONCLUIDO
+  numeroFrete String?      
+  nomePallet  String       
+  status      String       @default("PENDENTE") // PENDENTE, CONCLUIDO
   
   usuarioId   Int?
   usuario     Usuario?     @relation(fields: [usuarioId], references: [id])
+
+  // Vínculos com a Frota adicionados aqui:
+  motoristaId Int?
+  motorista   Motorista?   @relation(fields: [motoristaId], references: [id])
+
+  veiculoId   Int?
+  veiculo     Veiculo?     @relation(fields: [veiculoId], references: [id])
   
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   
-  skus        InboundSku[] // Relacionamento com os SKUs deste envio
+  skus        InboundSku[] 
 }
 
 model InboundSku {
@@ -83,13 +111,13 @@ model InboundSku {
   inboundId        Int
   inbound          InboundFull @relation(fields: [inboundId], references: [id], onDelete: Cascade)
   
-  sku              String      // Código do SKU extraído do PDF
-  descricao        String      // Descrição do produto
-  quantidadeTotal  Int         // Total solicitado pelo Mercado Livre
-  quantidadeBipada Int         @default(0) // Contador de quantos já foram bipados
+  sku              String      
+  descricao        String      
+  quantidadeTotal  Int         
+  quantidadeBipada Int         @default(0) 
   
-  status           String      @default("PENDENTE") // PENDENTE ou CONCLUIDO
-  variacoes        Json?       // <-- CAMPO NOVO ADICIONADO PARA GUARDAR OS CÓDIGOS ML
+  status           String      @default("PENDENTE") 
+  variacoes        Json?       
   
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
