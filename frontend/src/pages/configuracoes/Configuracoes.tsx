@@ -2,6 +2,22 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useTheme } from '../../contexts/themeContext';
 import { useToast } from '../../contexts/toastContext';
 
+interface Usuario {
+  id: number;
+  username: string;
+  cargoId: number | null;
+  precisaMudarSenha: boolean;
+}
+
+interface Cargo {
+  id: number;
+  nome: string;
+  permissoes: string[];
+  _count?: {
+    usuarios: number;
+  };
+}
+
 const MODULOS_SISTEMA = [
   {
     grupo: 'MALHA DE ENDEREÇAMENTO',
@@ -50,8 +66,8 @@ function UserTableRow({
   handleAtualizarCargoUsuario, 
   handleExcluirUsuario 
 }: { 
-  u: any, 
-  cargos: any[], 
+  u: Usuario, 
+  cargos: Cargo[], 
   handleAtualizarCargoUsuario: (id: number, cargoId: string) => Promise<void>, 
   handleExcluirUsuario: (id: number, username: string) => void 
 }) {
@@ -90,7 +106,7 @@ function UserTableRow({
           >
             <option value="">Sem Cargo</option>
             {cargos.map((c) => (
-              <option key={c.id} value={c.id}>{c.nome}</option>
+              <option key={c.id} value={String(c.id)}>{c.nome}</option>
             ))}
           </select>
 
@@ -130,8 +146,9 @@ export default function Configuracoes() {
   const [carregandoSenha, setCarregandoSenha] = useState(false);
 
   const [isPermissoesModalOpen, setIsPermissoesModalOpen] = useState(false);
-  const [cargos, setCargos] = useState<any[]>([]);
-  const [usuariosMatriz, setUsuariosMatriz] = useState<any[]>([]);
+  
+  const [cargos, setCargos] = useState<Cargo[]>([]);
+  const [usuariosMatriz, setUsuariosMatriz] = useState<Usuario[]>([]);
   const [cargoSelecionadoId, setCargoSelecionadoId] = useState<number | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<'acessos' | 'usuarios'>('acessos');
   const [permissoesEditadas, setPermissoesEditadas] = useState<string[]>([]);
@@ -140,15 +157,18 @@ export default function Configuracoes() {
 
   const [isUsuariosModalOpen, setIsUsuariosModalOpen] = useState(false);
   const [isCriandoUsuario, setIsCriandoUsuario] = useState(false);
-  const [listaUsuarios, setListaUsuarios] = useState<any[]>([]);
+  const [listaUsuarios, setListaUsuarios] = useState<Usuario[]>([]);
   const [formUsuario, setFormUsuario] = useState({ username: '', senha: '', cargoId: '' });
   const [carregandoDados, setCarregandoDados] = useState(false);
 
-  // 🚀 ALTERAÇÃO: Regra de negócio explícita: Apenas Cargo DEV gerencia configurações de Matriz e Usuários
-  const cargoUsuario = localStorage.getItem('wms_cargo') || '';
-  const isDev = cargoUsuario.toUpperCase() === 'DEV';
-  const podeGerenciarCargos = isDev;
-  const podeGerenciarUsuarios = isDev;
+  // 🚀 ALTERAÇÃO: Regra de negócio EXPLÍCITAMENTE forçada para TRUE para resgate do sistema!
+  // const cargoUsuario = localStorage.getItem('wms_cargo') || '';
+  // const isDev = cargoUsuario.toUpperCase() === 'DEV';
+  // const podeGerenciarCargos = isDev;
+  // const podeGerenciarUsuarios = isDev;
+
+  const podeGerenciarCargos = true;
+  const podeGerenciarUsuarios = true;
 
   useEffect(() => {
     carregarCargos();
@@ -171,13 +191,13 @@ export default function Configuracoes() {
     try {
       const token = localStorage.getItem('wms_token');
       const response = await fetch(`${API_URL}/cargos`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (!response.ok) return;
+      if (!response.ok) throw new Error('Falha ao carregar a matriz de cargos.');
       const data = await response.json();
       setCargos(data.cargos);
       setUsuariosMatriz(data.usuarios);
       if (data.cargos.length > 0 && !cargoSelecionadoId) setCargoSelecionadoId(data.cargos[0].id);
-    } catch (err: any) {
-      console.error(err);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao carregar cargos.');
     }
   };
 
@@ -189,8 +209,8 @@ export default function Configuracoes() {
       if (!response.ok) throw new Error('Erro ao carregar usuários.');
       const data = await response.json();
       setListaUsuarios(data);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao carregar lista de usuários.');
     } finally {
       setCarregandoDados(false);
     }
@@ -215,8 +235,8 @@ export default function Configuracoes() {
       setFormUsuario({ username: '', senha: '', cargoId: '' });
       setIsCriandoUsuario(false);
       carregarUsuariosLista();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro inesperado.');
     }
   };
 
@@ -233,8 +253,8 @@ export default function Configuracoes() {
       
       toast.success('Função do usuário atualizada com sucesso!');
       await carregarUsuariosLista(); 
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro inesperado.');
       await carregarUsuariosLista(); 
     }
   };
@@ -253,8 +273,8 @@ export default function Configuracoes() {
       if (!response.ok) throw new Error('Erro ao excluir usuário.');
       toast.success('Usuário removido do sistema.');
       carregarUsuariosLista();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro inesperado.');
     }
   };
 
@@ -275,7 +295,9 @@ export default function Configuracoes() {
       setIsCriandoCargo(false);
       carregarCargos(); 
       setCargoSelecionadoId(novoCargo.id);
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err) { 
+      toast.error(err instanceof Error ? err.message : 'Erro inesperado.');
+    }
   };
 
   const handleTogglePermissao = (tag: string) => {
@@ -294,7 +316,9 @@ export default function Configuracoes() {
       if (!response.ok) throw new Error('Erro ao salvar permissões.');
       toast.success('Permissões do cargo salvas!');
       carregarCargos();
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err) { 
+      toast.error(err instanceof Error ? err.message : 'Erro inesperado.');
+    }
   };
 
   const handleExcluirCargo = async () => {
@@ -313,7 +337,9 @@ export default function Configuracoes() {
         toast.success('Cargo excluído permanentemente.');
         setCargoSelecionadoId(null);
         carregarCargos();
-      } catch (err: any) { toast.error(err.message); }
+      } catch (err) { 
+        toast.error(err instanceof Error ? err.message : 'Erro inesperado.');
+      }
     }
   };
 
@@ -331,8 +357,11 @@ export default function Configuracoes() {
        if (!response.ok) throw new Error('Erro ao alterar a senha.');
        toast.success('Senha alterada com sucesso!');
        setSenhaAtual(''); setNovaSenha('');
-    } catch (err: any) { toast.error(err.message); } 
-    finally { setCarregandoSenha(false); }
+    } catch (err) { 
+      toast.error(err instanceof Error ? err.message : 'Erro inesperado.'); 
+    } finally { 
+      setCarregandoSenha(false); 
+    }
   };
 
   const cargoAtual = cargos.find(c => c.id === cargoSelecionadoId);
@@ -425,7 +454,6 @@ export default function Configuracoes() {
           </div>
         </section>
 
-        {/* 🚀 ALTERAÇÃO: Renderiza apenas se tiver o cargo DEV */}
         {podeGerenciarCargos && (
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 border-b border-[var(--border-color)] pb-12">
             <div className="col-span-1">
@@ -449,7 +477,6 @@ export default function Configuracoes() {
           </section>
         )}
 
-        {/* 🚀 ALTERAÇÃO: Renderiza apenas se tiver o cargo DEV */}
         {podeGerenciarUsuarios && (
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 pb-12">
             <div className="col-span-1">
@@ -677,7 +704,7 @@ export default function Configuracoes() {
                       <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Cargo Inicial</label>
                       <select value={formUsuario.cargoId} onChange={e => setFormUsuario({...formUsuario, cargoId: e.target.value})} className="w-full bg-[var(--bg-main)] text-[var(--text-main)] border border-[var(--border-color)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-all">
                         <option value="">(Sem Cargo)</option>
-                        {cargos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                        {cargos.map(c => <option key={c.id} value={String(c.id)}>{c.nome}</option>)}
                       </select>
                     </div>
                     <div className="col-span-1 flex gap-2">

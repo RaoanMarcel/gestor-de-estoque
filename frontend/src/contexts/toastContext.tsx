@@ -69,7 +69,7 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
                 }}
                 className="px-5 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl shadow-sm transition-all"
               >
-                Confirmar
+                Confirmar!
               </button>
             </div>
           </div>
