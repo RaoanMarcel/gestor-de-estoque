@@ -37,7 +37,6 @@ export default function GestorEnviosFull() {
   const [modoTravado, setModoTravado] = useState(false);
   const [showSucessoProduto, setShowSucessoProduto] = useState(false);
   
-  // MODAL DE FINALIZAÇÃO E EDIÇÃO
   const [showModalFinalizarEnvio, setShowModalFinalizarEnvio] = useState(false);
   const [motoristaSelecionado, setMotoristaSelecionado] = useState('');
   const [veiculoSelecionado, setVeiculoSelecionado] = useState('');
@@ -49,7 +48,6 @@ export default function GestorEnviosFull() {
   const [nomeVeiculo, setNomeVeiculo] = useState('');
   const [placaVeiculo, setPlacaVeiculo] = useState('');
 
-  // Dropdowns Tela Inicial
   const [showMotoristasList, setShowMotoristasList] = useState(false);
   const [showVeiculosList, setShowVeiculosList] = useState(false);
 
@@ -273,28 +271,26 @@ export default function GestorEnviosFull() {
   };
 
   // ==========================================
-  // CABEÇALHO GLOBAL (ATUALIZADO)
+  // CABEÇALHO GLOBAL LADO A LADO VERDE MELI
   // ==========================================
   const HeaderGlobal = ({ showClose = true, onClose = () => navigate('/') }) => (
-    <div className="p-4 border-b border-gray-100 bg-white sticky top-0 z-10 flex items-center justify-between min-h-[90px]">
-      {/* Spacer Esquerdo */}
-      <div className="w-12 h-12"></div> 
+    <div className="p-4 border-b border-gray-100 bg-white sticky top-0 z-10 flex items-center justify-between min-h-[80px]">
+      <div className="w-10 h-10"></div> 
       
-      {/* Bloco Central (Logo e Título) */}
-      <div className="flex-1 flex flex-col items-center justify-center -mt-1">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="text-blue-600 italic font-black text-3xl leading-none tracking-tight">⚡ FULL</span>
-        </div>
+      <div className="flex-1 flex items-center justify-center gap-2">
+        <span className="text-[#00a650] italic font-black text-[28px] leading-none tracking-tight flex items-center">
+          <svg className="w-6 h-6 mr-0.5 fill-yellow-400 stroke-[#00a650]" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+          FULL
+        </span>
         <span className="font-bold text-slate-800 text-lg uppercase tracking-widest mt-1">Gestor de Envios</span>
       </div>
 
-      {/* Botão Direito */}
       {showClose ? (
         <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-full transition shadow-sm border border-gray-100">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       ) : (
-        <div className="w-12 h-12"></div>
+        <div className="w-10 h-10"></div>
       )}
     </div>
   );
@@ -306,7 +302,7 @@ export default function GestorEnviosFull() {
       {modalCoord.isOpen && (
         <div className="fixed inset-0 z-[110] w-screen h-screen flex items-center justify-center bg-slate-900/40 backdrop-blur-[3px] p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className={`p-4 border-b flex justify-between items-center text-white ${modalCoord.acao === 'EXCLUIR' ? 'bg-red-600' : 'bg-emerald-600'}`}>
+            <div className={`p-4 border-b flex justify-between items-center text-white ${modalCoord.acao === 'EXCLUIR' ? 'bg-red-600' : 'bg-[#00a650]'}`}>
               <h3 className="font-bold">Confirmação de Ação</h3>
               <button type="button" onClick={() => setModalCoord({ isOpen: false, inboundId: null, acao: null, nomePallet: '' })} className="hover:opacity-75">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -320,7 +316,7 @@ export default function GestorEnviosFull() {
               
               <div className="flex gap-3 mt-4">
                 <button type="button" onClick={() => setModalCoord({ isOpen: false, inboundId: null, acao: null, nomePallet: '' })} className="flex-1 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition">Cancelar</button>
-                <button type="submit" className={`flex-1 font-bold py-3 rounded-xl transition shadow-md text-white ${modalCoord.acao === 'EXCLUIR' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>Confirmar</button>
+                <button type="submit" className={`flex-1 font-bold py-3 rounded-xl transition shadow-md text-white ${modalCoord.acao === 'EXCLUIR' ? 'bg-red-600 hover:bg-red-700' : 'bg-[#00a650] hover:bg-green-700'}`}>Confirmar</button>
               </div>
             </form>
           </div>
@@ -333,7 +329,7 @@ export default function GestorEnviosFull() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="p-6">
               <div className="text-center mb-6">
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isEditandoEnvio ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isEditandoEnvio ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-[#00a650]'}`}>
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {isEditandoEnvio ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>}
                   </svg>
@@ -344,14 +340,14 @@ export default function GestorEnviosFull() {
               <div className="space-y-4 mb-6">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Motorista</label>
-                  <select value={motoristaSelecionado} onChange={(e) => setMotoristaSelecionado(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-500 bg-gray-50">
+                  <select value={motoristaSelecionado} onChange={(e) => setMotoristaSelecionado(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#00a650] bg-gray-50">
                     <option value="">-- Escolha --</option>
                     {dashboardData.motoristas?.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Veículo</label>
-                  <select value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-500 bg-gray-50">
+                  <select value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#00a650] bg-gray-50">
                     <option value="">-- Escolha --</option>
                     {dashboardData.veiculos?.map(v => <option key={v.id} value={v.id}>{v.modelo} ({v.placa})</option>)}
                   </select>
@@ -359,7 +355,7 @@ export default function GestorEnviosFull() {
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setShowModalFinalizarEnvio(false)} className="flex-1 py-3 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-xl transition">Cancelar</button>
-                <button onClick={confirmarFinalizacaoEnvio} disabled={!motoristaSelecionado || !veiculoSelecionado} className="flex-1 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl shadow-md transition">Salvar</button>
+                <button onClick={confirmarFinalizacaoEnvio} disabled={!motoristaSelecionado || !veiculoSelecionado} className="flex-1 py-3 text-sm font-bold text-white bg-[#00a650] hover:bg-green-700 disabled:opacity-50 rounded-xl shadow-md transition">Salvar</button>
               </div>
             </div>
           </div>
@@ -372,8 +368,8 @@ export default function GestorEnviosFull() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="bg-gray-50 p-4 border-b flex justify-between items-center"><h3 className="font-bold">Cadastrar Motorista</h3><button onClick={() => setShowModalMotorista(false)}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div>
             <form onSubmit={handleSalvarMotorista} className="p-5">
-              <input type="text" value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} placeholder="Nome Completo" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-emerald-500" autoFocus/>
-              <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700">Salvar</button>
+              <input type="text" value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} placeholder="Nome Completo" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-[#00a650]" autoFocus/>
+              <button type="submit" className="w-full bg-[#00a650] text-white font-bold py-3 rounded-xl hover:bg-green-700">Salvar</button>
             </form>
           </div>
         </div>
@@ -385,9 +381,9 @@ export default function GestorEnviosFull() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="bg-gray-50 p-4 border-b flex justify-between items-center"><h3 className="font-bold">Cadastrar Veículo</h3><button onClick={() => setShowModalVeiculo(false)}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div>
             <form onSubmit={handleSalvarVeiculo} className="p-5">
-              <input type="text" value={nomeVeiculo} onChange={(e) => setNomeVeiculo(e.target.value)} placeholder="Modelo / Nome" className="w-full border rounded-lg p-3 text-sm mb-4 focus:ring-2 focus:ring-emerald-500" autoFocus/>
-              <input type="text" value={placaVeiculo} onChange={(e) => setPlacaVeiculo(e.target.value.toUpperCase())} placeholder="ABC-1234" maxLength={8} className="w-full border rounded-lg p-3 text-sm mb-5 uppercase tracking-widest font-bold focus:ring-2 focus:ring-emerald-500"/>
-              <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700">Salvar</button>
+              <input type="text" value={nomeVeiculo} onChange={(e) => setNomeVeiculo(e.target.value)} placeholder="Modelo / Nome" className="w-full border rounded-lg p-3 text-sm mb-4 focus:ring-2 focus:ring-[#00a650]" autoFocus/>
+              <input type="text" value={placaVeiculo} onChange={(e) => setPlacaVeiculo(e.target.value.toUpperCase())} placeholder="ABC-1234" maxLength={8} className="w-full border rounded-lg p-3 text-sm mb-5 uppercase tracking-widest font-bold focus:ring-2 focus:ring-[#00a650]"/>
+              <button type="submit" className="w-full bg-[#00a650] text-white font-bold py-3 rounded-xl hover:bg-green-700">Salvar</button>
             </form>
           </div>
         </div>
@@ -402,14 +398,14 @@ export default function GestorEnviosFull() {
             <HeaderGlobal />
             <div className="p-5 flex-1 bg-gray-50 flex flex-col overflow-y-auto">
               
-              <button onClick={() => setCurrentScreen(2)} className="w-full bg-[#1e293b] text-emerald-500 font-semibold py-4 rounded-xl mb-6 flex items-center justify-center gap-2 transition hover:bg-slate-800 shadow-md">
+              <button onClick={() => setCurrentScreen(2)} className="w-full bg-[#1e293b] text-[#00a650] font-semibold py-4 rounded-xl mb-6 flex items-center justify-center gap-2 transition hover:bg-slate-800 shadow-md">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg> Adicionar Novo Envio
               </button>
               
               <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-3">Gerenciamento de Ativos</h3>
               <div className="grid grid-cols-2 gap-3 mb-2">
-                <button onClick={() => setShowModalMotorista(true)} className="w-full bg-white border border-gray-200 text-emerald-600 font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-50 transition"><span className="text-lg leading-none">+</span> Motorista</button>
-                <button onClick={() => setShowModalVeiculo(true)} className="w-full bg-white border border-gray-200 text-emerald-600 font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-50 transition"><span className="text-lg leading-none">+</span> Veículo</button>
+                <button onClick={() => setShowModalMotorista(true)} className="w-full bg-white border border-gray-200 text-[#00a650] font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-green-50 transition"><span className="text-lg leading-none">+</span> Motorista</button>
+                <button onClick={() => setShowModalVeiculo(true)} className="w-full bg-white border border-gray-200 text-[#00a650] font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-green-50 transition"><span className="text-lg leading-none">+</span> Veículo</button>
               </div>
               
               {/* DROPDOWNS DE ATIVOS */}
@@ -418,7 +414,7 @@ export default function GestorEnviosFull() {
                 <div className="border border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm">
                   <button onClick={() => setShowMotoristasList(!showMotoristasList)} className="w-full px-3 py-2 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition">
                     <span className="text-[11px] font-bold text-gray-600 uppercase flex items-center gap-1.5">
-                      <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg> Motoristas
+                      <svg className="w-4 h-4 text-[#00a650]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg> Motoristas
                     </span>
                     <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showMotoristasList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
                   </button>
@@ -439,7 +435,7 @@ export default function GestorEnviosFull() {
                 <div className="border border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm">
                   <button onClick={() => setShowVeiculosList(!showVeiculosList)} className="w-full px-3 py-2 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition">
                     <span className="text-[11px] font-bold text-gray-600 uppercase flex items-center gap-1.5">
-                      <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg> Veículos
+                      <svg className="w-4 h-4 text-[#00a650]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg> Veículos
                     </span>
                     <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showVeiculosList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
                   </button>
@@ -472,9 +468,9 @@ export default function GestorEnviosFull() {
                     textoStatus = 'Prontos para envio';
                     statusClasses = 'text-yellow-700 bg-yellow-50 border-yellow-100';
                   } else if (inb.status === 'ENVIADO') {
-                    corBolinha = 'bg-emerald-500';
+                    corBolinha = 'bg-[#00a650]';
                     textoStatus = 'Produtos enviados';
-                    statusClasses = 'text-emerald-700 bg-emerald-50 border-emerald-100';
+                    statusClasses = 'text-green-700 bg-green-50 border-green-100';
                   }
 
                   const totalEsperado = inb.skus.reduce((a:number, s:any) => a + s.quantidadeTotal, 0);
@@ -492,7 +488,7 @@ export default function GestorEnviosFull() {
                         </button>
                       )}
 
-                      <h4 className="font-black text-gray-900 text-lg mb-1 pr-8 group-hover:text-emerald-600 transition">{inb.nomePallet}</h4>
+                      <h4 className="font-black text-gray-900 text-lg mb-1 pr-8 group-hover:text-[#00a650] transition">{inb.nomePallet}</h4>
                       <div className="flex gap-4 text-xs font-bold text-gray-500 mb-4">
                         <span>SKUs: {inb.skus.length}</span>
                         <span>UNIDADES: {totalBipado} / {totalEsperado}</span>
@@ -542,7 +538,7 @@ export default function GestorEnviosFull() {
                 <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center mb-8 cursor-pointer hover:bg-gray-50 transition">
                   <span className="text-sm font-semibold text-gray-600">{selectedFile ? selectedFile.name : 'Anexar Inbound (TXT)'}</span>
                 </div>
-                <button onClick={handleProcessarNovo} disabled={isProcessing} className="w-full text-white bg-emerald-600 font-bold py-4 rounded-xl shadow-md transition hover:bg-emerald-700 active:scale-[0.98]">Processar</button>
+                <button onClick={handleProcessarNovo} disabled={isProcessing} className="w-full text-white bg-[#00a650] font-bold py-4 rounded-xl shadow-md transition hover:bg-green-700 active:scale-[0.98]">Processar</button>
               </div>
             </div>
           </div>
@@ -552,16 +548,20 @@ export default function GestorEnviosFull() {
         {currentScreen === 3 && inboundData && (
           <div className="flex flex-col h-full bg-gray-50 animate-in duration-300">
             {skuEmBipagem ? (
-               <div className="p-4 border-b border-gray-100 bg-white sticky top-0 z-10 flex items-center justify-between min-h-[90px]">
+               <div className="p-4 border-b border-gray-100 bg-white sticky top-0 z-10 flex items-center justify-between min-h-[80px]">
                  <button onClick={fecharModoBipagem} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-full transition shadow-sm border border-gray-100">
                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"/></svg>
                  </button>
-                 <div className="flex-1 flex flex-col items-center justify-center -mt-1">
-                   <div className="flex items-center gap-1.5 mb-0.5">
-                     <span className="text-blue-600 italic font-black text-3xl leading-none tracking-tight">⚡ FULL</span>
-                   </div>
+                 
+                 {/* BLOCO CENTRALIZADO LADO A LADO - CORRIGIDO AQUI TAMBÉM */}
+                 <div className="flex-1 flex items-center justify-center gap-2">
+                   <span className="text-[#00a650] italic font-black text-[28px] leading-none tracking-tight flex items-center">
+                     <svg className="w-6 h-6 mr-0.5 fill-yellow-400 stroke-[#00a650]" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+                     FULL
+                   </span>
                    <span className="font-bold text-slate-800 text-lg uppercase tracking-widest mt-1">Gestor de Envios</span>
                  </div>
+
                  <div className="w-10"></div>
                </div>
              ) : (
@@ -582,17 +582,17 @@ export default function GestorEnviosFull() {
                 const codigosMLUnicos = item.variacoes ? Array.from(new Set(item.variacoes.map(v => v.codigoML))).filter(ml => ml !== 'N/A') : [];
                 return (
                   <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-4 relative overflow-hidden transition-all">
-                    {item.status === 'CONCLUIDO' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>}
+                    {item.status === 'CONCLUIDO' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#00a650]"></div>}
                     <div className="flex justify-between items-start mb-2 pl-2">
                       <div className="flex items-center gap-3 flex-wrap">
                         <div className="font-bold text-gray-900">SKU {item.sku}</div>
                         {codigosMLUnicos.length > 0 && (
-                          <div className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded shadow-sm">
+                          <div className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded shadow-sm">
                             Cód. ML: {codigosMLUnicos.join(', ')}
                           </div>
                         )}
                       </div>
-                      <div className={`text-xs font-semibold px-2 py-1 rounded ${item.status === 'CONCLUIDO' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>{item.quantidadeBipada} / {item.quantidadeTotal}</div>
+                      <div className={`text-xs font-semibold px-2 py-1 rounded ${item.status === 'CONCLUIDO' ? 'bg-green-100 text-[#00a650]' : 'bg-gray-100 text-gray-700'}`}>{item.quantidadeBipada} / {item.quantidadeTotal}</div>
                     </div>
                     <div className="text-xs text-gray-600 mb-4 pl-2 line-clamp-2">{item.descricao}</div>
                     <button onClick={() => setSkuEmBipagem(item)} className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 transition flex items-center justify-center gap-1.5">
@@ -604,14 +604,14 @@ export default function GestorEnviosFull() {
 
               {/* TELA DE BIPAGEM DO PRODUTO */}
               {skuEmBipagem && (
-                <div className={`bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-6 relative transition-all duration-300 ${showSucessoProduto ? 'ring-4 ring-emerald-400 bg-emerald-50' : ''}`}>
+                <div className={`bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-6 relative transition-all duration-300 ${showSucessoProduto ? 'ring-4 ring-[#00a650] bg-green-50' : ''}`}>
                   
                   {showSucessoProduto && (
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm animate-in fade-in">
-                      <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mb-2 shadow-lg animate-bounce">
+                      <div className="w-16 h-16 bg-[#00a650] text-white rounded-full flex items-center justify-center mb-2 shadow-lg animate-bounce">
                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
                       </div>
-                      <span className="font-black text-emerald-700 text-lg">Produto Concluído!</span>
+                      <span className="font-black text-[#00a650] text-lg">Produto Concluído!</span>
                     </div>
                   )}
 
@@ -620,7 +620,7 @@ export default function GestorEnviosFull() {
                       
                       <div className="font-black text-gray-900 text-[15px]">SKU: {skuEmBipagem.sku}</div>
                       {skuEmBipagem.variacoes && skuEmBipagem.variacoes.length > 0 && (
-                        <div className="text-[11px] font-bold text-emerald-700 mt-1">
+                        <div className="text-[11px] font-bold text-green-700 mt-1">
                            Cód. ML: {Array.from(new Set(skuEmBipagem.variacoes.map(v => v.codigoML))).filter(ml => ml !== 'N/A').join(', ')}
                         </div>
                       )}
@@ -628,13 +628,13 @@ export default function GestorEnviosFull() {
                     </div>
                     <div className="text-center bg-white border border-gray-200 p-2 rounded-lg min-w-[70px] shadow-sm flex flex-col justify-center h-max mt-8">
                       <div className="text-[9px] font-bold text-gray-400 uppercase">Bipados</div>
-                      <div className={`text-2xl font-black leading-none mt-1 ${skuEmBipagem.quantidadeBipada >= skuEmBipagem.quantidadeTotal ? 'text-emerald-500' : 'text-gray-900'}`}>{skuEmBipagem.quantidadeBipada}</div>
+                      <div className={`text-2xl font-black leading-none mt-1 ${skuEmBipagem.quantidadeBipada >= skuEmBipagem.quantidadeTotal ? 'text-[#00a650]' : 'text-gray-900'}`}>{skuEmBipagem.quantidadeBipada}</div>
                     </div>
                   </div>
                   
                   <div className="p-5">
                     {!isScanning ? (
-                      <button onClick={() => setIsScanning(true)} className="w-full py-4 bg-emerald-600 text-white font-bold text-[15px] rounded-xl shadow-md hover:bg-emerald-700 transition active:scale-[0.98]">
+                      <button onClick={() => setIsScanning(true)} className="w-full py-4 bg-[#00a650] text-white font-bold text-[15px] rounded-xl shadow-md hover:bg-green-700 transition active:scale-[0.98]">
                         Iniciar Bipagem
                       </button>
                     ) : (
@@ -644,8 +644,8 @@ export default function GestorEnviosFull() {
                           <div className="mb-4">
                             <p className="text-center text-xs font-bold text-gray-500 uppercase mb-2">Confirmar modo de bipagem:</p>
                             <div className="flex gap-2 p-1.5 bg-gray-100 border border-gray-200 rounded-lg">
-                              <button onClick={() => setModoBipagem('SKU_EAN')} className={`flex-1 py-3 text-xs font-bold rounded-md transition ${modoBipagem === 'SKU_EAN' ? 'bg-white text-emerald-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:bg-gray-200'}`}>SKU / EAN</button>
-                              <button onClick={() => setModoBipagem('SERIE')} className={`flex-1 py-3 text-xs font-bold rounded-md transition ${modoBipagem === 'SERIE' ? 'bg-white text-emerald-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:bg-gray-200'}`}>Número de Série</button>
+                              <button onClick={() => setModoBipagem('SKU_EAN')} className={`flex-1 py-3 text-xs font-bold rounded-md transition ${modoBipagem === 'SKU_EAN' ? 'bg-white text-[#00a650] shadow-sm border border-gray-200' : 'text-gray-500 hover:bg-gray-200'}`}>SKU / EAN</button>
+                              <button onClick={() => setModoBipagem('SERIE')} className={`flex-1 py-3 text-xs font-bold rounded-md transition ${modoBipagem === 'SERIE' ? 'bg-white text-[#00a650] shadow-sm border border-gray-200' : 'text-gray-500 hover:bg-gray-200'}`}>Número de Série</button>
                             </div>
                             <button onClick={() => setModoTravado(true)} className="w-full mt-3 py-3 bg-slate-800 text-white text-sm font-bold rounded-lg hover:bg-slate-900 transition shadow-sm">
                               Confirmar & Iniciar
@@ -655,8 +655,8 @@ export default function GestorEnviosFull() {
                           <div className="animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-2">
-                                <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span>
-                                <span className="text-xs font-bold text-emerald-600">Leitor Ativo ({modoBipagem === 'SERIE' ? 'Série' : 'SKU/EAN'})</span>
+                                <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#00a650]"></span></span>
+                                <span className="text-xs font-bold text-[#00a650]">Leitor Ativo ({modoBipagem === 'SERIE' ? 'Série' : 'SKU/EAN'})</span>
                               </div>
                               <button onClick={() => {setModoTravado(false); setMascaraSerie(null);}} className="text-[10px] font-bold text-gray-400 hover:text-gray-700 uppercase bg-gray-100 px-2 py-1 rounded">Trocar Modo</button>
                             </div>
@@ -682,7 +682,7 @@ export default function GestorEnviosFull() {
                                     ? (!mascaraSerie ? "Bipe o 1º Serial para definir o padrão..." : "Bipe o próximo Serial...") 
                                     : "Bipar código..."
                                 } 
-                                className="w-full border-2 border-emerald-500 rounded-xl p-4 text-center font-bold text-gray-800 focus:outline-none focus:ring-4 focus:ring-emerald-100 transition shadow-inner bg-emerald-50 placeholder:text-emerald-300 placeholder:font-medium" 
+                                className="w-full border-2 border-[#00a650] rounded-xl p-4 text-center font-bold text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100 transition shadow-inner bg-green-50 placeholder:text-green-300 placeholder:font-medium" 
                               />
                               <button type="submit" className="hidden"></button>
                             </form>
@@ -699,7 +699,7 @@ export default function GestorEnviosFull() {
                         {[...skuEmBipagem.leituras].reverse().map(l => (
                           <li key={l.id} className="flex justify-between items-center bg-white p-2 rounded-lg shadow-sm border border-gray-100">
                             <div className="flex items-center gap-2">
-                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${l.tipo === 'SERIE' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{l.tipo === 'SERIE' ? 'SÉRIE' : 'SKU/EAN'}</span>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${l.tipo === 'SERIE' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-[#00a650]'}`}>{l.tipo === 'SERIE' ? 'SÉRIE' : 'SKU/EAN'}</span>
                               <span className="text-xs font-semibold text-gray-700">{l.codigo}</span>
                             </div>
                             <button type="button" onClick={() => handleRemoverLeitura(l.id)} className="text-gray-300 hover:text-red-500 p-1 transition">
