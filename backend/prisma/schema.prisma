@@ -119,18 +119,20 @@ model InboundFull {
 
 model InboundSku {
   id               Int         @id @default(autoincrement())
-  
+
   inboundId        Int
   inbound          InboundFull @relation(fields: [inboundId], references: [id], onDelete: Cascade)
-  
+
   sku              String      
   descricao        String      
   quantidadeTotal  Int         
   quantidadeBipada Int         @default(0) 
+
+  status           String      @default("PENDENTE")
+  variacoes        Json?       
   
-  status           String      @default("PENDENTE") // PENDENTE ou CONCLUIDO
-  variacoes        Json?       // Guarda os códigos ML/EAN
-  
+  leituras         Json?       
+
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 }

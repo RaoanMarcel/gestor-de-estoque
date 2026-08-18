@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import ExcelJS from 'exceljs'; 
 
 const prisma = new PrismaClient();
 
-// Tradutor de ZPL: Transforma códigos Hexadecimais (_C3_B3) em Acentos Reais (ó)
 const decodeZPLText = (text: string) => {
   const urlEncoded = text.replace(/_([0-9A-Fa-f]{2})/g, '%$1');
   try {
@@ -23,29 +23,20 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Nenhum arquivo TXT foi enviado.' });
     }
 
-    // Lê o conteúdo do arquivo TXT/ZPL
     const zplData = arquivoTxt.buffer.toString('utf-8');
-
-    // Corta o texto a cada nova etiqueta (^XA)
     const blocos = zplData.split(/\^XA/i).filter((b: string) => b.trim() !== '');
     const produtosRaw: any[] = [];
 
     for (const bloco of blocos) {
       if (!bloco.includes('^XZ')) continue;
 
-      // 1. Extrai o Código ML
       const matchML = bloco.match(/\^BCN,.*?\^FD([A-Z0-9]+)\^FS/i) || bloco.match(/\^FD([A-Z0-9]{7,15})\^FS/i);
       const ml = matchML ? matchML[1] : 'N/A';
-
-      // 2. Extrai o SKU
       const matchSKU = bloco.match(/\^FDSKU:\s*([A-Z0-9\-]+)\^FS/i);
       const sku = matchSKU ? matchSKU[1] : 'N/A';
-
-      // 3. Extrai a Quantidade
       const matchQtd = bloco.match(/\^PQ(\d+)/i);
       const quantidade = matchQtd ? parseInt(matchQtd[1], 10) : 1;
 
-      // 4. Extrai a Descrição
       const todosFDs = Array.from(bloco.matchAll(/\^FD(.*?)\^FS/gi)).map((m: any) => m[1]);
       let descricao = 'Produto (Sem descrição)';
 
@@ -66,7 +57,6 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
       }
     }
 
-    // 5. AGRUPAMENTO INTELIGENTE DAS GAVETAS (SKUs Repetidos)
     const skusExtraidos: any[] = [];
 
     for (const p of produtosRaw) {
@@ -100,12 +90,11 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
 
     const totalUnidadesCalc = skusExtraidos.reduce((acc, item) => acc + item.quantidadeTotal, 0);
 
-    // 6. PERSISTÊNCIA NO BANCO
     const novoInbound = await prisma.inboundFull.create({
       data: {
         numeroFrete: null,
         nomePallet,
-        status: 'PENDENTE', // Status Vermelho
+        status: 'PENDENTE', 
         usuarioId: usuarioId ? Number(usuarioId) : null,
         skus: {
           create: skusExtraidos.map(item => ({
@@ -114,7 +103,8 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
             quantidadeTotal: item.quantidadeTotal,
             quantidadeBipada: 0,
             status: 'PENDENTE',
-            variacoes: item.variacoes 
+            variacoes: item.variacoes,
+            leituras: [] // Inicializando o JSON de leituras
           }))
         }
       },
@@ -134,16 +124,11 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
   }
 };
 
-// ==========================================
-// CONTROLADORES DE ATIVOS E DASHBOARD
-// ==========================================
-
 export const cadastrarMotorista = async (req: Request, res: Response) => {
   try {
     const { nome } = req.body;
     if (!nome) return res.status(400).json({ error: 'O nome do motorista é obrigatório.' });
 
-    // VERIFICA DUPLICIDADE IGNORANDO MAIÚSCULAS/MINÚSCULAS
     const existe = await prisma.motorista.findFirst({
       where: { nome: { equals: nome.trim(), mode: 'insensitive' } }
     });
@@ -166,7 +151,6 @@ export const cadastrarVeiculo = async (req: Request, res: Response) => {
     const { modelo, placa } = req.body;
     if (!modelo || !placa) return res.status(400).json({ error: 'Modelo e placa são obrigatórios.' });
 
-    // VERIFICA DUPLICIDADE PELA PLACA FORÇANDO MAIÚSCULAS
     const placaLimpa = placa.trim().toUpperCase();
     const existe = await prisma.veiculo.findUnique({ where: { placa: placaLimpa } });
     
@@ -189,8 +173,14 @@ export const listarDashboard = async (req: Request, res: Response) => {
   try {
     const motoristas = await prisma.motorista.findMany({ orderBy: { nome: 'asc' } });
     const veiculos = await prisma.veiculo.findMany({ orderBy: { placa: 'asc' } });
+    
     const inbounds = await prisma.inboundFull.findMany({ 
-      include: { motorista: true, veiculo: true, skus: true },
+      include: { 
+        motorista: true, 
+        veiculo: true, 
+        usuario: true,
+        skus: true
+      },
       orderBy: { createdAt: 'desc' }
     });
     
@@ -201,26 +191,35 @@ export const listarDashboard = async (req: Request, res: Response) => {
   }
 };
 
-// ==========================================
-// FINALIZAÇÃO GLOBAL DA CARGA (INBOUND)
-// ==========================================
-
 export const finalizarInbound = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { motoristaId, veiculoId } = req.body;
+    const { motoristaId, veiculoId, skus } = req.body; 
 
     const inboundAtualizado = await prisma.inboundFull.update({
       where: { id: Number(id) },
       data: {
-        status: 'CONCLUIDO', // Status Amarelo
+        status: 'CONCLUIDO',
         motoristaId: motoristaId ? Number(motoristaId) : null,
         veiculoId: veiculoId ? Number(veiculoId) : null,
       }
     });
 
+    if (skus && Array.isArray(skus)) {
+      for (const sku of skus) {
+        await prisma.inboundSku.update({
+          where: { id: sku.id },
+          data: {
+            quantidadeBipada: sku.quantidadeBipada,
+            status: sku.status,
+            leituras: sku.leituras 
+          }
+        });
+      }
+    }
+
     return res.status(200).json({ 
-      mensagem: 'Carga Inbound finalizada com sucesso!', 
+      mensagem: 'Carga e Produtos salvos no banco com sucesso!', 
       inbound: inboundAtualizado 
     });
   } catch (error) {
@@ -229,28 +228,94 @@ export const finalizarInbound = async (req: Request, res: Response) => {
   }
 };
 
-// ==========================================
-// AÇÕES DO COORDENADOR (EXCLUIR / ENVIAR) - DEV MODE
-// ==========================================
-
 export const acaoCoordenador = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { acao } = req.body;
 
-    // DEV MODE: Validação de senha removida para testes.
-    // Posteriormente, adicionar validação baseada no token/cargo do usuário logado.
-
     if (acao === 'EXCLUIR') {
       await prisma.inboundFull.delete({ where: { id: Number(id) } });
       return res.status(200).json({ mensagem: 'O Envio foi removido do sistema!' });
     } 
-    else if (acao === 'ENVIAR') {
-      await prisma.inboundFull.update({
-        where: { id: Number(id) },
-        data: { status: 'ENVIADO' } // Status Verde
+    else if (acao === 'ENVIAR' || acao === 'REIMPRIMIR') {
+      
+      let inboundAtualizado;
+      if (acao === 'ENVIAR') {
+        inboundAtualizado = await prisma.inboundFull.update({
+          where: { id: Number(id) },
+          data: { status: 'ENVIADO' }, 
+          include: { motorista: true, veiculo: true, skus: true, usuario: true }
+        });
+      } else {
+        inboundAtualizado = await prisma.inboundFull.findUnique({
+          where: { id: Number(id) },
+          include: { motorista: true, veiculo: true, skus: true, usuario: true }
+        });
+      }
+
+      if (!inboundAtualizado) return res.status(404).json({ error: 'Envio não encontrado.' });
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Rastreabilidade Full');
+
+      worksheet.columns = [
+        { header: 'ID do Envio / Pallet', key: 'pallet', width: 25 },
+        { header: 'Motorista', key: 'motorista', width: 25 },
+        { header: 'Placa do Veículo', key: 'veiculo', width: 18 },
+        { header: 'Operador Responsável', key: 'usuario', width: 22 },
+        { header: 'Data do Despacho (Bipagem)', key: 'dataBipagem', width: 25 }, 
+        { header: 'SKU Bipado', key: 'sku', width: 15 },
+        { header: 'Descrição do Produto', key: 'descricao', width: 45 },
+        { header: 'Serial / EAN Lido', key: 'serial', width: 25 }, 
+      ];
+
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00A650' } }; 
+
+      inboundAtualizado.skus.forEach((sku: any) => { // 'any' aqui contorna o erro temporário de tipagem do Prisma
+        let arrayLeituras: any[] = [];
+        
+        if (sku.leituras) {
+          if (typeof sku.leituras === 'string') {
+            try { arrayLeituras = JSON.parse(sku.leituras); } catch (e) { arrayLeituras = []; }
+          } else if (Array.isArray(sku.leituras)) {
+            arrayLeituras = sku.leituras;
+          }
+        }
+
+        if (arrayLeituras.length === 0) {
+          worksheet.addRow({
+            pallet: inboundAtualizado?.nomePallet,
+            motorista: inboundAtualizado?.motorista?.nome || 'Não definido',
+            veiculo: inboundAtualizado?.veiculo?.placa || 'Não definido',
+            usuario: inboundAtualizado?.usuario?.username || 'Sistema',
+            dataBipagem: '-',
+            sku: sku.sku,
+            descricao: sku.descricao,
+            serial: 'Bipagem Sem Serial'
+          });
+        } else {
+          arrayLeituras.forEach(leitura => {
+            worksheet.addRow({
+              pallet: inboundAtualizado?.nomePallet,
+              motorista: inboundAtualizado?.motorista?.nome || 'Não definido',
+              veiculo: inboundAtualizado?.veiculo?.placa || 'Não definido',
+              usuario: inboundAtualizado?.usuario?.username || 'Sistema',
+              dataBipagem: leitura.data ? new Date(leitura.data).toLocaleString('pt-BR') : '-',
+              sku: sku.sku,
+              descricao: sku.descricao,
+              serial: leitura.codigo
+            });
+          });
+        }
       });
-      return res.status(200).json({ mensagem: 'O Envio foi marcado como despachado!' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=Rastreabilidade_${inboundAtualizado.nomePallet}.xlsx`);
+
+      await workbook.xlsx.write(res);
+      return res.end();
     }
 
     return res.status(400).json({ error: 'Ação desconhecida.' });
