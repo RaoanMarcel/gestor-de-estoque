@@ -12,7 +12,14 @@ interface InboundSKU {
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-const gerarMascara = (str: string) => str.replace(/[0-9]/g, 'N').replace(/[a-zA-Z]/g, 'L');
+
+// 🚀 ALTERAÇÃO: Máscara Posicional Estrita Restaurada!
+// Transforma Letras em "L" e Números em "N". Se o primeiro for D5J... a máscara crava LNL...
+// Qualquer tentativa de bipar 609... (NNN...) será bloqueada imediatamente.
+const gerarMascara = (str: string) => {
+  if (!str) return '';
+  return str.toUpperCase().replace(/[0-9]/g, 'N').replace(/[A-Z]/g, 'L');
+};
 
 export default function GestorEnviosFull() {
   const navigate = useNavigate();
@@ -41,7 +48,6 @@ export default function GestorEnviosFull() {
   const [showModalFinalizarEnvio, setShowModalFinalizarEnvio] = useState(false);
   const [motoristaSelecionado, setMotoristaSelecionado] = useState('');
   const [veiculoSelecionado, setVeiculoSelecionado] = useState('');
-  const [isEditandoEnvio, setIsEditandoEnvio] = useState(false); 
   
   const [showModalMotorista, setShowModalMotorista] = useState(false);
   const [nomeMotorista, setNomeMotorista] = useState('');
@@ -51,7 +57,6 @@ export default function GestorEnviosFull() {
 
   const [showMotoristasList, setShowMotoristasList] = useState(false);
   const [showVeiculosList, setShowVeiculosList] = useState(false);
-  // 🚀 NOVIDADE: Estado para controlar a visibilidade do bloco inteiro de Ativos
   const [showGerenciamentoAtivos, setShowGerenciamentoAtivos] = useState(false);
 
   const [termoBusca, setTermoBusca] = useState('');
@@ -97,6 +102,26 @@ export default function GestorEnviosFull() {
   useEffect(() => {
     if (modoTravado && inputBipagemRef.current) inputBipagemRef.current.focus();
   }, [modoTravado, showModalFinalizarEnvio, showSucessoProduto]);
+
+  // 🚀 NOVIDADE: Sincronização em Tempo Real (Auto-Save)
+  // Envia as leituras direto para o PostgreSQL em background para não perder dados ao fechar a tela.
+  const autoSalvarBackground = async (skusAtualizados: InboundSKU[]) => {
+    if (!inboundData) return;
+    try {
+      const token = localStorage.getItem('wms_token');
+      await fetch(`${API_URL}/inbounds/${inboundData.id}/finalizar`, {
+        method: 'PUT', 
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ 
+           motoristaId: motoristaSelecionado || null, 
+           veiculoId: veiculoSelecionado || null, 
+           skus: skusAtualizados 
+        })
+      });
+    } catch (err) {
+      console.error('Falha no auto-save em background:', err);
+    }
+  };
 
   const handleSalvarMotorista = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,6 +261,20 @@ export default function GestorEnviosFull() {
     setMascaraSerie(null);
   };
 
+  const handleAbrirProduto = (item: InboundSKU) => {
+    setSkuEmBipagem(item);
+    
+    let leiturasArray: any[] = [];
+    try { leiturasArray = typeof item.leituras === 'string' ? JSON.parse(item.leituras as string) : (item.leituras || []); } catch(e){}
+    
+    const primeiraSerie = leiturasArray.find((l: any) => l.tipo === 'SERIE');
+    if (primeiraSerie) {
+      setMascaraSerie(gerarMascara(primeiraSerie.codigo));
+    } else {
+      setMascaraSerie(null);
+    }
+  };
+
   const salvarEdicaoAtivosTela3 = async () => {
     if (!inboundData || !motoristaSelecionado || !veiculoSelecionado) return toast.error("Selecione motorista e veículo.");
     try {
@@ -285,11 +324,18 @@ export default function GestorEnviosFull() {
     } else if (modoBipagem === 'SERIE') {
       if (isSku || isEan) { toast.error('Você bipou um SKU/EAN no campo de Série!'); setCodigoLido(''); return; }
       if (skuEmBipagem.leituras?.some(l => l.codigo === codigoLimpo)) { toast.error('Duplicidade: Número JÁ FOI bipado!'); setCodigoLido(''); return; }
+      
       const mascaraAtual = gerarMascara(codigoLimpo);
       if (!mascaraSerie) { setMascaraSerie(mascaraAtual); isValid = true; } 
       else {
-        if (mascaraAtual === mascaraSerie) isValid = true;
-        else { toast.error(`Formato Incorreto! O serial deve ser (${mascaraSerie.length} caracteres).`); setCodigoLido(''); return; }
+        if (mascaraAtual === mascaraSerie) {
+          isValid = true;
+        } else { 
+          // Notifica o erro detalhado da trava posicional
+          toast.error(`Incorreto! Padrão exigido: ${mascaraSerie} (L=Letra, N=Número)`); 
+          setCodigoLido(''); 
+          return; 
+        }
       }
     }
 
@@ -310,6 +356,9 @@ export default function GestorEnviosFull() {
       setSkus(updatedSkus);
       setSkuEmBipagem(updatedSkus.find(s => s.id === skuEmBipagem.id) || null);
       
+      // 🚀 AUTO-SAVE: Envia o Bip direto para o banco de dados
+      autoSalvarBackground(updatedSkus);
+
       const todosConcluidosLocal = updatedSkus.every(sku => sku.quantidadeBipada >= sku.quantidadeTotal);
       setDashboardData(prev => ({
         ...prev,
@@ -352,6 +401,9 @@ export default function GestorEnviosFull() {
     });
     setSkus(updatedSkus);
     setSkuEmBipagem(updatedSkus.find(s => s.id === skuEmBipagem.id) || null);
+
+    // 🚀 AUTO-SAVE: Salva a remoção imediatamente no banco
+    autoSalvarBackground(updatedSkus);
 
     setDashboardData(prev => ({
       ...prev,
@@ -557,7 +609,6 @@ export default function GestorEnviosFull() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg> Adicionar Novo Envio
               </button>
               
-              {/* 🚀 MUDANÇA: Bloco Gerenciamento de Ativos "Escondido" via Sanfona */}
               <div className="border border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm mb-6">
                 <button onClick={() => setShowGerenciamentoAtivos(!showGerenciamentoAtivos)} className="w-full px-4 py-3 flex items-center justify-between bg-white hover:bg-gray-50 transition">
                   <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider m-0">Gerenciamento de Ativos</h3>
@@ -629,7 +680,6 @@ export default function GestorEnviosFull() {
                 />
               </div>
 
-              {/* 🚀 MUDANÇA: Data e Checkboxes movidos para baixo do input de busca */}
               <div className="mb-4 mt-2">
                 <label className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-3 block">Data</label>
                 <div className="flex items-center w-full border border-gray-300 rounded-lg overflow-hidden shadow-sm bg-white">
@@ -885,7 +935,7 @@ export default function GestorEnviosFull() {
                       </div>
                     )}
 
-                    <button onClick={() => setSkuEmBipagem(item)} className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 transition flex items-center justify-center gap-1.5 mt-3">
+                    <button onClick={() => handleAbrirProduto(item)} className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 transition flex items-center justify-center gap-1.5 mt-3">
                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Abrir Produto
                     </button>
                   </div>
