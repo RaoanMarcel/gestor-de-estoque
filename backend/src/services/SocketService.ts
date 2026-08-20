@@ -9,7 +9,10 @@ export class SocketService {
   private io: Server | null = null;
   
   private activeUsersInRooms: Map<string, Set<string>> = new Map();
-  private socketData: Map<string, { username: string; rooms: Set<string> }> = new Map();
+  
+  // 🚀 NOVIDADE: Mapa para rastrear SKUs bloqueados e os dados dos sockets conectados
+  private lockedSkus: Map<string, string> = new Map(); // skuId -> username
+  private socketData: Map<string, { username: string; rooms: Set<string>; lockedSkus: Set<string> }> = new Map();
 
   private constructor() {}
 
@@ -43,9 +46,34 @@ export class SocketService {
       console.log(`🔌 Conectado: ${username} [${socket.id}]`);
       
       socket.join('global_malha');
-      this.socketData.set(socket.id, { username, rooms: new Set() });
+      this.socketData.set(socket.id, { username, rooms: new Set(), lockedSkus: new Set() });
       
       socket.emit('presence:global_update', this.getGlobalPresenceData());
+      
+      // 🚀 Envia a lista atual de SKUs bloqueados para quem acabou de entrar
+      socket.emit('sku_locks_initial', Object.fromEntries(this.lockedSkus));
+
+      // ==========================================
+      // 🚀 LÓGICA DE TRAVA DE CONCORRÊNCIA (SKU)
+      // ==========================================
+      socket.on('lock_sku', ({ skuId, usuario }: { skuId: string, usuario: string }) => {
+        const currentLock = this.lockedSkus.get(String(skuId));
+        
+        if (currentLock && currentLock !== username) {
+          // Já está bloqueado por outra pessoa, avisa o infrator!
+          socket.emit('sku_locked_error', { skuId, usuario: currentLock });
+        } else {
+          // Bloqueia com sucesso e avisa a malha global
+          this.lockedSkus.set(String(skuId), username);
+          this.socketData.get(socket.id)!.lockedSkus.add(String(skuId));
+          this.io!.emit('sku_lock_update', { skuId: String(skuId), lockedBy: username });
+        }
+      });
+
+      socket.on('unlock_sku', ({ skuId }: { skuId: string }) => {
+        this.unlockSku(socket, String(skuId));
+      });
+      // ==========================================
 
       socket.on('subscribe:pallet', (palletId: string | number) => {
         const sala = `pallet_${palletId}`;
@@ -68,13 +96,25 @@ export class SocketService {
         console.log(`❌ Desconectado: ${username} [${socket.id}]`);
         const userData = this.socketData.get(socket.id);
         if (userData) {
+          // 🚀 Libera todos os pallets E SKUs que a pessoa estava olhando quando caiu a internet
           userData.rooms.forEach(palletId => {
             this.removeUserFromRoom(socket, palletId, username);
+          });
+          userData.lockedSkus.forEach(skuId => {
+            this.unlockSku(socket, skuId);
           });
         }
         this.socketData.delete(socket.id);
       });
     });
+  }
+
+  // 🚀 Função auxiliar para destravar o SKU
+  private unlockSku(socket: Socket, skuId: string) {
+    this.lockedSkus.delete(skuId);
+    const userData = this.socketData.get(socket.id);
+    if (userData) userData.lockedSkus.delete(skuId);
+    this.io?.emit('sku_lock_update', { skuId, lockedBy: null });
   }
 
   private removeUserFromRoom(socket: Socket, palletId: string, username: string) {

@@ -119,16 +119,13 @@ model InboundFull {
 
 model InboundSku {
   id               Int         @id @default(autoincrement())
-
   inboundId        Int
   inbound          InboundFull @relation(fields: [inboundId], references: [id], onDelete: Cascade)
-
   sku              String      
   descricao        String      
   quantidadeTotal  Int         
   quantidadeBipada Int         @default(0) 
-
-  status           String      @default("PENDENTE")
+  status           String      @default("PENDENTE") 
   variacoes        Json?       
   
   leituras         Json?       
