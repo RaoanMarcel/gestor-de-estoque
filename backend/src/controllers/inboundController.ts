@@ -135,11 +135,9 @@ export const finalizarInbound = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { motoristaId, veiculoId, skus } = req.body; 
 
-    // Busca o status atual no banco para não perder se já tiver sido ENVIADO
     const inboundDb = await prisma.inboundFull.findUnique({ where: { id: Number(id) }, include: { skus: true } });
     if (!inboundDb) return res.status(404).json({ error: 'Envio não encontrado' });
 
-    // Salva a Bipagem dos SKUs
     if (skus && Array.isArray(skus)) {
       for (const sku of skus) {
         const skuStatus = sku.quantidadeBipada >= sku.quantidadeTotal ? 'CONCLUIDO' : (sku.quantidadeBipada > 0 ? 'EM_PROCESSO' : 'PENDENTE');
@@ -150,7 +148,6 @@ export const finalizarInbound = async (req: Request, res: Response) => {
       }
     }
 
-    // 🚀 LÓGICA DE STATUS GERAL DO PALLET
     const skusParaCalculo = skus && Array.isArray(skus) ? skus : inboundDb.skus;
     const totalEsperado = skusParaCalculo.reduce((acc: number, s: any) => acc + s.quantidadeTotal, 0);
     const totalBipado = skusParaCalculo.reduce((acc: number, s: any) => acc + s.quantidadeBipada, 0);
@@ -166,7 +163,7 @@ export const finalizarInbound = async (req: Request, res: Response) => {
         if (motoristaId && veiculoId) {
           statusDesejado = 'CONCLUIDO';
         } else {
-          statusDesejado = 'EM_PROCESSO'; // Falta motorista e veículo para ser concluído
+          statusDesejado = 'EM_PROCESSO';
         }
       }
     }
@@ -248,12 +245,17 @@ export const acaoCoordenador = async (req: Request, res: Response) => {
           });
         } else {
           arrayLeituras.forEach(leitura => {
+            // 🚀 MUDANÇA: Formatação de data com fuso horário forçado (UTC-3 São Paulo)
+            const dataFormatada = leitura.data 
+                ? new Date(leitura.data).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) 
+                : '-';
+
             worksheet.addRow({
               pallet: inboundAtualizado?.nomePallet,
               usuarioImportou: inboundAtualizado?.usuario?.username || 'Sistema',
               motorista: inboundAtualizado?.motorista?.nome || 'Não definido',
               veiculo: inboundAtualizado?.veiculo?.placa || 'Não definido',
-              dataBipagem: leitura.data ? new Date(leitura.data).toLocaleString('pt-BR') : '-',
+              dataBipagem: dataFormatada,
               sku: sku.sku,
               descricao: sku.descricao,
               serial: leitura.codigo,

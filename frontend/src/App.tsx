@@ -24,10 +24,8 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   const podeVerFull = permissoes.some(p => p.startsWith('full'));
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  // 🚀 ALTERAÇÃO: Estado novo para controlar o Menu Mobile (Gaveta)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 🚀 ALTERAÇÃO: Unifica a lógica. A barra deve abrir no hover do PC OU no clique do mobile.
   const isOpen = isSidebarOpen || isMobileMenuOpen;
 
   const handleLogout = () => {
@@ -43,7 +41,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] antialiased overflow-hidden relative">
       
-      {/* 🚀 ALTERAÇÃO: Fundo escuro (Backdrop) visível apenas no mobile quando o menu está aberto */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden animate-in fade-in"
@@ -51,7 +48,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* 🚀 ALTERAÇÃO: Comportamento Side Drawer (Off-canvas) no Mobile e Sidebar normal no Desktop */}
       <aside 
         onMouseEnter={() => setIsSidebarOpen(true)}
         onMouseLeave={() => setIsSidebarOpen(false)}
@@ -61,11 +57,12 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
         `}
       >
         <div className="flex h-16 items-center border-b border-[var(--sidebar-border)] shrink-0 px-5 overflow-hidden">
-          <div className="flex items-center h-8 w-8 rounded-lg bg-blue-600 text-white shrink-0 justify-center shadow-sm">
+          {/* 🚀 MUDANÇA: Logotipo Azul agora é um botão para fechar a sidebar no mobile */}
+          <button type="button" onClick={closeMobileMenu} className="flex items-center h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors text-white shrink-0 justify-center shadow-sm cursor-pointer">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-[18px] h-[18px]">
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l3 1.75M9 20.25v-9" />
             </svg>
-          </div>
+          </button>
           <span className={`font-bold tracking-wide text-white whitespace-nowrap overflow-hidden transition-all duration-300 ${isOpen ? 'w-auto max-w-[180px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
             Gestão de Estoque
           </span>
@@ -113,7 +110,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
           )}
         </nav>
 
-        {/* 🚀 ALTERAÇÃO: Agrupamento Inferior. Preso com mt-auto para celular e computador. */}
         <div className="mt-auto border-t border-[var(--sidebar-border)] p-3 flex flex-col gap-1 overflow-hidden shrink-0">
           
           <Link onClick={closeMobileMenu} to="/configuracoes" title="Configurações" className={`flex items-center h-11 px-3 rounded-lg transition-all duration-200 shrink-0 ${isActive('/configuracoes') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
@@ -161,7 +157,6 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
       {/* ÁREA DIREITA (CONTEÚDO) */}
       <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-main)] overflow-hidden">
         
-        {/* 🚀 ALTERAÇÃO: Cabeçalho Exclusivo Mobile para acionar o Sanduíche */}
         <header className="md:hidden flex items-center justify-between h-16 shrink-0 px-4 bg-[var(--header-bg)] border-b border-[var(--header-border)] z-30">
           <div className="flex items-center gap-3">
             <button onClick={() => setIsMobileMenuOpen(true)} className="text-[var(--text-main)] p-2 -ml-2 rounded-lg bg-[var(--bg-panel)] border border-[var(--border-color)] shadow-sm">
@@ -176,7 +171,7 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Cabeçalho Desktop (Permanece Oculto no Mobile e Oculto na Rota do Full) */}
+        {/* Cabeçalho Desktop */}
         {!isActive('/mercado-full') && (
           <header className="hidden md:flex h-16 shrink-0 items-center justify-between px-6 bg-[var(--header-bg)] border-b border-[var(--header-border)] backdrop-blur-xl z-30">
             <div className="text-[var(--header-text)] text-xs font-semibold tracking-wide uppercase">
