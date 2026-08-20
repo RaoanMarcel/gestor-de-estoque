@@ -7,7 +7,7 @@ interface Variacao { codigoML: string; codigoUniversal: string; quantidade: numb
 interface Leitura { id: string; codigo: string; tipo: 'SKU_EAN' | 'SERIE'; data: string; usuarioNome: string; }
 interface InboundSKU {
   id: number; sku: string; descricao: string; quantidadeTotal: number;
-  quantidadeBipada: number; status: 'PENDENTE' | 'CONCLUIDO';
+  quantidadeBipada: number; status: 'PENDENTE' | 'EM_PROCESSO' | 'CONCLUIDO';
   variacoes?: Variacao[]; leituras?: Leitura[];
   updatedAt?: string;
 }
@@ -67,6 +67,9 @@ export default function GestorEnviosFull() {
   
   const [modoTravado, setModoTravado] = useState(false);
   const [showSucessoProduto, setShowSucessoProduto] = useState(false);
+  
+  // 🚀 NOVO ESTADO: Controle manual da exibição do teclado no celular
+  const [tecladoLiberado, setTecladoLiberado] = useState(false);
   
   const [modoConfirmModal, setModoConfirmModal] = useState<{isOpen: boolean, novoModo: 'SKU_EAN' | 'SERIE' | null}>({ isOpen: false, novoModo: null });
   
@@ -140,8 +143,11 @@ export default function GestorEnviosFull() {
   useEffect(() => { carregarDashboard(); }, []);
 
   useEffect(() => {
-    if (modoTravado && inputBipagemRef.current) inputBipagemRef.current.focus();
-  }, [modoTravado, showModalFinalizarEnvio, showSucessoProduto]);
+    if (modoTravado && inputBipagemRef.current) {
+      // Pequeno timeout para garantir que o input pegou foco ao alternar a liberação do teclado
+      setTimeout(() => inputBipagemRef.current?.focus(), 50);
+    }
+  }, [modoTravado, showModalFinalizarEnvio, showSucessoProduto, tecladoLiberado]);
 
   const autoSalvarBackground = async (skusAtualizados: InboundSKU[]) => {
     if (!inboundData) return;
@@ -242,6 +248,7 @@ export default function GestorEnviosFull() {
     if (lockedSkus[item.id] && lockedSkus[item.id] !== getUsuarioLogado()) {
       return toast.error(`Atenção! O usuário ${lockedSkus[item.id]} já está conferindo este produto agora mesmo.`);
     }
+    
     socket.emit('lock_sku', { skuId: item.id, usuario: getUsuarioLogado() });
 
     setSkuEmBipagem(item);
@@ -266,6 +273,7 @@ export default function GestorEnviosFull() {
     setModoTravado(false);
     setCodigoLido('');
     setShowSucessoProduto(false);
+    setTecladoLiberado(false); // Reseta o teclado ao voltar
   };
 
   const salvarEdicaoAtivosTela3 = async () => {
@@ -346,9 +354,15 @@ export default function GestorEnviosFull() {
       setSkuEmBipagem(updatedSkus.find(s => s.id === skuEmBipagem.id) || null);
       autoSalvarBackground(updatedSkus);
 
-      if (novoStatusSku === 'CONCLUIDO') {
+      const todosConcluidosLocal = updatedSkus.every(sku => sku.quantidadeBipada >= sku.quantidadeTotal);
+      
+      if (todosConcluidosLocal) {
+        setInboundData((prev: any) => prev ? { ...prev, status: 'CONCLUIDO' } : null);
         setShowSucessoProduto(true);
-        setTimeout(() => { fecharModoBipagem(); toast.success('SKU Bipado 100%!'); }, 1500);
+        setTimeout(() => { fecharModoBipagem(); toast.success('Carga Concluída!'); }, 1500);
+      } else if (novaQtd >= skuEmBipagem.quantidadeTotal) {
+        setShowSucessoProduto(true);
+        setTimeout(() => { fecharModoBipagem(); }, 1500);
       }
     }
     setCodigoLido(''); 
@@ -424,7 +438,6 @@ export default function GestorEnviosFull() {
     });
   }) || [];
 
-  // 🚀 Variável auxiliar para checar se todos os SKUs da tela 3 estão bipados
   const todosSkusConcluidosNaTela = skus.length > 0 && skus.every(s => s.quantidadeBipada >= s.quantidadeTotal);
 
   return (
@@ -700,7 +713,6 @@ export default function GestorEnviosFull() {
                   </div>
                 </div>
 
-                {/* 🚀 MUDANÇA: Dropdown de Motorista e Veículo SÓ aparecem se TUDO estiver bipado */}
                 {todosSkusConcluidosNaTela && inboundData.status !== 'ENVIADO' && (
                   <div className="bg-white p-4 border-b border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
                      <div className="flex-1 w-full">
@@ -723,7 +735,6 @@ export default function GestorEnviosFull() {
                   </div>
                 )}
 
-                {/* Mostra frota de forma inativa se o envio já partiu */}
                 {inboundData.status === 'ENVIADO' && (
                   <div className="bg-white p-4 border-b border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
                      <div className="flex-1 w-full">
@@ -745,12 +756,11 @@ export default function GestorEnviosFull() {
 
             <div className="flex-1 overflow-y-auto p-4">
               
-              {/* 🚀 MUDANÇA: Ordenação Inteligente - Em Processo (Amarelo) -> Pendente (Vermelho) -> Concluído (Verde) */}
               {!skuEmBipagem && [...skus].sort((a, b) => {
                 const getPriority = (sku: any) => {
-                  if (sku.quantidadeBipada > 0 && sku.quantidadeBipada < sku.quantidadeTotal) return 1; // Prioridade MÁXIMA (Em processo)
-                  if (sku.quantidadeBipada === 0) return 2; // Prioridade MÉDIA (Falta iniciar)
-                  return 3; // Prioridade BAIXA (Concluído)
+                  if (sku.quantidadeBipada > 0 && sku.quantidadeBipada < sku.quantidadeTotal) return 1; 
+                  if (sku.quantidadeBipada === 0) return 2; 
+                  return 3; 
                 };
                 return getPriority(a) - getPriority(b);
               }).map(item => {
@@ -821,7 +831,7 @@ export default function GestorEnviosFull() {
                 );
               })}
 
-              {/* TELA DE BIPAGEM ========================================================================================= */}
+              {/* TELA DE BIPAGEM POR PRODUTO */}
               {skuEmBipagem && (
                 <div className={`bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-6 relative transition-all duration-300 ${showSucessoProduto ? 'ring-4 ring-[#00a650] bg-green-50' : ''}`}>
                   
@@ -929,8 +939,25 @@ export default function GestorEnviosFull() {
                                   <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#00a650]"></span></span>
                                   <span className="text-xs font-bold text-[#00a650]">Leitor Ativo ({modoBipagem === 'SERIE' ? 'Série' : 'SKU/EAN'})</span>
                                 </div>
-                                {/* 🚀 MUDANÇA: O botão Trocar Modo volta a ficar aqui para agilizar (mas pede confirmação) */}
-                                <button onClick={() => setModoConfirmModal({ isOpen: true, novoModo: modoBipagem === 'SERIE' ? 'SKU_EAN' : 'SERIE' })} className="text-[11px] font-bold text-[#64748b] hover:text-slate-800 uppercase bg-slate-200 px-3 py-1.5 rounded-md transition-colors">Trocar Modo</button>
+                                
+                                <div className="flex items-center gap-2">
+                                  {/* 🚀 NOVO BOTÃO: Liga/Desliga Teclado */}
+                                  <button 
+                                    type="button" 
+                                    onClick={() => {
+                                      setTecladoLiberado(!tecladoLiberado);
+                                      if (!tecladoLiberado) setTimeout(() => inputBipagemRef.current?.focus(), 100);
+                                    }} 
+                                    className={`flex items-center gap-1.5 text-[10px] font-bold uppercase px-2.5 py-1.5 rounded-md transition-colors border ${tecladoLiberado ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-inner' : 'bg-slate-100 text-[#64748b] border-transparent hover:bg-slate-200'}`}
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      {tecladoLiberado ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />}
+                                    </svg>
+                                    Teclado
+                                  </button>
+
+                                  <button onClick={() => setModoConfirmModal({ isOpen: true, novoModo: modoBipagem === 'SERIE' ? 'SKU_EAN' : 'SERIE' })} className="text-[10px] font-bold text-[#64748b] hover:text-slate-800 uppercase bg-slate-200 px-3 py-1.5 rounded-md transition-colors">Trocar Modo</button>
+                                </div>
                               </div>
 
                               {modoBipagem === 'SERIE' && mascaraSerie && (
@@ -952,7 +979,7 @@ export default function GestorEnviosFull() {
                                 <input 
                                   ref={inputBipagemRef} 
                                   type="text" 
-                                  inputMode="none" // Esconde o teclado nativamente no celular
+                                  inputMode={tecladoLiberado ? "text" : "none"} // 🚀 Alterna nativamente entre teclado visível ou oculto
                                   autoComplete="off"
                                   value={codigoLido} 
                                   onChange={(e) => setCodigoLido(e.target.value)} 
