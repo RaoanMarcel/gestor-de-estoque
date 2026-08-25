@@ -16,15 +16,12 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
     let usuarioId = (req as any).usuario?.id || (req as any).user?.id || (req as any).usuarioId || null;
     const usuarioImportadorFront = req.body.usuarioImportador;
 
-    // 🚀 BUSCA FORÇADA NO BANCO: Se o ID não vier no token, busca pelo nome que o Front enviou
     if (!usuarioId && usuarioImportadorFront && usuarioImportadorFront !== 'Operador_X') {
       try {
         const userDb = await prisma.usuario.findFirst({
           where: { 
             OR: [
               { username: { equals: String(usuarioImportadorFront), mode: 'insensitive' } }
-              // Obs: Se o seu banco de dados usar a coluna "nome" ao invés de "username", 
-              // você pode adicionar a busca por nome aqui futuramente.
             ]
           }
         });
@@ -157,14 +154,17 @@ export const finalizarInbound = async (req: Request, res: Response) => {
     const inboundDb = await prisma.inboundFull.findUnique({ where: { id: Number(id) }, include: { skus: true } });
     if (!inboundDb) return res.status(404).json({ error: 'Envio não encontrado' });
 
+    // 🚀 LÓGICA ENTERPRISE: Transaction para salvar milhares de bipes instantaneamente
     if (skus && Array.isArray(skus)) {
-      for (const sku of skus) {
+      const transacoes = skus.map((sku: any) => {
         const skuStatus = sku.quantidadeBipada >= sku.quantidadeTotal ? 'CONCLUIDO' : (sku.quantidadeBipada > 0 ? 'EM_PROCESSO' : 'PENDENTE');
-        await prisma.inboundSku.update({
+        return prisma.inboundSku.update({
           where: { id: sku.id },
           data: { quantidadeBipada: sku.quantidadeBipada, status: skuStatus, leituras: sku.leituras }
         });
-      }
+      });
+      // Executa tudo de uma vez só!
+      await prisma.$transaction(transacoes);
     }
 
     const skusParaCalculo = skus && Array.isArray(skus) ? skus : inboundDb.skus;
@@ -198,7 +198,10 @@ export const finalizarInbound = async (req: Request, res: Response) => {
     });
 
     return res.status(200).json({ mensagem: 'Sincronizado com sucesso!', inbound: inboundAtualizado });
-  } catch (error) { return res.status(500).json({ error: 'Erro ao finalizar a carga Inbound.' }); }
+  } catch (error) { 
+    console.error("Erro no finalizarInbound:", error);
+    return res.status(500).json({ error: 'Erro ao finalizar a carga Inbound.' }); 
+  }
 };
 
 export const acaoCoordenador = async (req: Request, res: Response) => {
@@ -250,7 +253,6 @@ export const acaoCoordenador = async (req: Request, res: Response) => {
         let arrayLeituras: any[] = [];
         try { arrayLeituras = typeof sku.leituras === 'string' ? JSON.parse(sku.leituras) : (sku.leituras || []); } catch(e){}
 
-        // 🚀 CORREÇÃO EXCEL: Busca o nome de forma muito mais dinâmica para evitar o "Sistema"
         const nomeImportador = (inboundAtualizado as any).usuario?.username || (inboundAtualizado as any).usuario?.nome || 'Sistema';
 
         if (arrayLeituras.length === 0) {

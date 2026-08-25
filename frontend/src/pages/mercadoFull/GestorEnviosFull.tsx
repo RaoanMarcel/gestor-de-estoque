@@ -68,13 +68,21 @@ export default function GestorEnviosFull() {
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🚀 CORREÇÃO 1: Adicionado o "wms_user" que é a chave correta do seu App.tsx
   const getUsuarioLogado = () => {
-    return localStorage.getItem('wms_user') || 
-           localStorage.getItem('wms_username') || 
-           localStorage.getItem('username') || 
-           localStorage.getItem('usuario') || 
-           'Operador_X';
+    const keysToTry = ['wms_user', 'wms_username', 'username', 'usuario', 'nome', 'user', 'user_data', 'auth'];
+    for (const key of keysToTry) {
+      const val = localStorage.getItem(key);
+      if (val && val !== 'undefined' && val !== 'null') {
+        if (val.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(val);
+            const extractedName = parsed.nome || parsed.username || parsed.name || parsed.usuario;
+            if (extractedName) return String(extractedName);
+          } catch (e) {}
+        } else { return val; }
+      }
+    }
+    return 'Operador_X'; 
   };
 
   const [inboundData, setInboundData] = useState<any | null>(null);
@@ -88,7 +96,6 @@ export default function GestorEnviosFull() {
   
   const [modoTravado, setModoTravado] = useState(false);
   const [showSucessoProduto, setShowSucessoProduto] = useState(false);
-  
   const [tecladoLiberado, setTecladoLiberado] = useState(false);
   
   const [modoConfirmModal, setModoConfirmModal] = useState<{isOpen: boolean, novoModo: 'SKU_EAN' | 'SERIE' | null}>({ isOpen: false, novoModo: null });
@@ -124,26 +131,19 @@ export default function GestorEnviosFull() {
 
   const [lockedSkus, setLockedSkus] = useState<Record<string, string>>({});
 
+  // 🚀 CORREÇÃO DO TIPO: Usando ReturnType nativo do TypeScript para compatibilidade Front-end
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     socket.on('sku_locks_initial', (data: Record<string, string>) => setLockedSkus(data));
     socket.on('sku_lock_update', ({ skuId, lockedBy }: { skuId: string, lockedBy: string | null }) => {
-      setLockedSkus(prev => {
-        const novo = { ...prev };
-        if (lockedBy) novo[skuId] = lockedBy;
-        else delete novo[skuId];
-        return novo;
-      });
+      setLockedSkus(prev => { const novo = { ...prev }; if (lockedBy) novo[skuId] = lockedBy; else delete novo[skuId]; return novo; });
     });
     socket.on('sku_locked_error', (data: { skuId: string, usuario: string }) => {
       toast.error(`Atenção! O usuário ${data.usuario} já está conferindo este produto.`);
-      setSkuEmBipagem(null);
-      setIsScanning(false);
+      setSkuEmBipagem(null); setIsScanning(false);
     });
-    return () => {
-      socket.off('sku_locks_initial');
-      socket.off('sku_lock_update');
-      socket.off('sku_locked_error');
-    };
+    return () => { socket.off('sku_locks_initial'); socket.off('sku_lock_update'); socket.off('sku_locked_error'); };
   }, []);
 
   const carregarDashboard = async () => {
@@ -163,25 +163,31 @@ export default function GestorEnviosFull() {
   useEffect(() => { carregarDashboard(); }, []);
 
   useEffect(() => {
-    if (modoTravado && inputBipagemRef.current) {
-      setTimeout(() => inputBipagemRef.current?.focus(), 50);
-    }
+    if (modoTravado && inputBipagemRef.current) setTimeout(() => inputBipagemRef.current?.focus(), 50);
   }, [modoTravado, showModalFinalizarEnvio, showSucessoProduto, tecladoLiberado]);
 
-  const autoSalvarBackground = async (skusAtualizados: InboundSKU[]) => {
+  const autoSalvarBackground = (skusAtualizados: InboundSKU[]) => {
     if (!inboundData) return;
-    try {
-      const token = localStorage.getItem('wms_token');
-      await fetch(`${API_URL}/inbounds/${inboundData.id}/finalizar`, {
-        method: 'PUT', 
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ motoristaId: motoristaSelecionado || null, veiculoId: veiculoSelecionado || null, skus: skusAtualizados })
-      });
-      setDashboardData((prev: any) => ({
-        ...prev,
-        inbounds: prev.inbounds.map((i: any) => i.id === inboundData.id ? { ...i, skus: skusAtualizados } : i)
-      }));
-    } catch (err) {}
+
+    setDashboardData((prev: any) => ({
+      ...prev,
+      inbounds: prev.inbounds.map((i: any) => i.id === inboundData.id ? { ...i, skus: skusAtualizados } : i)
+    }));
+
+    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+    
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem('wms_token');
+        await fetch(`${API_URL}/inbounds/${inboundData.id}/finalizar`, {
+          method: 'PUT', 
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ motoristaId: motoristaSelecionado || null, veiculoId: veiculoSelecionado || null, skus: skusAtualizados })
+        });
+      } catch (err) {
+        console.error("Erro no autosave silencioso", err);
+      }
+    }, 1500);
   };
 
   const handleSalvarMotorista = async (e: React.FormEvent) => {
@@ -218,7 +224,7 @@ export default function GestorEnviosFull() {
         const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Relatorio_${modalCoord.nomePallet}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
         toast.success("Envio Despachado e Relatório Baixado!"); setModalCoord({ isOpen: false, inboundId: null, acao: null, nomePallet: '' }); setCurrentScreen(1); carregarDashboard(); return;
       }
-      const data = await res.json(); if (!res.ok) throw new Error(data.error);
+      const data = await res.json().catch(() => ({})); if (!res.ok) throw new Error(data.error || 'Erro.');
       toast.success(data.mensagem); setModalCoord({ isOpen: false, inboundId: null, acao: null, nomePallet: '' }); carregarDashboard();
     } catch (err: any) { toast.error(err.message || 'Erro.'); }
   };
@@ -249,7 +255,6 @@ export default function GestorEnviosFull() {
       const formData = new FormData(); 
       formData.append('nomePallet', nomePallet); 
       formData.append('inboundPdf', selectedFile);
-      // 🚀 CORREÇÃO 2: Envia o nome do usuário importador junto para o backend vincular no DB
       formData.append('usuarioImportador', getUsuarioLogado());
 
       const res = await fetch(`${API_URL}/inbounds/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
@@ -260,7 +265,8 @@ export default function GestorEnviosFull() {
 
   const abrirEnvioCompleto = (inb: any) => {
     const totalUnidadesCalc = inb.skus.reduce((acc: number, item: any) => acc + item.quantidadeTotal, 0);
-    setInboundData({ id: inb.id, nome: inb.nomePallet, totalSku: inb.skus.length, totalUnidades: totalUnidadesCalc, status: inb.status, usuarioImportador: inb.usuario?.username || 'Sistema' });
+    const nomeImportadorFinal = inb.usuario?.nome || inb.usuario?.username || inb.usuarioImportadorNome || 'Sistema';
+    setInboundData({ id: inb.id, nome: inb.nomePallet, totalSku: inb.skus.length, totalUnidades: totalUnidadesCalc, status: inb.status, usuarioImportador: nomeImportadorFinal });
     setSkus(inb.skus);
     setMotoristaSelecionado(inb.motoristaId ? String(inb.motoristaId) : '');
     setVeiculoSelecionado(inb.veiculoId ? String(inb.veiculoId) : '');
@@ -302,15 +308,26 @@ export default function GestorEnviosFull() {
 
   const salvarEdicaoAtivosTela3 = async () => {
     if (!inboundData || !motoristaSelecionado || !veiculoSelecionado) return toast.error("Selecione motorista e veículo.");
+    
+    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+
     try {
       const token = localStorage.getItem('wms_token');
       const res = await fetch(`${API_URL}/inbounds/${inboundData.id}/finalizar`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ motoristaId: motoristaSelecionado, veiculoId: veiculoSelecionado, skus })
       });
-      if (!res.ok) throw new Error();
+      
+      if (!res.ok) {
+        if (res.status === 413) throw new Error('A carga é muito grande. Peça ao TI para aumentar o limite do servidor (413).');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Falha de comunicação com o servidor.');
+      }
+
       toast.success("Informações salvas!"); carregarDashboard(); setCurrentScreen(1);
-    } catch (err: any) { toast.error('Erro.'); }
+    } catch (err: any) { 
+      toast.error(err.message || 'Erro inesperado.'); 
+    }
   };
 
   const handleIniciarBipagem = () => {

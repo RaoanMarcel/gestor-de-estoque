@@ -24,7 +24,10 @@ const PORT = Number(process.env.PORT) || 3001;
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 
 app.use(cors());
-app.use(express.json());
+
+// 🚀 CORREÇÃO DO LIMITE DE PAYLOAD (ERRO 413): Aumentado de 100kb para 50mb
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('X-Backend-Version', APP_VERSION);
