@@ -16,28 +16,44 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const gerarMascara = (str: string) => {
   if (!str) return '';
-  return str.toUpperCase().replace(/[0-9]/g, 'N').replace(/[A-Z]/g, 'L');
+  const strUp = str.toUpperCase().trim();
+  
+  if (strUp.length <= 3) {
+    return strUp.split('').map(char => {
+      if (/[0-9]/.test(char)) return 'N';
+      if (/[A-Z]/.test(char)) return 'L';
+      return char;
+    }).join('');
+  }
+
+  const prefixo = strUp.substring(0, 2);
+  const resto = strUp.substring(2);
+  
+  const mascaraResto = resto.split('').map(char => {
+    if (/[0-9]/.test(char)) return 'N';
+    if (/[A-Z]/.test(char)) return 'L';
+    return char;
+  }).join('');
+
+  return prefixo + mascaraResto;
 };
 
 const tocarSom = (tipo: 'sucesso' | 'erro' | 'invalido') => {
   try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gainNode = ctx.createGain();
+    let audioPath = '';
     
-    osc.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    if (tipo === 'sucesso') {
-      osc.type = 'sine'; osc.frequency.setValueAtTime(880, ctx.currentTime); gainNode.gain.setValueAtTime(0.1, ctx.currentTime); osc.start(); gainNode.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.3); osc.stop(ctx.currentTime + 0.3);
-    } else if (tipo === 'erro') {
-      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, ctx.currentTime); gainNode.gain.setValueAtTime(0.2, ctx.currentTime); osc.start(); osc.stop(ctx.currentTime + 0.5);
-    } else if (tipo === 'invalido') {
-      osc.type = 'square'; osc.frequency.setValueAtTime(300, ctx.currentTime); gainNode.gain.setValueAtTime(0.1, ctx.currentTime); osc.start(); osc.frequency.setValueAtTime(200, ctx.currentTime + 0.1); osc.stop(ctx.currentTime + 0.2);
+    if (tipo === 'sucesso') audioPath = '/sounds/beep_sucesso.mp3';
+    else if (tipo === 'erro') audioPath = '/sounds/beep_duplicidade.mp3';
+    else if (tipo === 'invalido') audioPath = '/sounds/beep_erro.mp3';
+
+    if (audioPath) {
+      const audio = new Audio(audioPath);
+      audio.volume = 1.0; 
+      audio.play().catch(e => console.log('Áudio bloqueado pelo navegador:', e));
     }
-  } catch (e) { console.log('Audio não suportado neste navegador.'); }
+  } catch (error) {
+    console.error('Erro ao tocar som:', error);
+  }
 };
 
 export default function GestorEnviosFull() {
@@ -52,8 +68,13 @@ export default function GestorEnviosFull() {
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 🚀 CORREÇÃO 1: Adicionado o "wms_user" que é a chave correta do seu App.tsx
   const getUsuarioLogado = () => {
-    return localStorage.getItem('wms_username') || localStorage.getItem('username') || localStorage.getItem('usuario') || 'Operador_X';
+    return localStorage.getItem('wms_user') || 
+           localStorage.getItem('wms_username') || 
+           localStorage.getItem('username') || 
+           localStorage.getItem('usuario') || 
+           'Operador_X';
   };
 
   const [inboundData, setInboundData] = useState<any | null>(null);
@@ -68,7 +89,6 @@ export default function GestorEnviosFull() {
   const [modoTravado, setModoTravado] = useState(false);
   const [showSucessoProduto, setShowSucessoProduto] = useState(false);
   
-  // 🚀 NOVO ESTADO: Controle manual da exibição do teclado no celular
   const [tecladoLiberado, setTecladoLiberado] = useState(false);
   
   const [modoConfirmModal, setModoConfirmModal] = useState<{isOpen: boolean, novoModo: 'SKU_EAN' | 'SERIE' | null}>({ isOpen: false, novoModo: null });
@@ -144,7 +164,6 @@ export default function GestorEnviosFull() {
 
   useEffect(() => {
     if (modoTravado && inputBipagemRef.current) {
-      // Pequeno timeout para garantir que o input pegou foco ao alternar a liberação do teclado
       setTimeout(() => inputBipagemRef.current?.focus(), 50);
     }
   }, [modoTravado, showModalFinalizarEnvio, showSucessoProduto, tecladoLiberado]);
@@ -227,7 +246,12 @@ export default function GestorEnviosFull() {
     setIsProcessing(true);
     try {
       const token = localStorage.getItem('wms_token');
-      const formData = new FormData(); formData.append('nomePallet', nomePallet); formData.append('inboundPdf', selectedFile);
+      const formData = new FormData(); 
+      formData.append('nomePallet', nomePallet); 
+      formData.append('inboundPdf', selectedFile);
+      // 🚀 CORREÇÃO 2: Envia o nome do usuário importador junto para o backend vincular no DB
+      formData.append('usuarioImportador', getUsuarioLogado());
+
       const res = await fetch(`${API_URL}/inbounds/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
       const data = await res.json(); if (!res.ok) throw new Error(data.error);
       toast.success(data.mensagem); setNomePallet(''); setSelectedFile(null); carregarDashboard(); setCurrentScreen(1); 
@@ -273,7 +297,7 @@ export default function GestorEnviosFull() {
     setModoTravado(false);
     setCodigoLido('');
     setShowSucessoProduto(false);
-    setTecladoLiberado(false); // Reseta o teclado ao voltar
+    setTecladoLiberado(false); 
   };
 
   const salvarEdicaoAtivosTela3 = async () => {
@@ -941,7 +965,6 @@ export default function GestorEnviosFull() {
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
-                                  {/* 🚀 NOVO BOTÃO: Liga/Desliga Teclado */}
                                   <button 
                                     type="button" 
                                     onClick={() => {
@@ -979,7 +1002,7 @@ export default function GestorEnviosFull() {
                                 <input 
                                   ref={inputBipagemRef} 
                                   type="text" 
-                                  inputMode={tecladoLiberado ? "text" : "none"} // 🚀 Alterna nativamente entre teclado visível ou oculto
+                                  inputMode={tecladoLiberado ? "text" : "none"}
                                   autoComplete="off"
                                   value={codigoLido} 
                                   onChange={(e) => setCodigoLido(e.target.value)} 

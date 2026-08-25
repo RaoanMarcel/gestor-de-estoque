@@ -13,7 +13,26 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
   try {
     const { nomePallet } = req.body;
     const arquivoTxt = (req as any).file;
-    const usuarioId = (req as any).usuario?.id || (req as any).user?.id || (req as any).usuarioId || null;
+    let usuarioId = (req as any).usuario?.id || (req as any).user?.id || (req as any).usuarioId || null;
+    const usuarioImportadorFront = req.body.usuarioImportador;
+
+    // 🚀 BUSCA FORÇADA NO BANCO: Se o ID não vier no token, busca pelo nome que o Front enviou
+    if (!usuarioId && usuarioImportadorFront && usuarioImportadorFront !== 'Operador_X') {
+      try {
+        const userDb = await prisma.usuario.findFirst({
+          where: { 
+            OR: [
+              { username: { equals: String(usuarioImportadorFront), mode: 'insensitive' } }
+              // Obs: Se o seu banco de dados usar a coluna "nome" ao invés de "username", 
+              // você pode adicionar a busca por nome aqui futuramente.
+            ]
+          }
+        });
+        if (userDb) usuarioId = userDb.id;
+      } catch (e) {
+        console.log('Aviso: Falha ao buscar usuário no DB por username.');
+      }
+    }
 
     if (!arquivoTxt || !arquivoTxt.buffer) return res.status(400).json({ error: 'Nenhum arquivo TXT foi enviado.' });
 
@@ -231,10 +250,13 @@ export const acaoCoordenador = async (req: Request, res: Response) => {
         let arrayLeituras: any[] = [];
         try { arrayLeituras = typeof sku.leituras === 'string' ? JSON.parse(sku.leituras) : (sku.leituras || []); } catch(e){}
 
+        // 🚀 CORREÇÃO EXCEL: Busca o nome de forma muito mais dinâmica para evitar o "Sistema"
+        const nomeImportador = (inboundAtualizado as any).usuario?.username || (inboundAtualizado as any).usuario?.nome || 'Sistema';
+
         if (arrayLeituras.length === 0) {
           worksheet.addRow({
             pallet: inboundAtualizado?.nomePallet,
-            usuarioImportou: inboundAtualizado?.usuario?.username || 'Sistema',
+            usuarioImportou: nomeImportador,
             motorista: inboundAtualizado?.motorista?.nome || 'Não definido',
             veiculo: inboundAtualizado?.veiculo?.placa || 'Não definido',
             dataBipagem: '-',
@@ -245,14 +267,13 @@ export const acaoCoordenador = async (req: Request, res: Response) => {
           });
         } else {
           arrayLeituras.forEach(leitura => {
-            // 🚀 MUDANÇA: Formatação de data com fuso horário forçado (UTC-3 São Paulo)
             const dataFormatada = leitura.data 
                 ? new Date(leitura.data).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) 
                 : '-';
 
             worksheet.addRow({
               pallet: inboundAtualizado?.nomePallet,
-              usuarioImportou: inboundAtualizado?.usuario?.username || 'Sistema',
+              usuarioImportou: nomeImportador,
               motorista: inboundAtualizado?.motorista?.nome || 'Não definido',
               veiculo: inboundAtualizado?.veiculo?.placa || 'Não definido',
               dataBipagem: dataFormatada,
