@@ -9,6 +9,7 @@ interface InboundSKU {
   id: number; sku: string; descricao: string; quantidadeTotal: number;
   quantidadeBipada: number; status: 'PENDENTE' | 'EM_PROCESSO' | 'CONCLUIDO';
   variacoes?: Variacao[]; leituras?: Leitura[];
+  mascaraPredefinida?: string | null; // 🚀 NOVO CAMPO
   updatedAt?: string;
 }
 
@@ -36,6 +37,27 @@ const gerarMascara = (str: string) => {
   }).join('');
 
   return prefixo + mascaraResto;
+};
+
+// 🚀 NOVA FUNÇÃO: Validador de Máscara Robusto
+const validarMascara = (codigo: string, mascara: string) => {
+  if (codigo.length !== mascara.length) return false;
+  
+  for (let i = 0; i < mascara.length; i++) {
+    const charCod = codigo[i].toUpperCase();
+    const charMasc = mascara[i].toUpperCase();
+
+    if (charMasc === 'N') {
+      if (!/[0-9]/.test(charCod)) return false;
+    } else if (charMasc === 'L') {
+      if (!/[A-Z]/.test(charCod)) return false;
+    } else if (charMasc === 'X') {
+      if (!/[A-Z0-9]/.test(charCod)) return false; // Letra ou Número
+    } else {
+      if (charCod !== charMasc) return false; // Casos Literais (BR, -, etc)
+    }
+  }
+  return true;
 };
 
 const tocarSom = (tipo: 'sucesso' | 'erro' | 'invalido') => {
@@ -131,7 +153,6 @@ export default function GestorEnviosFull() {
 
   const [lockedSkus, setLockedSkus] = useState<Record<string, string>>({});
 
-  // 🚀 CORREÇÃO DO TIPO: Usando ReturnType nativo do TypeScript para compatibilidade Front-end
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -282,7 +303,11 @@ export default function GestorEnviosFull() {
     socket.emit('lock_sku', { skuId: item.id, usuario: getUsuarioLogado() });
 
     setSkuEmBipagem(item);
-    if (item.leituras && item.leituras.length > 0) {
+    
+    // 🚀 LÓGICA DE DEFINIÇÃO DE MÁSCARA AO ABRIR PRODUTO
+    if (item.mascaraPredefinida) {
+      setMascaraSerie(item.mascaraPredefinida);
+    } else if (item.leituras && item.leituras.length > 0) {
        const primeiraSerie = item.leituras.find(l => l.tipo === 'SERIE');
        if (primeiraSerie) {
          setModoBipagem('SERIE');
@@ -342,6 +367,9 @@ export default function GestorEnviosFull() {
   };
 
   const resetarMascara = () => {
+    if (skuEmBipagem?.mascaraPredefinida) {
+      return toast.error('Atenção: Este produto possui uma máscara OBRIGATÓRIA de fábrica. Não é possível resetar.');
+    }
     setMascaraSerie(null);
     toast.success('Padrão de Série resetado. Bipe o próximo serial.');
     if (inputBipagemRef.current) inputBipagemRef.current.focus();
@@ -362,11 +390,19 @@ export default function GestorEnviosFull() {
       if (isSku || isEan) { tocarSom('invalido'); toast.error('Você bipou um SKU/EAN no campo de Série!'); setCodigoLido(''); return; }
       if (skuEmBipagem.leituras?.some(l => l.codigo === codigoLimpo)) { tocarSom('erro'); toast.error('Duplicidade: Número JÁ FOI bipado!'); setCodigoLido(''); return; }
       
-      const mascaraAtual = gerarMascara(codigoLimpo);
-      if (!mascaraSerie) { setMascaraSerie(mascaraAtual); isValid = true; } 
-      else {
-        if (mascaraAtual === mascaraSerie) isValid = true;
-        else { tocarSom('invalido'); toast.error(`Incorreto! Padrão exigido: ${mascaraSerie}`); setCodigoLido(''); return; }
+      // 🚀 VALIDAÇÃO COM O NOVO SISTEMA DE MÁSCARA (INCLUI CURINGA X)
+      if (!mascaraSerie) { 
+        setMascaraSerie(gerarMascara(codigoLimpo)); 
+        isValid = true; 
+      } else {
+        if (validarMascara(codigoLimpo, mascaraSerie)) {
+          isValid = true;
+        } else { 
+          tocarSom('invalido'); 
+          toast.error(`Incorreto! Padrão exigido: ${mascaraSerie}`); 
+          setCodigoLido(''); 
+          return; 
+        }
       }
     }
 

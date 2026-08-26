@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import ExcelJS from 'exceljs'; 
+import { getMascaraPorSku } from './maskController.js'; // 🚀 IMPORTANDO O ARQUIVO DE MÁSCARAS
 
 const prisma = new PrismaClient();
 
@@ -97,7 +98,16 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
       include: { skus: true, usuario: { select: { username: true } } }
     });
 
-    return res.status(201).json({ mensagem: 'Inbound processado via TXT e salvo com sucesso!', inbound: novoInbound, totalSku: novoInbound.skus.length, totalUnidades: totalUnidadesCalc });
+    // 🚀 INJETANDO A MÁSCARA ANTES DE ENVIAR PARA O FRONT
+    const inboundTratado = {
+      ...novoInbound,
+      skus: novoInbound.skus.map((sku: any) => ({
+        ...sku,
+        mascaraPredefinida: getMascaraPorSku(sku.sku)
+      }))
+    };
+
+    return res.status(201).json({ mensagem: 'Inbound processado via TXT e salvo com sucesso!', inbound: inboundTratado, totalSku: novoInbound.skus.length, totalUnidades: totalUnidadesCalc });
   } catch (error: any) { return res.status(500).json({ error: 'Erro interno ao processar o arquivo TXT.' }); }
 };
 
@@ -134,11 +144,13 @@ export const listarDashboard = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'desc' }
     });
     
+    // 🚀 INJETANDO A MÁSCARA NA LISTAGEM
     const inbounds = inboundsDb.map(inb => ({
       ...inb,
       skus: inb.skus.map((sku: any) => ({
         ...sku,
-        leituras: typeof sku.leituras === 'string' ? JSON.parse(sku.leituras) : (sku.leituras || [])
+        leituras: typeof sku.leituras === 'string' ? JSON.parse(sku.leituras) : (sku.leituras || []),
+        mascaraPredefinida: getMascaraPorSku(sku.sku)
       }))
     }));
 
@@ -154,7 +166,6 @@ export const finalizarInbound = async (req: Request, res: Response) => {
     const inboundDb = await prisma.inboundFull.findUnique({ where: { id: Number(id) }, include: { skus: true } });
     if (!inboundDb) return res.status(404).json({ error: 'Envio não encontrado' });
 
-    // 🚀 LÓGICA ENTERPRISE: Transaction para salvar milhares de bipes instantaneamente
     if (skus && Array.isArray(skus)) {
       const transacoes = skus.map((sku: any) => {
         const skuStatus = sku.quantidadeBipada >= sku.quantidadeTotal ? 'CONCLUIDO' : (sku.quantidadeBipada > 0 ? 'EM_PROCESSO' : 'PENDENTE');
@@ -163,7 +174,6 @@ export const finalizarInbound = async (req: Request, res: Response) => {
           data: { quantidadeBipada: sku.quantidadeBipada, status: skuStatus, leituras: sku.leituras }
         });
       });
-      // Executa tudo de uma vez só!
       await prisma.$transaction(transacoes);
     }
 
@@ -197,7 +207,16 @@ export const finalizarInbound = async (req: Request, res: Response) => {
       include: { motorista: true, veiculo: true, usuario: { select: { username: true } }, skus: true }
     });
 
-    return res.status(200).json({ mensagem: 'Sincronizado com sucesso!', inbound: inboundAtualizado });
+    // 🚀 INJETANDO A MÁSCARA NA RESPOSTA DA FINALIZAÇÃO
+    const inboundTratado = {
+      ...inboundAtualizado,
+      skus: inboundAtualizado.skus.map((sku: any) => ({
+        ...sku,
+        mascaraPredefinida: getMascaraPorSku(sku.sku)
+      }))
+    };
+
+    return res.status(200).json({ mensagem: 'Sincronizado com sucesso!', inbound: inboundTratado });
   } catch (error) { 
     console.error("Erro no finalizarInbound:", error);
     return res.status(500).json({ error: 'Erro ao finalizar a carga Inbound.' }); 
