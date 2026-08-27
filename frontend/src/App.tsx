@@ -22,7 +22,14 @@ window.fetch = async (...args) => {
   
   if (response.status === 401 && window.location.pathname !== '/login') {
     console.warn('⚠️ Sessão expirada ou acessada em outro local. Deslogando...');
-    localStorage.clear(); 
+    
+    // 🚀 CORREÇÃO 1: Remoção cirúrgica (Preserva as cores e apaga só a segurança)
+    localStorage.removeItem('wms_token');
+    localStorage.removeItem('wms_refresh_token');
+    localStorage.removeItem('wms_user');
+    localStorage.removeItem('wms_cargo');
+    localStorage.removeItem('wms_permissoes');
+    
     window.location.href = '/login'; 
   }
   
@@ -49,14 +56,30 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   const isOpen = isSidebarOpen || isMobileMenuOpen;
 
   const handleLogout = () => {
-    localStorage.clear();
+    // 🚀 CORREÇÃO 1: Remoção cirúrgica no botão Sair (Preserva o layout)
+    localStorage.removeItem('wms_token');
+    localStorage.removeItem('wms_refresh_token');
+    localStorage.removeItem('wms_user');
+    localStorage.removeItem('wms_cargo');
+    localStorage.removeItem('wms_permissoes');
+    
     window.location.href = '/login';
   };
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
   const isActive = (path: string) => location.pathname === path;
 
-  if (esconderHeader) return <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)]">{children}</div>;
+  // 🚀 CORREÇÃO 2: BLINDAGEM DA TELA DE LOGIN
+  // Removemos as variáveis globais (bg-[var(--bg-main)]) daqui.
+  // Agora forçamos o fundo padrão (#F6F8FC) e a cor do texto padrão (slate-800).
+  // O data-theme="ocean" trava a estética e impede que o Dark Mode invada o Login!
+  if (esconderHeader) {
+    return (
+      <div data-theme="ocean" className="min-h-screen bg-[#F6F8FC] text-slate-800 antialiased">
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] antialiased overflow-hidden relative">

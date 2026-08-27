@@ -11,7 +11,12 @@ export const buscarHistoricoItem = async (req: Request, res: Response): Promise<
 
     const historico = await prisma.historicoMovimentacao.findMany({
       where: { codigoItem: codigoFormatado },
-      orderBy: { bipadoEm: 'desc' }
+      orderBy: { bipadoEm: 'desc' },
+      include: {
+        usuario: {
+          select: { username: true } 
+        }
+      }
     });
     
     if (!historico || historico.length === 0) {

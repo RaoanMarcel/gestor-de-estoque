@@ -1,4 +1,5 @@
 export interface Produto {
+  usuario: any;
   id: number;
   codigoItem: string;
   bipadoEm: string;

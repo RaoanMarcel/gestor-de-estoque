@@ -53,7 +53,7 @@ export const exportarHistoricoExcel = async (req: Request, res: Response): Promi
         palletOrigem: log.palletOrigem || '-',
         palletDestino: log.palletDestino || '-',
         descricao: descricaoPallet,
-        createdAt: log.createdAt ? new Date(log.createdAt).toLocaleString('pt-BR') : '-'
+        createdAt: log.createdAt ? new Date(log.createdAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '-'
       });
     });
 
@@ -111,7 +111,7 @@ export const exportarRelatorioRMA = async (req: Request, res: Response): Promise
         acao: 'LANÇADO AO RMA',
         palletOrigem: log.palletOrigem || '-',
         descricao: log.palletOrigem ? (mapaDescricao.get(log.palletOrigem) || 'Sem descrição') : '-',
-        createdAt: log.createdAt ? new Date(log.createdAt).toLocaleString('pt-BR') : '-'
+        createdAt: log.createdAt ? new Date(log.createdAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '-'
       });
     });
 
@@ -127,7 +127,6 @@ export const exportarRelatorioRMA = async (req: Request, res: Response): Promise
   }
 };
 
-// 🚀 EXPORTAÇÃO ESTRITA: Puxa do DB apenas itens em pallets do tipo PADRAO
 export const exportarRelatorioGeralItens = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const produtos = await prisma.produtoPallet.findMany({
@@ -173,7 +172,7 @@ export const exportarRelatorioGeralItens = async (req: Request, res: Response): 
         rua: p.pallet?.rua || '-',
         estrutura: p.pallet?.estrutura || '-',
         nivel: p.pallet?.nivel || '-',
-        data: p.bipadoEm ? new Date(p.bipadoEm).toLocaleString('pt-BR') : '-'
+        data: p.bipadoEm ? new Date(p.bipadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '-'
       });
     });
 

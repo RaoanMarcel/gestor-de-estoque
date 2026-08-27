@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useToast } from "../../contexts/toastContext"; 
 import { useTheme } from '../../contexts/themeContext'; 
 import { usePalletLogic } from "./components/hooks/usePalletLogic";
@@ -9,6 +10,12 @@ import ModalDestino from "./components/parts/ModalDestino";
 export default function PalletInterface() {
   const toast = useToast(); 
   const { theme } = useTheme(); 
+
+  const [isKeyboardActive, setIsKeyboardActive] = useState(() => localStorage.getItem('wms_keyboard') !== 'false');
+
+  useEffect(() => {
+    localStorage.setItem('wms_keyboard', String(isKeyboardActive));
+  }, [isKeyboardActive]);
   
   const {
     pallet,
@@ -40,9 +47,9 @@ export default function PalletInterface() {
     handleAdicionarTodoOPalletNoLote,
     handleFinalizerColetaTransferencia,
     handleLancarAoRMA,
+    handleLancarPalletNovo,
     handleConfirmarDestinoFinal,
     handleExcluirItemLinha,
-    handleLancarPalletNovo,
     
     handleDesfazerExclusaoItem,
     handleConfirmarExclusaoEmLote,
@@ -90,7 +97,6 @@ export default function PalletInterface() {
   return (
     <div className="relative min-h-screen bg-transparent text-[var(--text-main)] antialiased overflow-hidden" onClick={manterFocoNoInput}>
       
-      {/* 🚀 Oculta gradientes nos temas escuros[cite: 6] */}
       {theme === 'ocean' && (
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.14),transparent_70%)] blur-3xl" />
@@ -112,6 +118,8 @@ export default function PalletInterface() {
           onAbrirModalPuxar={() => setExibirModalPuxar(true)}
           exclusoesPendentesCount={exclusoesPendentes.length}
           onConfirmarExclusoes={handleConfirmarSaidasPendentes}
+          isKeyboardActive={isKeyboardActive}           // 🚀 Repassa o estado pro Header
+          setIsKeyboardActive={setIsKeyboardActive}     // 🚀 Repassa o set pro Header
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -134,6 +142,7 @@ export default function PalletInterface() {
             handleFinalizerColetaTransferencia={handleFinalizerColetaTransferencia}
             carregandoDestinos={carregandoDestinos}
             handleLancarAoRMA={handleLancarAoRMA}
+            isKeyboardActive={isKeyboardActive}         // 🚀 Repassa o estado pro Input
           />
 
           <div className="lg:col-span-1 flex flex-col gap-6">

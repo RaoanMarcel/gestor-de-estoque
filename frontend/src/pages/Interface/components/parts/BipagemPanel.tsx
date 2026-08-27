@@ -20,6 +20,7 @@ interface BipagemPanelProps {
   handleFinalizerColetaTransferencia: () => void;
   carregandoDestinos: boolean;
   handleLancarAoRMA: () => void;
+  isKeyboardActive: boolean;
 }
 
 export default function BipagemPanel({
@@ -41,6 +42,7 @@ export default function BipagemPanel({
   handleFinalizerColetaTransferencia,
   carregandoDestinos,
   handleLancarAoRMA,
+  isKeyboardActive
 }: BipagemPanelProps) {
   
   const tipoPallet = pallet?.tipo?.toUpperCase() || '';
@@ -131,10 +133,11 @@ export default function BipagemPanel({
           Aponte o leitor de código de barras
         </label>
         
-        {/* Input adaptado ao tema atual */}
+        {/* 🚀 O SEGREDO DO TECLADO VIRTUAL: inputMode={isKeyboardActive ? "text" : "none"} */}
         <input
           ref={inputBipRef}
           type="text"
+          inputMode={isKeyboardActive ? "text" : "none"}
           maxLength={maxLen}
           placeholder={placeholderInput}
           className={`w-full p-6 rounded-xl font-mono text-2xl text-center font-bold tracking-wider transition-all border-2 focus:outline-none focus:ring-4 bg-[var(--bg-main)] ${

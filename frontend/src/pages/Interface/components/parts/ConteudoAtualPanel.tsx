@@ -53,24 +53,39 @@ export default function ConteudoAtualPanel({
                     : 'border-[var(--border-color)] bg-[var(--bg-main)] hover:border-[var(--text-muted)] hover:shadow-sm'
                 }`}
               >
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5 w-full pr-3 overflow-hidden">
                   <div className="flex items-center gap-2.5">
                     <span className={`font-mono text-sm font-bold block ${isPendente ? 'text-[var(--text-muted)] line-through decoration-rose-500' : 'text-[var(--text-main)]'}`}>
                       {produto.codigoItem}
                     </span>
                     {isPendente && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider bg-[var(--bg-panel)] border border-rose-500/30 text-rose-500 px-2 py-0.5 rounded-md shadow-sm">
+                      <span className="text-[9px] font-bold uppercase tracking-wider bg-[var(--bg-panel)] border border-rose-500/30 text-rose-500 px-2 py-0.5 rounded-md shadow-sm shrink-0">
                         Exclusão
                       </span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-medium ${isPendente ? 'text-rose-400/70' : 'text-[var(--text-muted)]'}`}>
-                    {new Date(produto.bipadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
+                  
+                  <div className={`flex items-center gap-1.5 text-[10px] font-semibold ${isPendente ? 'text-rose-400/70' : 'text-[var(--text-muted)]'}`}>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                      {new Date(produto.bipadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </div>
+                    
+                    <span className="opacity-40 text-[8px] shrink-0">●</span>
+                    
+                    <div className="flex items-center gap-1 min-w-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3 shrink-0">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                      </svg>
+                      <span className="truncate tracking-wide">{produto.usuario?.username || 'Sistema'}</span>
+                    </div>
+                  </div>
                 </div>
 
                 {!isModoTransferencia && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     {isPendente ? (
                       <button
                         onClick={() => handleDesfazerExclusaoItem(produto.codigoItem)}

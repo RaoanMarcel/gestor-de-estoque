@@ -26,6 +26,9 @@ model ProdutoPallet {
   palletId   Int
   bipadoEm   DateTime @default(now())
   pallet     Pallet   @relation(fields: [palletId], references: [id], onDelete: Cascade)
+  
+  usuarioId  Int?
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id])
 }
 
 model HistoricoMovimentacao {
@@ -45,25 +48,26 @@ model HistoricoMovimentacao {
 model Cargo {
   id         Int       @id @default(autoincrement())
   nome       String    @unique
-  permissoes Json      // Guarda a lista de acessos (ex: ["full", "estoque"])
-  usuarios   Usuario[] // Relacionamento com os usuários que possuem este cargo
+  permissoes Json      
+  usuarios   Usuario[] 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 }
 
 model Usuario {
-  id                Int                     @id @default(autoincrement())
-  username          String                  @unique
-  senha             String
-  precisaMudarSenha Boolean                 @default(true)
-  sessaoToken       String?
+  id                 Int      @id @default(autoincrement())
+  username           String   @unique
+  senha              String
+  precisaMudarSenha  Boolean  @default(true)
+  sessaoToken        String?
   
-cargoId            Int?
-cargo              Cargo?                  @relation(fields: [cargoId], references: [id], onDelete: SetNull)
+  cargoId            Int?
+  cargo              Cargo?   @relation(fields: [cargoId], references: [id], onDelete: SetNull)
 
-  createdAt         DateTime                @default(now())
-  historicos        HistoricoMovimentacao[]
-  inbounds          InboundFull[]           
+  createdAt          DateTime @default(now())
+  historicos         HistoricoMovimentacao[]
+  inbounds           InboundFull[] 
+  produtosBipados    ProdutoPallet[] 
 }
 
 model Contador {
@@ -82,18 +86,18 @@ model Motorista {
 
 model Veiculo {
   id        Int           @id @default(autoincrement())
-  modelo    String        // Ex: Iveco Daily
-  placa     String        @unique // Placas não se repetem
+  modelo    String        
+  placa     String        @unique 
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
-  inbounds  InboundFull[] // Histórico de cargas que este veículo trouxe
+  inbounds  InboundFull[] 
 }
 
 model InboundFull {
   id          Int          @id @default(autoincrement())
   numeroFrete String?      
   nomePallet  String       
-  status      String       @default("PENDENTE") // PENDENTE, CONCLUIDO
+  status      String       @default("PENDENTE") 
   
   usuarioId   Int?
   usuario     Usuario?     @relation(fields: [usuarioId], references: [id])

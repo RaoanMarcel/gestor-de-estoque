@@ -41,8 +41,12 @@ export default function Home() {
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [carregandoExcel, setCarregandoExcel] = useState(false);
   const [isRastreabilidadeOpen, setIsRastreabilidadeOpen] = useState(false); 
-  
   const [totalItensEstoque, setTotalItensEstoque] = useState(0);
+  const [isKeyboardActive, setIsKeyboardActive] = useState(() => localStorage.getItem('wms_keyboard') !== 'false');
+
+  useEffect(() => {
+    localStorage.setItem('wms_keyboard', String(isKeyboardActive));
+  }, [isKeyboardActive]);
 
   useEffect(() => {
     const buscarTotalAbsoluto = async () => {
@@ -126,11 +130,22 @@ export default function Home() {
       )}
 
       <div className="relative max-w-6xl mx-auto p-4 md:p-8 space-y-8">
-        <HomeHeader setIsExcelModalOpen={setIsExcelModalOpen} setIsModalOpen={setIsModalOpen} />
+        <HomeHeader 
+          setIsExcelModalOpen={setIsExcelModalOpen} 
+          setIsModalOpen={setIsModalOpen} 
+          isKeyboardActive={isKeyboardActive}
+          setIsKeyboardActive={setIsKeyboardActive}
+        />
 
         <div className="flex flex-col sm:flex-row gap-4 items-stretch">
           <div className="flex-1">
-            <ScannerBar handleQrBipado={handleQrBipado} qrCodeBipado={qrCodeBipado} setQrCodeBipado={setQrCodeBipado} qrInputRef={qrInputRef} />
+            <ScannerBar 
+              handleQrBipado={handleQrBipado} 
+              qrCodeBipado={qrCodeBipado} 
+              setQrCodeBipado={setQrCodeBipado} 
+              qrInputRef={qrInputRef} 
+              isKeyboardActive={isKeyboardActive}
+            />
           </div>
           <button onClick={() => setIsRastreabilidadeOpen(true)} className="flex items-center justify-center gap-2 px-6 py-4 sm:py-0 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-xl font-semibold text-sm transition-all shadow-sm">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>

@@ -41,6 +41,8 @@ const gerarProximoCodigoSequencial = async (tx: any, regras: any): Promise<strin
 export const biparItem = async (req: Request, res: Response): Promise<Response | void> => {
   const { palletId, codigoItem, acao, gerarSequencial, novoCodigoBipado } = req.body;
   const numeroPallet = String(palletId); 
+  const usuarioLogadoId = (req as any).usuario?.id;
+  const usernameLogado = (req as any).usuario?.username || 'Sistema';
 
   try {
     const pallet = await prisma.pallet.findUnique({ where: { numero: numeroPallet } });
@@ -57,7 +59,7 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
         const itemGerado = await prisma.$transaction(async (tx) => {
           const codigoFinal = await gerarProximoCodigoSequencial(tx, regras);
           return tx.produtoPallet.create({ 
-            data: { palletId: idInterno, codigoItem: codigoFinal } 
+            data: { palletId: idInterno, codigoItem: codigoFinal, usuarioId: usuarioLogadoId } 
           });
         });
 
@@ -67,15 +69,15 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
             acao: 'ENTRADA', 
             palletAlvo: pallet.numero, 
             palletDestino: pallet.numero, 
-            usuarioId: (req as any).usuario?.id 
+            usuarioId: usuarioLogadoId 
           } as any
         });
 
         const socketId = getSocketId(req);
         SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: idInterno }, socketId);
-        SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: itemGerado }, socketId);
+        SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: { ...itemGerado, usuario: { username: usernameLogado } } }, socketId);
 
-        return res.status(200).json({ mensagem: 'Item gerado com sucesso!', item: itemGerado });
+        return res.status(200).json({ mensagem: 'Item gerado com sucesso!', item: { ...itemGerado, usuario: { username: usernameLogado } } });
       }
 
       const codigoFormatado = String(codigoItem).trim().toUpperCase();
@@ -111,7 +113,7 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
         if (itemExistente) {
           const novoItem = await prisma.$transaction(async (tx) => {
             await tx.produtoPallet.delete({ where: { id: itemExistente.id } });
-            const criado = await tx.produtoPallet.create({ data: { palletId: idInterno, codigoItem: codigoFinalBipado } });
+            const criado = await tx.produtoPallet.create({ data: { palletId: idInterno, codigoItem: codigoFinalBipado, usuarioId: usuarioLogadoId } });
 
             await tx.historicoMovimentacao.create({
               data: {
@@ -121,7 +123,7 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
                 palletOrigem: itemExistente.pallet.numero,
                 palletDestino: pallet.numero,
                 palletAlvo: pallet.numero,
-                usuarioId: (req as any).usuario?.id
+                usuarioId: usuarioLogadoId
               } as any
             });
             return criado;
@@ -130,12 +132,12 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
           const socketId = getSocketId(req);
           SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'TRANSFERENCIA_RETRIAGEM' }, socketId);
           SocketService.getInstance().emitToPallet(itemExistente.pallet.numero, 'pallet:updated', { acao: 'SAIDA', codigoItem: itemExistente.codigoItem }, socketId);
-          SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: novoItem }, socketId);
+          SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: { ...novoItem, usuario: { username: usernameLogado } } }, socketId);
 
-          return res.status(200).json({ mensagem: `Código substituído fisicamente com sucesso!`, item: novoItem });
+          return res.status(200).json({ mensagem: `Código substituído com sucesso!`, item: { ...novoItem, usuario: { username: usernameLogado } } });
         } else {
           const novoItem = await prisma.$transaction(async (tx) => {
-            const criado = await tx.produtoPallet.create({ data: { palletId: idInterno, codigoItem: codigoFinalBipado } });
+            const criado = await tx.produtoPallet.create({ data: { palletId: idInterno, codigoItem: codigoFinalBipado, usuarioId: usuarioLogadoId } });
 
             await tx.historicoMovimentacao.create({
               data: {
@@ -144,7 +146,7 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
                 acao: 'ENTRADA_COM_RETRIAGEM',
                 palletDestino: pallet.numero,
                 palletAlvo: pallet.numero,
-                usuarioId: (req as any).usuario?.id
+                usuarioId: usuarioLogadoId
               } as any
             });
             return criado;
@@ -152,14 +154,14 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
 
           const socketId = getSocketId(req);
           SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: idInterno }, socketId);
-          SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: novoItem }, socketId);
+          SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: { ...novoItem, usuario: { username: usernameLogado } } }, socketId);
 
-          return res.status(200).json({ mensagem: `Item inédito adicionado sob a nova etiqueta!`, item: novoItem });
+          return res.status(200).json({ mensagem: `Item inédito adicionado sob a nova etiqueta!`, item: { ...novoItem, usuario: { username: usernameLogado } } });
         }
       }
 
       if (itemExistente) {
-        const atualizado = await prisma.produtoPallet.update({ where: { id: itemExistente.id }, data: { palletId: idInterno } });
+        const atualizado = await prisma.produtoPallet.update({ where: { id: itemExistente.id }, data: { palletId: idInterno, usuarioId: usuarioLogadoId } });
         
         await prisma.historicoMovimentacao.create({
           data: {
@@ -168,21 +170,21 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
             palletOrigem: itemExistente.pallet.numero,
             palletDestino: pallet.numero,
             palletAlvo: pallet.numero,
-            usuarioId: (req as any).usuario?.id
+            usuarioId: usuarioLogadoId
           } as any
         });
 
         const socketId = getSocketId(req);
         SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'TRANSFERENCIA' }, socketId);
         SocketService.getInstance().emitToPallet(itemExistente.pallet.numero, 'pallet:updated', { acao: 'SAIDA', codigoItem: itemExistente.codigoItem }, socketId);
-        SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: atualizado }, socketId);
+        SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: { ...atualizado, usuario: { username: usernameLogado } } }, socketId);
 
-        return res.status(200).json({ mensagem: 'Item transferido com sucesso!', item: atualizado });
+        return res.status(200).json({ mensagem: 'Item transferido com sucesso!', item: { ...atualizado, usuario: { username: usernameLogado } } });
       }
 
       const item = await prisma.$transaction(async (tx) => {
         return tx.produtoPallet.create({ 
-          data: { palletId: idInterno, codigoItem: codigoFormatado } 
+          data: { palletId: idInterno, codigoItem: codigoFormatado, usuarioId: usuarioLogadoId } 
         });
       });
 
@@ -192,15 +194,15 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
           acao: 'ENTRADA', 
           palletAlvo: pallet.numero, 
           palletDestino: pallet.numero, 
-          usuarioId: (req as any).usuario?.id 
+          usuarioId: usuarioLogadoId 
         } as any
       });
 
       const socketId = getSocketId(req);
       SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: idInterno }, socketId);
-      SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item }, socketId);
+      SocketService.getInstance().emitToPallet(numeroPallet, 'pallet:updated', { acao: 'ENTRADA', item: { ...item, usuario: { username: usernameLogado } } }, socketId);
 
-      return res.status(200).json({ mensagem: 'Item adicionado com sucesso!', item });
+      return res.status(200).json({ mensagem: 'Item adicionado com sucesso!', item: { ...item, usuario: { username: usernameLogado } } });
     } 
     
     if (acao === 'SAIDA') {
@@ -217,7 +219,7 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
           acao: 'SAIDA', 
           palletAlvo: pallet.numero, 
           palletOrigem: pallet.numero, 
-          usuarioId: (req as any).usuario?.id 
+          usuarioId: usuarioLogadoId 
         } as any
       });
 
@@ -241,6 +243,9 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
 export const transferirUm = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { codigoItem, numeroPalletDestino } = req.body;
+    const usuarioLogadoId = (req as any).usuario?.id;
+    const usernameLogado = (req as any).usuario?.username || 'Sistema';
+
     if (!codigoItem || !numeroPalletDestino) {
       return res.status(400).json({ error: 'Dados obrigatórios ausentes.' });
     }
@@ -278,7 +283,7 @@ export const transferirUm = async (req: Request, res: Response): Promise<Respons
     const itemFinal = await prisma.$transaction(async (tx) => {
       const atualizado = await tx.produtoPallet.update({ 
         where: { id: produtoOrigem.id }, 
-        data: { palletId: palletDestino.id } 
+        data: { palletId: palletDestino.id, usuarioId: usuarioLogadoId } 
       });
       
       await tx.historicoMovimentacao.create({ 
@@ -288,7 +293,7 @@ export const transferirUm = async (req: Request, res: Response): Promise<Respons
           palletOrigem: produtoOrigem.pallet.numero, 
           palletDestino: palletDestino.numero, 
           palletAlvo: palletDestino.numero, 
-          usuarioId: (req as any).usuario?.id 
+          usuarioId: usuarioLogadoId 
         } as any
       });
       
@@ -298,9 +303,9 @@ export const transferirUm = async (req: Request, res: Response): Promise<Respons
     const socketId = getSocketId(req);
     SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'TRANSFERENCIA' }, socketId);
     SocketService.getInstance().emitToPallet(produtoOrigem.pallet.numero, 'pallet:updated', { acao: 'SAIDA', codigoItem: produtoOrigem.codigoItem }, socketId);
-    SocketService.getInstance().emitToPallet(palletDestino.numero, 'pallet:updated', { acao: 'ENTRADA', item: itemFinal }, socketId);
+    SocketService.getInstance().emitToPallet(palletDestino.numero, 'pallet:updated', { acao: 'ENTRADA', item: { ...itemFinal, usuario: { username: usernameLogado } } }, socketId);
 
-    return res.status(200).json({ mensagem: `Item ${codigoItem} puxado com sucesso!`, item: itemFinal });
+    return res.status(200).json({ mensagem: `Item ${codigoItem} puxado com sucesso!`, item: { ...itemFinal, usuario: { username: usernameLogado } } });
   } catch (error: any) {
     return res.status(500).json({ error: 'Erro ao processar a transferência unitária.' });
   }
@@ -309,6 +314,8 @@ export const transferirUm = async (req: Request, res: Response): Promise<Respons
 export const transferirEmLote = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { codigosItens, numeroPalletDestino } = req.body;
+    const usuarioLogadoId = (req as any).usuario?.id;
+
     if (!codigosItens || codigosItens.length === 0 || !numeroPalletDestino) {
       return res.status(400).json({ error: 'Dados ausentes.' });
     }
@@ -331,14 +338,17 @@ export const transferirEmLote = async (req: Request, res: Response): Promise<Res
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.produtoPallet.updateMany({ where: { codigoItem: { in: codigosItens } }, data: { palletId: palletDestino.id } });
+      await tx.produtoPallet.updateMany({ 
+        where: { codigoItem: { in: codigosItens } }, 
+        data: { palletId: palletDestino.id, usuarioId: usuarioLogadoId } 
+      });
       const logsData = codigosItens.map((codigo: string) => ({ 
         codigoItem: String(codigo), 
         acao: 'TRANSFERENCIA_LOTE', 
         palletAlvo: palletDestino.numero, 
         palletOrigem: primeiroItem.pallet.numero, 
         palletDestino: palletDestino.numero, 
-        usuarioId: (req as any).usuario?.id 
+        usuarioId: usuarioLogadoId 
       }));
       await tx.historicoMovimentacao.createMany({ data: logsData as any });
     });
@@ -455,7 +465,14 @@ export const buscarPalletPorIdentificador = async (req: Request, res: Response):
   try {
     const pallet = await prisma.pallet.findUnique({
       where: { numero: String(identificador) },
-      include: { produtos: { orderBy: { bipadoEm: 'desc' } } }
+      include: { 
+        produtos: { 
+          orderBy: { bipadoEm: 'desc' },
+          include: {
+            usuario: { select: { username: true } }
+          }
+        } 
+      }
     });
     
     if (!pallet) return res.status(404).json({ error: 'Pallet não encontrado.' });
@@ -501,7 +518,6 @@ export const biparItemEmLote = async (req: Request, res: Response): Promise<Resp
   }
 };
 
-// 🚀 NOVA ROTA EXCLUSIVA DE LANÇAMENTO (Validação de Senha + Baixa + Relatório)
 export const lancarPalletNovo = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { palletId, senha } = req.body;
@@ -511,7 +527,6 @@ export const lancarPalletNovo = async (req: Request, res: Response): Promise<Res
       return res.status(400).json({ error: 'Identificador do pallet e senha do operador são obrigatórios.' });
     }
 
-    // 1. Validar Senha do Operador
     const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
     if (!usuario) {
       return res.status(404).json({ error: 'Sessão de usuário inválida.' });
@@ -521,7 +536,6 @@ export const lancarPalletNovo = async (req: Request, res: Response): Promise<Res
       return res.status(401).json({ error: 'Senha incorreta! Operação de lançamento bloqueada.' });
     }
 
-    // 2. Buscar Pallet e verificar disponibilidade
     const pallet = await prisma.pallet.findUnique({
       where: { id: Number(palletId) },
       include: { produtos: true }
@@ -533,12 +547,9 @@ export const lancarPalletNovo = async (req: Request, res: Response): Promise<Res
 
     const codigosLançados = pallet.produtos.map(p => p.codigoItem);
 
-    // 3. Efetuar as baixas no banco de dados e Registrar no Histórico em Lote
     await prisma.$transaction(async (tx) => {
-      // Deleta todos os produtos
       await tx.produtoPallet.deleteMany({ where: { palletId: pallet.id } });
 
-      // Gera os registros de saída
       const logsData = codigosLançados.map(codigo => ({
         codigoItem: String(codigo),
         acao: 'LANCAMENTO_LOTE_NOVO',
@@ -549,7 +560,6 @@ export const lancarPalletNovo = async (req: Request, res: Response): Promise<Res
       await tx.historicoMovimentacao.createMany({ data: logsData as any });
     });
 
-    // 4. Criação dinâmica da Planilha de Excel usando exceljs
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(`Relatório - ${pallet.numero}`);
 
@@ -560,9 +570,8 @@ export const lancarPalletNovo = async (req: Request, res: Response): Promise<Res
       { header: 'Data do Lançamento', key: 'data', width: 25 },
     ];
 
-    // Formatação de destaque para o cabeçalho
     worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; // Cor da sua paleta WMS
+    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; 
 
     const dataHoraBrasil = new Date().toLocaleString('pt-BR');
     
@@ -575,17 +584,15 @@ export const lancarPalletNovo = async (req: Request, res: Response): Promise<Res
       });
     });
 
-    // Configurando os cabeçalhos de resposta para download binário (Blob)
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=Fechamento_${pallet.numero}.xlsx`);
 
     await workbook.xlsx.write(res);
-    res.end(); // Finaliza a resposta binária
+    res.end(); 
 
-    // 5. Comunica a mudança aos demais operadores (Sockets)
     const socketId = getSocketId(req);
     SocketService.getInstance().emitToGlobal('grid:updated', { acao: 'ATUALIZADO', palletId: pallet.id }, socketId);
-    SocketService.getInstance().emitToPallet(pallet.numero, 'pallet:refresh', {}, socketId); // Manda quem estiver na tela dar refresh (esvaziar tudo)
+    SocketService.getInstance().emitToPallet(pallet.numero, 'pallet:refresh', {}, socketId); 
 
   } catch (error: any) {
     return res.status(500).json({ error: 'Erro interno no servidor ao processar lançamento de lote.' });

@@ -1,8 +1,19 @@
+export interface Produto {
+  id: number;
+  codigoItem: string;
+  palletId: number;
+  bipadoEm: string;
+  usuarioId?: number | null;
+  usuario?: {
+    username: string;
+  };
+}
+
 export interface PalletCount {
   produtos: number;
 }
 
-export interface Pallet {
+export interface PalletData {
   descricao: string;
   id: number;
   numero: string;
@@ -13,14 +24,5 @@ export interface Pallet {
   _count?: {
     produtos: number;
   };
-  produtos?: any[];
-}
-
-export interface CriarPalletInput {
-  numero: string;
-  rua: string;
-  estrutura: string;
-  nivel: string;
-  tipo: string;
-  descricao: string;
+  produtos: Produto[];
 }

@@ -11,9 +11,10 @@ interface PalletHeaderProps {
   navigate: (rota: string) => void;
   activeUsers?: string[];
   onAbrirModalPuxar?: () => void;
-  // 🚀 NOVAS PROPRIEDADES ADICIONADAS
   exclusoesPendentesCount?: number;
   onConfirmarExclusoes?: () => void;
+  isKeyboardActive: boolean;
+  setIsKeyboardActive: (valor: boolean) => void;
 }
 
 const getAvatarColor = (name: string) => {
@@ -41,8 +42,10 @@ export default function PalletHeader({
   navigate, 
   activeUsers = [], 
   onAbrirModalPuxar,
-  exclusoesPendentesCount = 0, // 🚀 Recebe a quantidade
-  onConfirmarExclusoes         // 🚀 Recebe a função de confirmar
+  exclusoesPendentesCount = 0, 
+  onConfirmarExclusoes,
+  isKeyboardActive,
+  setIsKeyboardActive
 }: PalletHeaderProps) {
 
   const tipoUpper = pallet.tipo?.toUpperCase() || '';
@@ -86,9 +89,8 @@ export default function PalletHeader({
         )}
 
         {!isModoTransferencia ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             
-            {/* 🚀 NOVO BOTÃO DE SALVAR EXCLUSÕES (Aparece apenas se houver pendências) */}
             {exclusoesPendentesCount > 0 && (
               <button 
                 onClick={onConfirmarExclusoes} 
@@ -101,6 +103,19 @@ export default function PalletHeader({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
                 Salvar Exclusões
+              </button>
+            )}
+
+            {/* 🚀 BOTÃO DE TECLADO MÓVEL AQUI (IDÊNTICO À HOME) */}
+            {isKeyboardActive ? (
+              <button onClick={() => setIsKeyboardActive(false)} title="Desativar Teclado" className="px-3 h-9 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-bold tracking-wider uppercase transition-all shadow-sm flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                <span className="hidden sm:inline">Teclado</span>
+              </button>
+            ) : (
+              <button onClick={() => setIsKeyboardActive(true)} title="Ativar Teclado" className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 text-[11px] font-bold tracking-wider uppercase transition-all shadow-sm flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+                <span className="hidden sm:inline">Teclado</span>
               </button>
             )}
 

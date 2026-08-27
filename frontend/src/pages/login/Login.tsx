@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import api from '../../services/api.js';
@@ -20,6 +20,21 @@ interface LoginResponse {
 export default function Login() {
   const navigate = useNavigate();
 
+  // 🚀 ALTERAÇÃO: Efeito de Blindagem de Tema
+  // Força o tema claro (ocean) na raiz do HTML apenas enquanto estiver na tela de login.
+  // Ao sair da tela (usuário logou), o "return" restaura imediatamente o tema escuro que estava salvo!
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'ocean');
+    document.documentElement.setAttribute('data-radius', 'modern');
+    
+    return () => {
+      const savedTheme = localStorage.getItem('wms_theme') || 'ocean';
+      const savedRadius = localStorage.getItem('wms_radius') || 'modern';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      document.documentElement.setAttribute('data-radius', savedRadius);
+    };
+  }, []);
+
   const [face, setFace] = useState<Face>('login');
 
   const [username, setUsername] = useState('');
@@ -38,7 +53,10 @@ export default function Login() {
     setErro(''); 
     setCarregando(true);
     try {
-      const { data } = await api.post<LoginResponse>('/auth/login', { username, senha });
+      const { data } = await api.post<LoginResponse>('/auth/login', { 
+        username: username.trim(), 
+        senha 
+      });
       
       if (data.precisaMudarSenha) {
         setSenhaAtual(senha); 
@@ -48,11 +66,10 @@ export default function Login() {
 
       localStorage.setItem('wms_token', data.token);
       localStorage.setItem('wms_refresh_token', data.refreshToken);
-      localStorage.setItem('wms_user', data.username || username);
+      localStorage.setItem('wms_user', data.username || username.trim());
       localStorage.setItem('wms_cargo', data.cargo || '');
       localStorage.setItem('wms_permissoes', JSON.stringify(data.permissoes || []));
       
-      // 🚀 ALTERAÇÃO: Redirecionamento inteligente baseado na permissão (Resolve o bug do Expedição não logar)
       const perms = data.permissoes || [];
       if (perms.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'))) {
         navigate('/');
@@ -79,7 +96,12 @@ export default function Login() {
     if (novaSenha !== confirmarNovaSenha) return setErroTroca('As senhas não coincidem.');
     setSalvando(true);
     try {
-      await api.post('/auth/alterar-senha', { username, novaSenha });
+      await api.post('/auth/alterar-senha', { 
+        username: username.trim(), 
+        senhaAtual, 
+        novaSenha 
+      });
+      
       toast.success('Senha atualizada com sucesso! Agora faça o login com as novas credenciais.');
       
       setFace('login');
