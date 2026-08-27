@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation, Link, Navigate } from 'react-router-dom';
 import { useState, type JSX } from 'react';
-import { ToastProvider } from './contexts/toastContext'; 
-import { ThemeProvider } from './contexts/themeContext'; 
+import { ToastProvider } from './contexts/toastContext';
+import { ThemeProvider } from './contexts/themeContext';
 
 import Home from './pages/home/Home.js';
 import PalletInterface from './pages/Interface/PalletInterface.js';
@@ -9,6 +9,26 @@ import Login from './pages/login/Login.js';
 import ProtectedRoute from './pages/home/components/ProtectedRoute.js';
 import GestorEnviosFull from './pages/mercadoFull/GestorEnviosFull.js';
 import Configuracoes from './pages/configuracoes/Configuracoes.js';
+
+// =========================================================================
+// 🚀 INTERCEPTADOR GLOBAL DE FETCH (LEÃO DE CHÁCARA)
+// Monitora todas as requisições nativas do navegador. Se receber um erro
+// 401 (Não Autorizado), significa que a sessão expirou ou o usuário 
+// logou em outra máquina. Ele força o logout automático.
+// =========================================================================
+const { fetch: originalFetch } = window;
+window.fetch = async (...args) => {
+  const response = await originalFetch(...args);
+  
+  if (response.status === 401 && window.location.pathname !== '/login') {
+    console.warn('⚠️ Sessão expirada ou acessada em outro local. Deslogando...');
+    localStorage.clear(); 
+    window.location.href = '/login'; 
+  }
+  
+  return response;
+};
+// =========================================================================
 
 function LayoutComum({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -42,22 +62,21 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] antialiased overflow-hidden relative">
       
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden animate-in fade-in"
           onClick={closeMobileMenu}
         />
       )}
 
-      <aside 
+      <aside
         onMouseEnter={() => setIsSidebarOpen(true)}
         onMouseLeave={() => setIsSidebarOpen(false)}
         className={`fixed md:relative top-0 left-0 h-full flex flex-col shrink-0 z-50 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] transition-all duration-300 ease-in-out
-          ${isMobileMenuOpen ? 'translate-x-0 w-64 shadow-2xl' : '-translate-x-full w-64'} 
+          ${isMobileMenuOpen ? 'translate-x-0 w-64 shadow-2xl' : '-translate-x-full w-64'}
           md:translate-x-0 ${isSidebarOpen ? 'md:w-64' : 'md:w-[76px]'}
         `}
       >
         <div className="flex h-16 items-center border-b border-[var(--sidebar-border)] shrink-0 px-5 overflow-hidden">
-          {/* 🚀 MUDANÇA: Logotipo Azul agora é um botão para fechar a sidebar no mobile */}
           <button type="button" onClick={closeMobileMenu} className="flex items-center h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors text-white shrink-0 justify-center shadow-sm cursor-pointer">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-[18px] h-[18px]">
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l3 1.75M9 20.25v-9" />

@@ -1,4 +1,3 @@
-// backend/src/controllers/maskController.ts
 
 /**
  * Retorna a máscara predefinida para um SKU específico.
@@ -10,10 +9,7 @@
  */
 export const getMascaraPorSku = (sku: string): string | null => {
   const regras: Record<string, string> = {
-    // 10 caracteres sendo letra ou numero
     '012400': 'XXXXXXXXXX', 
-    
-    // Inicia com BR e tem um total de 10 caracteres (BR + 8 alfanuméricos)
     '012249': 'BRXXXXXXXX', 
   };
 

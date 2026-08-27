@@ -2,15 +2,16 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto'; // 🚀 Importação nativa para gerar o UUID único da sessão
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const REFRESH_SECRET = process.env.REFRESH_SECRET || 'fallback_refresh_secret';
 
-interface TokenPayload {
+export interface TokenPayload {
   id: number;
   username: string;
-  // tenantId: number; // 🚀 Descomentaremos na Fase 4 (Multi-tenant)
+  sessaoToken: string; // 🚀 Adicionado ao payload
 }
 
 export const authController = {
@@ -22,7 +23,6 @@ export const authController = {
         return res.status(400).json({ error: 'Usuário e senha são obrigatórios' });
       }
 
-      // 🚀 ALTERAÇÃO: Adicionado o include para trazer o cargo e as permissões do banco
       const usuario = await prisma.usuario.findUnique({ 
         where: { username },
         include: { cargo: true }
@@ -37,11 +37,20 @@ export const authController = {
         return res.status(401).json({ error: 'Usuário ou senha incorretos' });
       }
 
-      const payload: TokenPayload = { id: usuario.id, username: usuario.username };
-      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
-      const refreshToken = jwt.sign({ id: usuario.id }, REFRESH_SECRET, { expiresIn: '7d' });
+      // 🚀 GERA UM ID ÚNICO PARA ESTA SESSÃO ESPECÍFICA E SALVA NO BANCO
+      const sessaoToken = crypto.randomUUID();
+      await prisma.usuario.update({
+        where: { id: usuario.id },
+        data: { sessaoToken } // Atualiza a sessão, derrubando dispositivos antigos
+      });
 
-      // 🚀 ALTERAÇÃO: Adicionado cargo e permissões na resposta da API
+      const payload: TokenPayload = { id: usuario.id, username: usuario.username, sessaoToken };
+      
+      // 🚀 ALTERADO PARA 1 DIA DE VALIDADE
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' }); 
+      // Refresh token também ajustado caso o sistema ainda o utilize em background
+      const refreshToken = jwt.sign({ id: usuario.id, sessaoToken }, REFRESH_SECRET, { expiresIn: '1d' });
+
       return res.json({
         token,
         refreshToken,
@@ -61,13 +70,16 @@ export const authController = {
       const { refreshToken } = req.body;
       if (!refreshToken) return res.status(401).json({ error: 'Refresh token ausente' });
 
-      const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as { id: number };
+      const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as { id: number, sessaoToken: string };
       const usuario = await prisma.usuario.findUnique({ where: { id: decoded.id } });
-      
-      if (!usuario) return res.status(401).json({ error: 'Usuário inválido ou inativo' });
 
-      const payload: TokenPayload = { id: usuario.id, username: usuario.username };
-      const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+      // Se a sessão no banco mudou, o refresh token antigo não serve mais!
+      if (!usuario || usuario.sessaoToken !== decoded.sessaoToken) {
+        return res.status(401).json({ error: 'Sessão encerrada ou usuário inválido' });
+      }
+
+      const payload: TokenPayload = { id: usuario.id, username: usuario.username, sessaoToken: usuario.sessaoToken };
+      const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
 
       return res.json({ token: newToken });
     } catch (error: unknown) {
@@ -84,12 +96,13 @@ export const authController = {
 
       const senhaCriptografada = await bcrypt.hash(novaSenha, 10);
 
+      // Ao mudar a senha, desloga todos os outros aparelhos limpando a sessão
       await prisma.usuario.update({
         where: { username },
-        data: { senha: senhaCriptografada, precisaMudarSenha: false }
+        data: { senha: senhaCriptografada, precisaMudarSenha: false, sessaoToken: null }
       });
 
-      return res.json({ mensagem: 'Senha atualizada com sucesso!' });
+      return res.json({ mensagem: 'Senha atualizada com sucesso! Faça login novamente.' });
     } catch (error: unknown) {
       console.error('🔥 [ERRO CRÍTICO - ALTERAR SENHA]:', error);
       return res.status(500).json({ error: 'Erro ao atualizar a senha' });
@@ -114,10 +127,10 @@ export const authController = {
 
       await prisma.usuario.update({
         where: { id: usuarioId },
-        data: { senha: novaSenhaCriptografada, precisaMudarSenha: false }
+        data: { senha: novaSenhaCriptografada, precisaMudarSenha: false, sessaoToken: null }
       });
 
-      return res.json({ mensagem: 'Senha atualizada com sucesso!' });
+      return res.json({ mensagem: 'Senha atualizada com sucesso! Faça login novamente.' });
     } catch (error: unknown) {
       console.error('🔥 [ERRO CRÍTICO - ALTERAR SENHA AUTENTICADO]:', error);
       return res.status(500).json({ error: 'Erro ao atualizar a senha' });
@@ -137,7 +150,7 @@ export const authController = {
       return res.status(201).json({ mensagem: `Usuário ${novoUsuario.username} criado com sucesso!` });
     } catch (error: any) {
       if (error.code === 'P2002') return res.status(400).json({ error: 'Este nome de usuário já existe' });
-      
+
       console.error('🔥 [ERRO CRÍTICO - CADASTRAR USUÁRIO]:', error);
       return res.status(500).json({ error: 'Erro ao criar usuário' });
     }
@@ -156,7 +169,7 @@ export const authController = {
       if (!usuario) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
       const senhaValida = await bcrypt.compare(senha, usuario.senha);
-      
+
       if (!senhaValida) {
         return res.status(401).json({ error: 'Senha incorreta. Ação bloqueada.' });
       }

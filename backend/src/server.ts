@@ -11,6 +11,9 @@ import inboundRoutes from './routes/inboundRoutes.js';
 import usuarioRoute from './routes/usuarioRoute.js';
 import cargoRoutes from './routes/cargoRoutes.js'; 
 
+// 🚀 IMPORTAÇÃO DO NOVO SERVIÇO DE VIGILÂNCIA DO BANCO
+import { KeepAliveService } from './services/KeepAliveService.js';
+
 dotenv.config();
 
 // A variável 'app' é criada aqui, então só podemos usar app.use() daqui para baixo!
@@ -25,7 +28,7 @@ const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 
 app.use(cors());
 
-// 🚀 CORREÇÃO DO LIMITE DE PAYLOAD (ERRO 413): Aumentado de 100kb para 50mb
+// CORREÇÃO DO LIMITE DE PAYLOAD (ERRO 413): Aumentado de 100kb para 50mb
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -65,14 +68,19 @@ app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.
 
 // ROTAS DA APLICAÇÃO
 app.use('/api', palletRoutes);
-app.use('/api/inbounds', inboundRoutes); // Rota inserida corretamente!
+app.use('/api/inbounds', inboundRoutes);
 app.use('/api/cargos', cargoRoutes);
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor ativo na porta ${PORT} | Versão: ${APP_VERSION}`);
+  
+  // 🚀 LIGA O CRON JOB ASSIM QUE O SERVIDOR FICA ONLINE
+  KeepAliveService.start();
 });
 
 const gracefulShutdown = async () => {
+  // 🚀 DESLIGA O CRON JOB ANTES DE DERRUBAR O SERVIDOR
+  KeepAliveService.stop();
   await prisma.$disconnect();
   process.exit(0);
 };
