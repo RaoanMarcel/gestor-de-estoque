@@ -1,17 +1,20 @@
+// backend/src/controllers/maskController.ts
 
 /**
  * Retorna a máscara predefinida para um SKU específico.
  * Legenda da Máscara:
- * L = Apenas Letras
- * N = Apenas Números
- * X = Letras ou Números (Alfanumérico)
- * Qualquer outro caractere será exigido exatamente como escrito (Ex: B, R, -)
+ * @ = Apenas Letras
+ * # = Apenas Números
+ * * = Letras ou Números (Alfanumérico)
+ * Qualquer outro caractere será exigido exatamente como escrito (Ex: B, R, -, N, A)
  */
 export const getMascaraPorSku = (sku: string): string | null => {
   const regras: Record<string, string> = {
-    '012400': 'XXXXXXXXXX', 
-    '012249': 'BRXXXXXXXX',
-    '003427': 'NAHXXXXXXXXXXXXXXXXX',
+    '012400': '**********', 
+    '012249': 'BR********',
+    '003427': 'NAH*****************', 
+    '013684': '########',
+    '012535': '**********',
   };
 
   return regras[sku] || null;
