@@ -10,7 +10,8 @@
 export const getMascaraPorSku = (sku: string): string | null => {
   const regras: Record<string, string> = {
     '012400': 'XXXXXXXXXX', 
-    '012249': 'BRXXXXXXXX', 
+    '012249': 'BRXXXXXXXX',
+    '003427': 'NAHXXXXXXXXXXXXXXXXX',
   };
 
   return regras[sku] || null;
