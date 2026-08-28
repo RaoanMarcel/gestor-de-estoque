@@ -21,8 +21,8 @@ const gerarMascara = (str: string) => {
   
   if (strUp.length <= 3) {
     return strUp.split('').map(char => {
-      if (/[0-9]/.test(char)) return 'N';
-      if (/[A-Z]/.test(char)) return 'L';
+      if (/[0-9]/.test(char)) return '#';
+      if (/[A-Z]/.test(char)) return '@';
       return char;
     }).join('');
   }
@@ -31,15 +31,15 @@ const gerarMascara = (str: string) => {
   const resto = strUp.substring(2);
   
   const mascaraResto = resto.split('').map(char => {
-    if (/[0-9]/.test(char)) return 'N';
-    if (/[A-Z]/.test(char)) return 'L';
+    if (/[0-9]/.test(char)) return '#';
+    if (/[A-Z]/.test(char)) return '@';
     return char;
   }).join('');
 
   return prefixo + mascaraResto;
 };
 
-// 🚀 NOVA FUNÇÃO: Validador de Máscara Robusto
+// 🚀 NOVA REGRA: * para alfanumérico, @ para letra, # para número
 const validarMascara = (codigo: string, mascara: string) => {
   if (codigo.length !== mascara.length) return false;
   
@@ -47,14 +47,14 @@ const validarMascara = (codigo: string, mascara: string) => {
     const charCod = codigo[i].toUpperCase();
     const charMasc = mascara[i].toUpperCase();
 
-    if (charMasc === 'N') {
+    if (charMasc === '#') {
       if (!/[0-9]/.test(charCod)) return false;
-    } else if (charMasc === 'L') {
+    } else if (charMasc === '@') {
       if (!/[A-Z]/.test(charCod)) return false;
-    } else if (charMasc === 'X') {
-      if (!/[A-Z0-9]/.test(charCod)) return false; // Letra ou Número
+    } else if (charMasc === '*') {
+      if (!/[A-Z0-9]/.test(charCod)) return false; // Alfanumérico
     } else {
-      if (charCod !== charMasc) return false; // Casos Literais (BR, -, etc)
+      if (charCod !== charMasc) return false; // Casos Literais (BR, NAH, -)
     }
   }
   return true;
