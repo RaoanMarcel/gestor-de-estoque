@@ -1,7 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { autenticarToken } from '../middlewares/authMiddleware.js';
 import { getAuth } from '../lib/auth.js';
-import { listarTenants, criarTenant, suspenderTenant } from '../controllers/superadminController.js';
+import {
+  listarTenants,
+  criarTenant,
+  atualizarTenant,
+  listarUsuariosGlobais,
+  adicionarUsuarioNoTenant,
+} from '../controllers/superadminController.js';
 
 const router = Router();
 
@@ -16,6 +22,8 @@ router.use(autenticarToken, requireSuperAdmin);
 
 router.get('/tenants', listarTenants);
 router.post('/tenants', criarTenant);
-router.patch('/tenants/:id/status', suspenderTenant);
+router.patch('/tenants/:id', atualizarTenant);
+router.post('/tenants/:id/usuarios', adicionarUsuarioNoTenant);
+router.get('/usuarios', listarUsuariosGlobais);
 
 export default router;

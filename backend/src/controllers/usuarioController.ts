@@ -6,14 +6,14 @@ import bcrypt from 'bcryptjs';
 export const listarUsuarios = async (req: Request, res: Response) => {
   try {
     const usuarios = await prisma.usuario.findMany({
-      select: { 
-        id: true, 
-        username: true, 
-        precisaMudarSenha: true, 
+      where: { isSuperAdmin: false }, // super-admin não aparece para os admins das empresas
+      select: {
+        id: true,
+        username: true,
+        precisaMudarSenha: true,
         createdAt: true,
-        // 🚀 ALTERAÇÃO: Adicionado o cargoId para o Frontend conseguir ler qual o cargo atual no select
-        cargoId: true, 
-        cargo: { select: { id: true, nome: true } } 
+        cargoId: true,
+        cargo: { select: { id: true, nome: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -62,12 +62,15 @@ export const atualizarCargoUsuario = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { cargoId } = req.body;
-    
+
+    const alvo = await prisma.usuario.findFirst({ where: { id: Number(id) }, select: { isSuperAdmin: true } });
+    if (!alvo || alvo.isSuperAdmin) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
     await prisma.usuario.update({
       where: { id: Number(id) },
       data: { cargoId: cargoId ? Number(cargoId) : null }
     });
-    
+
     res.json({ mensagem: 'Cargo do usuário atualizado com sucesso.' });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao atualizar o cargo do usuário.' });
@@ -77,6 +80,10 @@ export const atualizarCargoUsuario = async (req: Request, res: Response) => {
 export const excluirUsuario = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    const alvo = await prisma.usuario.findFirst({ where: { id: Number(id) }, select: { isSuperAdmin: true } });
+    if (!alvo || alvo.isSuperAdmin) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
     await prisma.usuario.delete({ where: { id: Number(id) } });
     res.json({ mensagem: 'Usuário excluído com sucesso.' });
   } catch (error) {

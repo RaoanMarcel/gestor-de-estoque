@@ -44,11 +44,12 @@ async function main() {
     },
   })
 
-  // conta dedicada de super-admin (cross-tenant) — usada só para criar/gerenciar tenants
+  // conta dedicada de super-admin (cross-tenant) — bootstrap/break-glass.
+  // A senha é sempre re-sincronizada a partir do env (troque depois de logar).
   const senhaSuper = await bcrypt.hash(process.env.SEED_SUPERADMIN_SENHA || 'super123', 10)
   const superadmin = await prisma.usuario.upsert({
     where: { username: 'superadmin' },
-    update: { isSuperAdmin: true },
+    update: { isSuperAdmin: true, senha: senhaSuper, precisaMudarSenha: false, sessaoToken: null, tenantId: tenant.id },
     create: {
       username: 'superadmin',
       senha: senhaSuper,

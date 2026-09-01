@@ -9,6 +9,7 @@ import Login from './pages/login/Login.js';
 import ProtectedRoute from './pages/home/components/ProtectedRoute.js';
 import GestorEnviosFull from './pages/mercadoFull/GestorEnviosFull.js';
 import RecebimentoMercadoria from './pages/recebimento/RecebimentoMercadoria.js';
+import SuperAdmin from './pages/superadmin/SuperAdmin.js';
 import Configuracoes from './pages/configuracoes/Configuracoes.js';
 
 // =========================================================================
@@ -24,6 +25,7 @@ const limparSessao = () => {
   localStorage.removeItem('wms_cargo');
   localStorage.removeItem('wms_permissoes');
   localStorage.removeItem('wms_tenant');
+  localStorage.removeItem('wms_superadmin');
 };
 
 const { fetch: originalFetch } = window;
@@ -58,6 +60,7 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   const inicialUsuario = usuarioLogado.charAt(0).toUpperCase();
   const cargoUsuario = localStorage.getItem('wms_cargo') || '';
   const tenantNome = localStorage.getItem('wms_tenant') || '';
+  const isSuperAdmin = localStorage.getItem('wms_superadmin') === 'true';
 
   const permissoesSalvas = localStorage.getItem('wms_permissoes');
   const permissoes: string[] = permissoesSalvas ? JSON.parse(permissoesSalvas) : [];
@@ -169,6 +172,17 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               </NavItem>
             </>
           )}
+
+          {isSuperAdmin && (
+            <>
+              <SidebarGroupLabel isOpen={isOpen} spaced>Plataforma</SidebarGroupLabel>
+              <NavItem to="/superadmin" title="Administração" label="Administração" isOpen={isOpen} active={isActive('/superadmin')} onClick={closeMobileMenu}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z" />
+                </svg>
+              </NavItem>
+            </>
+          )}
         </nav>
 
         <div className="mt-auto border-t border-[var(--sidebar-border)] p-3 flex flex-col gap-1 overflow-hidden shrink-0">
@@ -228,7 +242,7 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
             <span className="font-bold text-sm uppercase tracking-wide text-[var(--text-main)] truncate">
-                {isActive('/configuracoes') ? 'Configurações' : isActive('/mercado-full') ? 'Gestor Full' : isActive('/recebimento') ? 'Recebimento de Mercadoria' : 'WMS'}
+                {isActive('/configuracoes') ? 'Configurações' : isActive('/mercado-full') ? 'Gestor Full' : isActive('/recebimento') ? 'Recebimento de Mercadoria' : isActive('/superadmin') ? 'Administração' : 'WMS'}
             </span>
           </div>
           <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
@@ -237,7 +251,7 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Cabeçalho Desktop */}
-        {!isActive('/mercado-full') && !isActive('/recebimento') && (
+        {!isActive('/mercado-full') && !isActive('/recebimento') && !isActive('/superadmin') && (
           <header className="hidden md:flex h-16 shrink-0 items-center justify-between px-6 bg-[var(--header-bg)] border-b border-[var(--header-border)] backdrop-blur-xl z-30">
             <div className="text-[var(--header-text)] text-xs font-semibold tracking-wide uppercase">
               {isActive('/configuracoes') ? 'Configurações do Sistema' : 'WMS Operacional'}
@@ -359,6 +373,12 @@ function App() {
                   <RouteGuard permissoesObrigatorias={['recebimento']}>
                     <RecebimentoMercadoria />
                   </RouteGuard>
+                } />
+
+                <Route path="/superadmin" element={
+                  localStorage.getItem('wms_superadmin') === 'true'
+                    ? <SuperAdmin />
+                    : <Navigate to="/configuracoes" replace />
                 } />
 
                 <Route path="/configuracoes" element={<Configuracoes />} />

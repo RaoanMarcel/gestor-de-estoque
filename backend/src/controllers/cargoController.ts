@@ -14,6 +14,7 @@ export const listarCargosEUsuarios = async (req: Request, res: Response) => {
     
     // Trazemos os usuários apenas com ID, nome e o Cargo para listar na aba "Usuários Vinculados"
     const usuarios = await prisma.usuario.findMany({
+      where: { isSuperAdmin: false },
       select: { id: true, username: true, cargoId: true }
     });
 

@@ -72,9 +72,12 @@ export default function Login() {
       localStorage.setItem('wms_cargo', data.cargo || '');
       localStorage.setItem('wms_permissoes', JSON.stringify(data.permissoes || []));
       localStorage.setItem('wms_tenant', data.tenantNome || '');
-      
+      localStorage.setItem('wms_superadmin', data.isSuperAdmin ? 'true' : '');
+
       const perms = data.permissoes || [];
-      if (perms.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'))) {
+      if (data.isSuperAdmin) {
+        navigate('/superadmin');
+      } else if (perms.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'))) {
         navigate('/');
       } else if (perms.some(p => p.startsWith('full'))) {
         navigate('/mercado-full');
