@@ -206,25 +206,27 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
             <SidebarText isOpen={isOpen} className="ml-3 text-[13px] font-semibold">Sair do Sistema</SidebarText>
           </button>
 
-          <div className="flex items-center min-h-[46px] px-2 mt-1 border-t border-[var(--sidebar-border)] py-2 overflow-hidden">
+          <div className="flex items-center gap-3 min-h-[46px] px-2 mt-1 border-t border-[var(--sidebar-border)] py-2 overflow-hidden">
             <div className="h-[34px] w-[34px] rounded-full bg-white text-slate-800 flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
               {inicialUsuario}
             </div>
             <div
-              className={`ml-3 flex flex-col justify-center min-w-0 whitespace-nowrap transition-[opacity,transform] ${isOpen ? 'opacity-100 translate-x-0 duration-150 delay-75' : 'opacity-0 -translate-x-2 duration-75 pointer-events-none'}`}
+              className={`flex-1 flex items-center justify-between gap-2 min-w-0 whitespace-nowrap transition-[opacity,transform] ${isOpen ? 'opacity-100 translate-x-0 duration-150 delay-75' : 'opacity-0 -translate-x-2 duration-75 pointer-events-none'}`}
               aria-hidden={!isOpen}
             >
-              <span className="text-[13px] font-semibold text-[var(--sidebar-text-hover)] tracking-wide truncate leading-tight">
-                {usuarioLogado}
-              </span>
-              {tenantNome && (
-                <span className="text-[10px] font-semibold text-[var(--sidebar-text)] opacity-70 truncate mt-0.5 leading-tight">
-                  {tenantNome}
+              <div className="flex flex-col min-w-0 leading-tight">
+                <span className="text-[13px] font-semibold text-[var(--sidebar-text-hover)] tracking-wide truncate">
+                  {usuarioLogado}
                 </span>
-              )}
-              {cargoUsuario && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sidebar-text)] opacity-50 truncate leading-tight">
-                  {cargoUsuario}
+                {cargoUsuario && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sidebar-text)] opacity-60 truncate">
+                    {cargoUsuario}
+                  </span>
+                )}
+              </div>
+              {tenantNome && (
+                <span className="shrink-0 max-w-[42%] text-[10px] font-medium text-[var(--sidebar-text)] opacity-60 truncate">
+                  {tenantNome}
                 </span>
               )}
             </div>
@@ -327,6 +329,15 @@ function NavItem({ to, title, label, isOpen, active, onClick, children }: {
   );
 }
 
+function SuperAdminRoute() {
+  // Componente (não JSX inline) — reavalia o localStorage a cada render,
+  // senão a checagem ficaria congelada no valor de quando o App montou.
+  if (localStorage.getItem('wms_superadmin') !== 'true') {
+    return <Navigate to="/configuracoes" replace />;
+  }
+  return <SuperAdmin />;
+}
+
 function RouteGuard({ permissoesObrigatorias, children }: { permissoesObrigatorias: string[], children: JSX.Element }) {
   const permissoesSalvas = localStorage.getItem('wms_permissoes');
   const permissoes: string[] = permissoesSalvas ? JSON.parse(permissoesSalvas) : [];
@@ -375,11 +386,7 @@ function App() {
                   </RouteGuard>
                 } />
 
-                <Route path="/superadmin" element={
-                  localStorage.getItem('wms_superadmin') === 'true'
-                    ? <SuperAdmin />
-                    : <Navigate to="/configuracoes" replace />
-                } />
+                <Route path="/superadmin" element={<SuperAdminRoute />} />
 
                 <Route path="/configuracoes" element={<Configuracoes />} />
               </Route>

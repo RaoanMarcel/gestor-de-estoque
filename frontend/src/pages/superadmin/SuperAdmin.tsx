@@ -53,11 +53,14 @@ export default function SuperAdmin() {
   const carregar = async () => {
     setCarregando(true);
     try {
-      const [t, u] = await Promise.all([api('/superadmin/tenants'), api('/superadmin/usuarios')]);
+      const t = await api('/superadmin/tenants');
       if (t.ok) setTenants((await t.json()).tenants || []);
+      else throw new Error('tenants ' + t.status);
+      const u = await api('/superadmin/usuarios');
       if (u.ok) setUsuarios((await u.json()).usuarios || []);
-    } catch {
-      toast.error('Falha ao carregar dados da plataforma.');
+      else throw new Error('usuarios ' + u.status);
+    } catch (e: any) {
+      toast.error('Falha ao carregar dados da plataforma.' + (e?.message ? ` (${e.message})` : ''));
     } finally {
       setCarregando(false);
     }
