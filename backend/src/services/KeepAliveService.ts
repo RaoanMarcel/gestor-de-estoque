@@ -1,8 +1,6 @@
 // backend/src/services/KeepAliveService.ts
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prismaUnscoped as prisma } from '../lib/prisma.js';
 
 export class KeepAliveService {
   private static intervalId: ReturnType<typeof setInterval> | null = null;

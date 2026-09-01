@@ -1,14 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
+import { runWithTenant } from '../lib/tenantContext.js';
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 export interface TokenPayload {
   id: number;
   username: string;
-  sessaoToken: string; // 🚀 Sessão incluída na checagem
+  sessaoToken: string;
+  tenantId: number;
+  isSuperAdmin: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -25,23 +27,52 @@ export const autenticarToken = async (req: Request, res: Response, next: NextFun
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
-    
-    // 🚀 VALIDAÇÃO DE SESSÃO ÚNICA NO BANCO DE DADOS
+
+    // Validação de sessão única + tenant. `bypassRls` porque ainda não há contexto.
     const usuarioDb = await prisma.usuario.findUnique({
       where: { id: decoded.id },
-      select: { sessaoToken: true }
+      select: {
+        sessaoToken: true,
+        tenantId: true,
+        isSuperAdmin: true,
+        tenant: { select: { status: true } },
+      },
     });
 
-    // Se a sessão no banco for diferente da sessão do Token, alguém logou em outra máquina
     if (!usuarioDb || usuarioDb.sessaoToken !== decoded.sessaoToken) {
-      return res.status(401).json({ 
-        error: 'Sessão encerrada.', 
-        mensagem: 'Sua conta foi acessada em outro dispositivo. Faça login novamente.' 
+      return res.status(401).json({
+        error: 'Sessão encerrada.',
+        mensagem: 'Sua conta foi acessada em outro dispositivo. Faça login novamente.',
       });
     }
 
-    (req as AuthRequest).usuario = decoded;
-    next();
+    if (!usuarioDb.isSuperAdmin && usuarioDb.tenant?.status !== 'ATIVO') {
+      return res.status(403).json({
+        code: 'TENANT_SUSPENSO',
+        error: 'Acesso suspenso.',
+        mensagem: 'O acesso da sua empresa está suspenso. Fale com o suporte.',
+      });
+    }
+
+    const payload: TokenPayload = {
+      id: decoded.id,
+      username: decoded.username,
+      sessaoToken: decoded.sessaoToken,
+      tenantId: usuarioDb.tenantId,
+      isSuperAdmin: usuarioDb.isSuperAdmin,
+    };
+    (req as AuthRequest).usuario = payload;
+
+    // Ativa o escopo de tenant para todo o resto da cadeia deste request.
+    return runWithTenant(
+      {
+        tenantId: payload.isSuperAdmin ? null : payload.tenantId,
+        isSuperAdmin: payload.isSuperAdmin,
+        usuarioId: payload.id,
+        username: payload.username,
+      },
+      () => next()
+    );
   } catch (error: unknown) {
     return res.status(401).json({ error: 'Token de segurança inválido ou expirado.' });
   }

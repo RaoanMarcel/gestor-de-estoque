@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import ExcelJS from 'exceljs'; 
+import { prisma } from '../lib/prisma.js';
+import { getAuth } from '../lib/auth.js';
+import ExcelJS from 'exceljs';
 import { getMascaraPorSku } from './maskController.js'; // 🚀 IMPORTANDO O ARQUIVO DE MÁSCARAS
-
-const prisma = new PrismaClient();
 
 const decodeZPLText = (text: string) => {
   const urlEncoded = text.replace(/_([0-9A-Fa-f]{2})/g, '%$1');
@@ -14,23 +13,9 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
   try {
     const { nomePallet } = req.body;
     const arquivoTxt = (req as any).file;
-    let usuarioId = (req as any).usuario?.id || (req as any).user?.id || (req as any).usuarioId || null;
-    const usuarioImportadorFront = req.body.usuarioImportador;
-
-    if (!usuarioId && usuarioImportadorFront && usuarioImportadorFront !== 'Operador_X') {
-      try {
-        const userDb = await prisma.usuario.findFirst({
-          where: { 
-            OR: [
-              { username: { equals: String(usuarioImportadorFront), mode: 'insensitive' } }
-            ]
-          }
-        });
-        if (userDb) usuarioId = userDb.id;
-      } catch (e) {
-        console.log('Aviso: Falha ao buscar usuário no DB por username.');
-      }
-    }
+    const auth = getAuth(req);
+    const usuarioId = auth?.id ?? null;
+    const tid = auth!.tenantId;
 
     if (!arquivoTxt || !arquivoTxt.buffer) return res.status(400).json({ error: 'Nenhum arquivo TXT foi enviado.' });
 
@@ -81,8 +66,9 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
       data: {
         numeroFrete: null,
         nomePallet,
-        status: 'PENDENTE', 
+        status: 'PENDENTE',
         usuarioId: usuarioId ? Number(usuarioId) : null,
+        tenantId: tid,
         skus: {
           create: skusExtraidos.map(item => ({
             sku: item.sku,
@@ -91,7 +77,8 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
             quantidadeBipada: 0,
             status: 'PENDENTE',
             variacoes: item.variacoes,
-            leituras: []
+            leituras: [],
+            tenantId: tid
           }))
         }
       },
@@ -114,10 +101,11 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
 export const cadastrarMotorista = async (req: Request, res: Response) => {
   try {
     const { nome } = req.body;
+    const tid = getAuth(req)!.tenantId;
     if (!nome) return res.status(400).json({ error: 'O nome do motorista é obrigatório.' });
     const existe = await prisma.motorista.findFirst({ where: { nome: { equals: nome.trim(), mode: 'insensitive' } } });
     if (existe) return res.status(400).json({ error: 'Este motorista já está cadastrado no sistema.' });
-    const novoMotorista = await prisma.motorista.create({ data: { nome: nome.trim() } });
+    const novoMotorista = await prisma.motorista.create({ data: { nome: nome.trim(), tenantId: tid } });
     return res.status(201).json({ mensagem: 'Motorista cadastrado com sucesso!', motorista: novoMotorista });
   } catch (error) { return res.status(500).json({ error: 'Erro interno ao cadastrar motorista.' }); }
 };
@@ -125,11 +113,12 @@ export const cadastrarMotorista = async (req: Request, res: Response) => {
 export const cadastrarVeiculo = async (req: Request, res: Response) => {
   try {
     const { modelo, placa } = req.body;
+    const tid = getAuth(req)!.tenantId;
     if (!modelo || !placa) return res.status(400).json({ error: 'Modelo e placa são obrigatórios.' });
     const placaLimpa = placa.trim().toUpperCase();
-    const existe = await prisma.veiculo.findUnique({ where: { placa: placaLimpa } });
+    const existe = await prisma.veiculo.findFirst({ where: { placa: placaLimpa } });
     if (existe) return res.status(400).json({ error: 'Esta placa já está cadastrada no sistema.' });
-    const novoVeiculo = await prisma.veiculo.create({ data: { modelo: modelo.trim(), placa: placaLimpa } });
+    const novoVeiculo = await prisma.veiculo.create({ data: { modelo: modelo.trim(), placa: placaLimpa, tenantId: tid } });
     return res.status(201).json({ mensagem: 'Veículo cadastrado com sucesso!', veiculo: novoVeiculo });
   } catch (error) { return res.status(500).json({ error: 'Erro interno ao cadastrar veículo.' }); }
 };

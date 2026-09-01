@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation, Link, Navigate } from 'react-router-dom';
-import { useState, type JSX } from 'react';
+import { useState, useRef, type JSX } from 'react';
 import { ToastProvider } from './contexts/toastContext';
 import { ThemeProvider } from './contexts/themeContext';
 
@@ -8,6 +8,7 @@ import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
 import ProtectedRoute from './pages/home/components/ProtectedRoute.js';
 import GestorEnviosFull from './pages/mercadoFull/GestorEnviosFull.js';
+import RecebimentoMercadoria from './pages/recebimento/RecebimentoMercadoria.js';
 import Configuracoes from './pages/configuracoes/Configuracoes.js';
 
 // =========================================================================
@@ -16,23 +17,36 @@ import Configuracoes from './pages/configuracoes/Configuracoes.js';
 // 401 (Não Autorizado), significa que a sessão expirou ou o usuário 
 // logou em outra máquina. Ele força o logout automático.
 // =========================================================================
+const limparSessao = () => {
+  localStorage.removeItem('wms_token');
+  localStorage.removeItem('wms_refresh_token');
+  localStorage.removeItem('wms_user');
+  localStorage.removeItem('wms_cargo');
+  localStorage.removeItem('wms_permissoes');
+  localStorage.removeItem('wms_tenant');
+};
+
 const { fetch: originalFetch } = window;
 window.fetch = async (...args) => {
   const response = await originalFetch(...args);
-  
-  if (response.status === 401 && window.location.pathname !== '/login') {
-    console.warn('⚠️ Sessão expirada ou acessada em outro local. Deslogando...');
-    
-    // 🚀 CORREÇÃO 1: Remoção cirúrgica (Preserva as cores e apaga só a segurança)
-    localStorage.removeItem('wms_token');
-    localStorage.removeItem('wms_refresh_token');
-    localStorage.removeItem('wms_user');
-    localStorage.removeItem('wms_cargo');
-    localStorage.removeItem('wms_permissoes');
-    
-    window.location.href = '/login'; 
+
+  if (window.location.pathname !== '/login') {
+    if (response.status === 401) {
+      console.warn('⚠️ Sessão expirada ou acessada em outro local. Deslogando...');
+      limparSessao();
+      window.location.href = '/login';
+    } else if (response.status === 403) {
+      const clone = response.clone();
+      clone.json().then((body) => {
+        if (body?.code === 'TENANT_SUSPENSO') {
+          limparSessao();
+          alert('O acesso da sua empresa foi suspenso. Fale com o suporte.');
+          window.location.href = '/login';
+        }
+      }).catch(() => {});
+    }
   }
-  
+
   return response;
 };
 // =========================================================================
@@ -43,26 +57,34 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
   const usuarioLogado = localStorage.getItem('wms_user') || 'Operador';
   const inicialUsuario = usuarioLogado.charAt(0).toUpperCase();
   const cargoUsuario = localStorage.getItem('wms_cargo') || '';
+  const tenantNome = localStorage.getItem('wms_tenant') || '';
 
   const permissoesSalvas = localStorage.getItem('wms_permissoes');
   const permissoes: string[] = permissoesSalvas ? JSON.parse(permissoesSalvas) : [];
 
   const podeVerArmazem = permissoes.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'));
   const podeVerFull = permissoes.some(p => p.startsWith('full'));
+  const podeVerRecebimento = permissoes.some(p => p.startsWith('recebimento'));
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const isOpen = isSidebarOpen || isMobileMenuOpen;
 
+  // Hover-intent: só expande depois de ~180ms com o mouse parado sobre a sidebar
+  // (evita abrir sem querer ao passar de raspão); recolhe na hora ao sair.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSidebarEnter = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setIsSidebarOpen(true), 45);
+  };
+  const handleSidebarLeave = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setIsSidebarOpen(false);
+  };
+
   const handleLogout = () => {
-    // 🚀 CORREÇÃO 1: Remoção cirúrgica no botão Sair (Preserva o layout)
-    localStorage.removeItem('wms_token');
-    localStorage.removeItem('wms_refresh_token');
-    localStorage.removeItem('wms_user');
-    localStorage.removeItem('wms_cargo');
-    localStorage.removeItem('wms_permissoes');
-    
+    limparSessao();
     window.location.href = '/login';
   };
 
@@ -92,9 +114,9 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
       )}
 
       <aside
-        onMouseEnter={() => setIsSidebarOpen(true)}
-        onMouseLeave={() => setIsSidebarOpen(false)}
-        className={`fixed md:relative top-0 left-0 h-full flex flex-col shrink-0 z-50 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] transition-all duration-300 ease-in-out
+        onMouseEnter={handleSidebarEnter}
+        onMouseLeave={handleSidebarLeave}
+        className={`fixed md:relative top-0 left-0 h-full flex flex-col shrink-0 z-50 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] transition-[width,transform] duration-200 ease-out
           ${isMobileMenuOpen ? 'translate-x-0 w-64 shadow-2xl' : '-translate-x-full w-64'}
           md:translate-x-0 ${isSidebarOpen ? 'md:w-64' : 'md:w-[76px]'}
         `}
@@ -105,91 +127,92 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l3 1.75M9 20.25v-9" />
             </svg>
           </button>
-          <span className={`font-bold tracking-wide text-white whitespace-nowrap overflow-hidden transition-all duration-300 ${isOpen ? 'w-auto max-w-[180px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
+          <SidebarText isOpen={isOpen} className="ml-3 font-bold tracking-wide text-white">
             Gestão de Estoque
-          </span>
+          </SidebarText>
         </div>
 
-        <nav className="flex-1 flex flex-col overflow-y-auto py-6 px-3 space-y-2 scrollbar-hide">
-          
+        <nav className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden py-5 px-3 gap-1 scrollbar-hide">
+
           {podeVerArmazem && (
             <>
-              <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'h-auto opacity-100 mb-3 ml-2' : 'h-0 opacity-0 mb-0 ml-0'}`}>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-70">Principal</p>
-              </div>
-              <div className={`h-px w-6 bg-[var(--sidebar-border)] mx-auto transition-all duration-300 ${isOpen ? 'my-0 opacity-0 h-0' : 'my-4 opacity-100 h-px'}`} />
-              
-              <Link onClick={closeMobileMenu} to="/" title="Visão do Armazém" className={`flex items-center h-11 px-3 rounded-lg transition-all duration-200 shrink-0 ${isActive('/') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 shrink-0 ${!isOpen && 'mx-auto'}`}>
+              <SidebarGroupLabel isOpen={isOpen}>Principal</SidebarGroupLabel>
+              <NavItem to="/" title="Triagens" label="Triagens" isOpen={isOpen} active={isActive('/')} onClick={closeMobileMenu}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                   <rect x="3" y="3" width="7" height="7" rx="1.5" />
                   <rect x="14" y="3" width="7" height="7" rx="1.5" />
                   <rect x="14" y="14" width="7" height="7" rx="1.5" />
                   <rect x="3" y="14" width="7" height="7" rx="1.5" />
                 </svg>
-                <span className={`text-[13px] font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ${isOpen ? 'w-auto max-w-[150px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
-                  Triagens
-                </span>
-              </Link>
+              </NavItem>
             </>
           )}
 
           {podeVerFull && (
             <>
-              <div className={`overflow-hidden mt-8 transition-all duration-300 ${isOpen ? 'h-auto opacity-100 mb-3 ml-2' : 'h-0 opacity-0 mb-0 ml-0 mt-0'}`}>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-70">Operações Externas</p>
-              </div>
-              <div className={`h-px w-6 bg-[var(--sidebar-border)] mx-auto transition-all duration-300 ${isOpen ? 'my-0 opacity-0 h-0' : 'my-6 opacity-100 h-px'}`} />
-              
-              <Link onClick={closeMobileMenu} to="/mercado-full" title="Mercado Full" className={`flex items-center h-11 px-3 rounded-lg transition-all duration-200 shrink-0 ${isActive('/mercado-full') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 shrink-0 ${!isOpen && 'mx-auto'}`}>
+              <SidebarGroupLabel isOpen={isOpen} spaced>Operações Externas</SidebarGroupLabel>
+              <NavItem to="/mercado-full" title="Mercado Full" label="Mercado Full" isOpen={isOpen} active={isActive('/mercado-full')} onClick={closeMobileMenu}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
                 </svg>
-                <span className={`text-[13px] font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ${isOpen ? 'w-auto max-w-[150px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
-                  Mercado Full
-                </span>
-              </Link>
+              </NavItem>
+            </>
+          )}
+
+          {podeVerRecebimento && (
+            <>
+              <SidebarGroupLabel isOpen={isOpen} spaced>Produtos</SidebarGroupLabel>
+              <NavItem to="/recebimento" title="Recebimento de Mercadoria" label="Recebimento de Mercadoria" isOpen={isOpen} active={isActive('/recebimento')} onClick={closeMobileMenu}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+                </svg>
+              </NavItem>
             </>
           )}
         </nav>
 
         <div className="mt-auto border-t border-[var(--sidebar-border)] p-3 flex flex-col gap-1 overflow-hidden shrink-0">
-          
-          <Link onClick={closeMobileMenu} to="/configuracoes" title="Configurações" className={`flex items-center h-11 px-3 rounded-lg transition-all duration-200 shrink-0 ${isActive('/configuracoes') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 shrink-0 transition-transform ${!isOpen && 'mx-auto'} ${!isActive('/configuracoes') && 'group-hover:rotate-45'}`}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854-.107-1.204l-.527-.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className={`text-[13px] font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ${isOpen ? 'w-auto max-w-[150px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
-              Configurações
+
+          <Link onClick={closeMobileMenu} to="/configuracoes" title="Configurações" className={`group/navitem flex items-center h-11 rounded-lg shrink-0 transition-[color,background-color,padding] duration-200 ${isOpen ? 'px-3' : 'px-4'} ${isActive('/configuracoes') ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'}`}>
+            <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
             </span>
+            <SidebarText isOpen={isOpen} className="ml-3 text-[13px] font-semibold">Configurações</SidebarText>
           </Link>
 
-          <button onClick={handleLogout} title="Sair do Sistema" className="flex items-center h-11 px-3 rounded-lg text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all duration-200 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 shrink-0 ${!isOpen && 'mx-auto'}`}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-            </svg>
-            <span className={`text-[13px] font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ${isOpen ? 'w-auto max-w-[150px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
-              Sair do Sistema
+          <button onClick={handleLogout} title="Sair do Sistema" className={`flex items-center h-11 rounded-lg shrink-0 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-[color,background-color,padding] duration-200 ${isOpen ? 'px-3' : 'px-4'}`}>
+            <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+              </svg>
             </span>
+            <SidebarText isOpen={isOpen} className="ml-3 text-[13px] font-semibold">Sair do Sistema</SidebarText>
           </button>
 
-          <div className="flex flex-col gap-1 overflow-hidden w-full mt-1 border-t border-[var(--sidebar-border)] pt-2">
-            <div className="flex items-center px-1 py-1 transition-all duration-300">
-              <div className={`flex items-center w-full ${!isOpen && 'justify-center'}`}>
-                <div className="h-[34px] w-[34px] rounded-full bg-white text-slate-800 flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
-                  {inicialUsuario}
-                </div>
-                <div className={`flex flex-col justify-center overflow-hidden transition-all duration-300 ${isOpen ? 'w-auto max-w-[120px] opacity-100 ml-3' : 'w-0 max-w-0 opacity-0 ml-0'}`}>
-                  <span className="text-[13px] font-semibold text-[var(--sidebar-text-hover)] tracking-wide truncate leading-tight">
-                    {usuarioLogado}
-                  </span>
-                  {cargoUsuario && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sidebar-text)] opacity-70 truncate mt-0.5 leading-tight">
-                      {cargoUsuario}
-                    </span>
-                  )}
-                </div>
-              </div>
+          <div className="flex items-center min-h-[46px] px-2 mt-1 border-t border-[var(--sidebar-border)] py-2 overflow-hidden">
+            <div className="h-[34px] w-[34px] rounded-full bg-white text-slate-800 flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
+              {inicialUsuario}
+            </div>
+            <div
+              className={`ml-3 flex flex-col justify-center min-w-0 whitespace-nowrap transition-[opacity,transform] ${isOpen ? 'opacity-100 translate-x-0 duration-150 delay-75' : 'opacity-0 -translate-x-2 duration-75 pointer-events-none'}`}
+              aria-hidden={!isOpen}
+            >
+              <span className="text-[13px] font-semibold text-[var(--sidebar-text-hover)] tracking-wide truncate leading-tight">
+                {usuarioLogado}
+              </span>
+              {tenantNome && (
+                <span className="text-[10px] font-semibold text-[var(--sidebar-text)] opacity-70 truncate mt-0.5 leading-tight">
+                  {tenantNome}
+                </span>
+              )}
+              {cargoUsuario && (
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sidebar-text)] opacity-50 truncate leading-tight">
+                  {cargoUsuario}
+                </span>
+              )}
             </div>
           </div>
 
@@ -205,7 +228,7 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
             <span className="font-bold text-sm uppercase tracking-wide text-[var(--text-main)] truncate">
-                {isActive('/configuracoes') ? 'Configurações' : isActive('/mercado-full') ? 'Gestor Full' : 'WMS'}
+                {isActive('/configuracoes') ? 'Configurações' : isActive('/mercado-full') ? 'Gestor Full' : isActive('/recebimento') ? 'Recebimento de Mercadoria' : 'WMS'}
             </span>
           </div>
           <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
@@ -214,7 +237,7 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Cabeçalho Desktop */}
-        {!isActive('/mercado-full') && (
+        {!isActive('/mercado-full') && !isActive('/recebimento') && (
           <header className="hidden md:flex h-16 shrink-0 items-center justify-between px-6 bg-[var(--header-bg)] border-b border-[var(--header-border)] backdrop-blur-xl z-30">
             <div className="text-[var(--header-text)] text-xs font-semibold tracking-wide uppercase">
               {isActive('/configuracoes') ? 'Configurações do Sistema' : 'WMS Operacional'}
@@ -227,6 +250,66 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+  );
+}
+
+// Rótulo de texto da sidebar (títulos de seção e labels dos itens): quando a sidebar
+// está recolhida fica 100% invisível (opacity-0 + largura clipada pelo overflow-hidden
+// do <aside>); ao expandir, aparece com um pequeno atraso para "acompanhar" a abertura
+// do painel — nunca mostra pedaços de letra no estado recolhido.
+function SidebarText({ children, isOpen, muted = false, className = '' }: {
+  children: React.ReactNode; isOpen: boolean; muted?: boolean; className?: string;
+}) {
+  return (
+    <span
+      className={`whitespace-nowrap transition-[opacity,transform] ${
+        isOpen
+          ? 'opacity-100 translate-x-0 duration-150 delay-75'
+          : 'opacity-0 -translate-x-2 duration-75 delay-0 pointer-events-none'
+      } ${muted ? 'opacity-60' : ''} ${className}`}
+      aria-hidden={!isOpen}
+    >
+      {children}
+    </span>
+  );
+}
+
+// Cabeçalho de seção: altura fixa nos dois estados para os ícones NUNCA se moverem na vertical.
+function SidebarGroupLabel({ children, isOpen, spaced = false }: { children: React.ReactNode; isOpen: boolean; spaced?: boolean }) {
+  return (
+    <div className={`h-7 flex items-end px-3 shrink-0 overflow-hidden ${spaced ? 'mt-4' : ''}`}>
+      <span
+        className={`text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--sidebar-text)] whitespace-nowrap transition-[opacity,transform] ${
+          isOpen ? 'opacity-60 translate-x-0 duration-150 delay-75' : 'opacity-0 -translate-x-2 duration-75'
+        }`}
+        aria-hidden={!isOpen}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
+// Item de navegação: ícone em slot de largura fixa (não desliza) + rótulo controlado por SidebarText.
+function NavItem({ to, title, label, isOpen, active, onClick, children }: {
+  to: string; title: string; label: string; isOpen: boolean; active: boolean; onClick?: () => void; children: React.ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      title={title}
+      onClick={onClick}
+      className={`flex items-center h-11 rounded-lg shrink-0 transition-[color,background-color,padding] duration-200 ${
+        isOpen ? 'px-3' : 'px-4'
+      } ${
+        active
+          ? 'bg-blue-600 text-white shadow-md'
+          : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-hover)]'
+      }`}
+    >
+      <span className="w-5 h-5 shrink-0 flex items-center justify-center">{children}</span>
+      <SidebarText isOpen={isOpen} className="ml-3 text-[13px] font-semibold">{label}</SidebarText>
+    </Link>
   );
 }
 
@@ -269,6 +352,12 @@ function App() {
                 <Route path="/mercado-full" element={
                   <RouteGuard permissoesObrigatorias={['full']}>
                     <GestorEnviosFull />
+                  </RouteGuard>
+                } />
+
+                <Route path="/recebimento" element={
+                  <RouteGuard permissoesObrigatorias={['recebimento']}>
+                    <RecebimentoMercadoria />
                   </RouteGuard>
                 } />
 

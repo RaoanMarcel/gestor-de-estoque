@@ -1,31 +1,26 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { 
+import {
   processarInboundPdf,
   cadastrarMotorista,
   cadastrarVeiculo,
   listarDashboard,
   finalizarInbound,
-  acaoCoordenador
+  acaoCoordenador,
 } from '../controllers/inboundController.js';
+import { autenticarToken } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Rota POST que recebe o arquivo TXT/ZPL e o nome do pallet
-router.post('/upload', upload.single('inboundPdf'), processarInboundPdf);
+// Todas as rotas de inbound exigem autenticação (o tenant vem do token).
+router.use(autenticarToken);
 
-// Rotas para cadastro de frota
+router.post('/upload', upload.single('inboundPdf'), processarInboundPdf);
 router.post('/motoristas', cadastrarMotorista);
 router.post('/veiculos', cadastrarVeiculo);
-
-// Rota para listar tudo na tela inicial
 router.get('/dashboard', listarDashboard);
-
-// Rota para finalizar a carga amarrando o motorista e o veículo
 router.put('/:id/finalizar', finalizarInbound);
-
-// Rota para a lixeira e finalização de envio (requer senha)
 router.post('/:id/coordenador', acaoCoordenador);
 
 export default router;

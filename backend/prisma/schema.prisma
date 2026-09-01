@@ -7,51 +7,91 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Tenant {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  slug      String   @unique
+  status    String   @default("ATIVO") // ATIVO | SUSPENSO
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pallets       Pallet[]
+  produtos      ProdutoPallet[]
+  historicos    HistoricoMovimentacao[]
+  cargos        Cargo[]
+  usuarios      Usuario[]
+  contadores    Contador[]
+  motoristas    Motorista[]
+  veiculos      Veiculo[]
+  inbounds      InboundFull[]
+  inboundSkus   InboundSku[]
+  recebimentos  Recebimento[]
+  recebimentoItens RecebimentoItem[]
+}
+
 model Pallet {
   id        Int             @id @default(autoincrement())
-  numero    String          @unique
+  numero    String
   rua       String?
   estrutura String?
   nivel     String?
-  descricao String?         
-  tipo      String?         
+  descricao String?
+  tipo      String?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
-  produtos  ProdutoPallet[] 
+  produtos  ProdutoPallet[]
+
+  tenantId  Int
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, numero])
 }
 
 model ProdutoPallet {
   id         Int      @id @default(autoincrement())
-  codigoItem String   @unique
+  codigoItem String
   palletId   Int
   bipadoEm   DateTime @default(now())
   pallet     Pallet   @relation(fields: [palletId], references: [id], onDelete: Cascade)
-  
+
   usuarioId  Int?
   usuario    Usuario? @relation(fields: [usuarioId], references: [id])
+
+  tenantId   Int
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, codigoItem])
 }
 
 model HistoricoMovimentacao {
   id             Int      @id @default(autoincrement())
-  codigoItem     String   
-  codigoAnterior String?  
-  acao           String   
-  palletOrigem   String?  
-  palletDestino  String?  
+  codigoItem     String
+  codigoAnterior String?
+  acao           String
+  palletOrigem   String?
+  palletDestino  String?
   palletAlvo     String?
   usuarioId      Int?
   usuario        Usuario? @relation(fields: [usuarioId], references: [id])
   bipadoEm       DateTime @default(now())
   createdAt      DateTime @default(now())
+
+  tenantId       Int
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
 }
 
 model Cargo {
   id         Int       @id @default(autoincrement())
-  nome       String    @unique
-  permissoes Json      
-  usuarios   Usuario[] 
+  nome       String
+  permissoes Json
+  usuarios   Usuario[]
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+
+  tenantId   Int
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, nome])
 }
 
 model Usuario {
@@ -60,20 +100,30 @@ model Usuario {
   senha              String
   precisaMudarSenha  Boolean  @default(true)
   sessaoToken        String?
-  
+  isSuperAdmin       Boolean  @default(false)
+
   cargoId            Int?
   cargo              Cargo?   @relation(fields: [cargoId], references: [id], onDelete: SetNull)
 
+  tenantId           Int
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+
   createdAt          DateTime @default(now())
   historicos         HistoricoMovimentacao[]
-  inbounds           InboundFull[] 
-  produtosBipados    ProdutoPallet[] 
+  inbounds           InboundFull[]
+  produtosBipados    ProdutoPallet[]
+  recebimentos       Recebimento[]
 }
 
 model Contador {
-  id    Int    @id @default(autoincrement())
-  chave String @unique
-  valor Int    @default(0)
+  id       Int    @id @default(autoincrement())
+  chave    String
+  valor    Int    @default(0)
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, chave])
 }
 
 model Motorista {
@@ -81,24 +131,32 @@ model Motorista {
   nome      String
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
-  inbounds  InboundFull[] 
+  inbounds  InboundFull[]
+
+  tenantId  Int
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
 }
 
 model Veiculo {
   id        Int           @id @default(autoincrement())
-  modelo    String        
-  placa     String        @unique 
+  modelo    String
+  placa     String
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
-  inbounds  InboundFull[] 
+  inbounds  InboundFull[]
+
+  tenantId  Int
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, placa])
 }
 
 model InboundFull {
   id          Int          @id @default(autoincrement())
-  numeroFrete String?      
-  nomePallet  String       
-  status      String       @default("PENDENTE") 
-  
+  numeroFrete String?
+  nomePallet  String
+  status      String       @default("PENDENTE")
+
   usuarioId   Int?
   usuario     Usuario?     @relation(fields: [usuarioId], references: [id])
 
@@ -107,26 +165,90 @@ model InboundFull {
 
   veiculoId   Int?
   veiculo     Veiculo?     @relation(fields: [veiculoId], references: [id])
-  
+
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  
-  skus        InboundSku[] 
+
+  skus        InboundSku[]
+
+  tenantId    Int
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
 }
 
 model InboundSku {
   id               Int         @id @default(autoincrement())
   inboundId        Int
   inbound          InboundFull @relation(fields: [inboundId], references: [id], onDelete: Cascade)
-  sku              String      
-  descricao        String      
-  quantidadeTotal  Int         
-  quantidadeBipada Int         @default(0) 
-  status           String      @default("PENDENTE") 
-  variacoes        Json?       
-  
-  leituras         Json?       
+  sku              String
+  descricao        String
+  quantidadeTotal  Int
+  quantidadeBipada Int         @default(0)
+  status           String      @default("PENDENTE")
+  variacoes        Json?
+
+  leituras         Json?
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+
+  tenantId         Int
+  tenant           Tenant      @relation(fields: [tenantId], references: [id])
+}
+
+model Recebimento {
+  id             Int      @id @default(autoincrement())
+  identificacao  String
+  numeroNota     String?
+  serieNota      String?
+  chaveAcesso    String?
+  fornecedor     String?
+  fornecedorCnpj String?
+  valorTotal     Float?
+  dataEmissao    DateTime?
+  dataAgendada   DateTime?
+  observacao     String?
+  status         String   @default("AGENDADO")
+  xmlOriginal    String?
+
+  usuarioId      Int?
+  usuario        Usuario? @relation(fields: [usuarioId], references: [id])
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  itens          RecebimentoItem[]
+
+  tenantId       Int
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, chaveAcesso])
+}
+
+model RecebimentoItem {
+  id                  Int         @id @default(autoincrement())
+  recebimentoId       Int
+  recebimento         Recebimento @relation(fields: [recebimentoId], references: [id], onDelete: Cascade)
+
+  numItem             Int
+  codigoProduto       String
+  ean                 String?
+  eanTributavel       String?
+  descricao           String
+  ncm                 String?
+  cfop                String?
+  unidade             String?
+  quantidade          Float
+  valorUnitario       Float?
+  valorTotal          Float?
+
+  precisaConferencia  Boolean     @default(true)
+  quantidadeConferida Float       @default(0)
+  status              String      @default("PENDENTE")
+  leituras            Json?
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  tenantId            Int
+  tenant              Tenant      @relation(fields: [tenantId], references: [id])
 }

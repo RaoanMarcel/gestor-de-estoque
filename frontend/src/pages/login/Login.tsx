@@ -15,6 +15,8 @@ interface LoginResponse {
   username: string;
   cargo?: string;
   permissoes?: string[];
+  tenantNome?: string;
+  isSuperAdmin?: boolean;
 }
 
 export default function Login() {
@@ -69,6 +71,7 @@ export default function Login() {
       localStorage.setItem('wms_user', data.username || username.trim());
       localStorage.setItem('wms_cargo', data.cargo || '');
       localStorage.setItem('wms_permissoes', JSON.stringify(data.permissoes || []));
+      localStorage.setItem('wms_tenant', data.tenantNome || '');
       
       const perms = data.permissoes || [];
       if (perms.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'))) {

@@ -15,6 +15,29 @@ interface InboundSKU {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// A trava de concorrência via socket é compartilhada com o Recebimento; o prefixo evita
+// que InboundSku #N e RecebimentoItem #N colidam na mesma chave do servidor.
+const lockKey = (id: number | string) => `full:${id}`;
+const POR_PAGINA = 6;
+
+// Paginador simples com tokens de tema — some quando só há uma página.
+function Paginador({ pagina, totalPaginas, onChange }: { pagina: number; totalPaginas: number; onChange: (p: number) => void }) {
+  if (totalPaginas <= 1) return null;
+  const btn = 'h-9 min-w-9 px-2 rounded-lg border text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
+  const paginas = Array.from({ length: totalPaginas }, (_, i) => i + 1);
+  return (
+    <div className="flex items-center justify-center gap-1.5 mt-6 flex-wrap">
+      <button className={`${btn} border-[var(--border-color)] bg-[var(--bg-panel)] text-[var(--text-main)] hover:border-blue-500`} disabled={pagina <= 1} onClick={() => onChange(pagina - 1)}>‹</button>
+      {totalPaginas <= 7
+        ? paginas.map((p) => (
+            <button key={p} onClick={() => onChange(p)} className={`${btn} ${p === pagina ? 'bg-blue-600 border-blue-600 text-white' : 'border-[var(--border-color)] bg-[var(--bg-panel)] text-[var(--text-main)] hover:border-blue-500'}`}>{p}</button>
+          ))
+        : <span className="px-3 text-sm font-bold text-[var(--text-muted)]">Página {pagina} de {totalPaginas}</span>}
+      <button className={`${btn} border-[var(--border-color)] bg-[var(--bg-panel)] text-[var(--text-main)] hover:border-blue-500`} disabled={pagina >= totalPaginas} onClick={() => onChange(pagina + 1)}>›</button>
+    </div>
+  );
+}
+
 const gerarMascara = (str: string) => {
   if (!str) return '';
   const strUp = str.toUpperCase().trim();
@@ -146,25 +169,45 @@ export default function GestorEnviosFull() {
   const [dataFim, setDataFim] = useState(dataFimPadrao);
 
   const [filtros, setFiltros] = useState({ PENDENTE: true, EM_PROCESSO: true, CONCLUIDO: true, ENVIADO: true });
+  const [pagina, setPagina] = useState(1);
 
   const [modalCoord, setModalCoord] = useState<{isOpen: boolean, inboundId: number | null, acao: 'EXCLUIR' | 'ENVIAR' | null, nomePallet: string}>({
     isOpen: false, inboundId: null, acao: null, nomePallet: ''
   });
 
   const [lockedSkus, setLockedSkus] = useState<Record<string, string>>({});
+  const skuTravadoRef = useRef<number | null>(null);
 
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    socket.on('sku_locks_initial', (data: Record<string, string>) => setLockedSkus(data));
-    socket.on('sku_lock_update', ({ skuId, lockedBy }: { skuId: string, lockedBy: string | null }) => {
+    const onLocksInitial = (data: Record<string, string>) => setLockedSkus(data);
+    const onLockUpdate = ({ skuId, lockedBy }: { skuId: string, lockedBy: string | null }) => {
       setLockedSkus(prev => { const novo = { ...prev }; if (lockedBy) novo[skuId] = lockedBy; else delete novo[skuId]; return novo; });
-    });
-    socket.on('sku_locked_error', (data: { skuId: string, usuario: string }) => {
+    };
+    const onLockedError = (data: { skuId: string, usuario: string }) => {
       toast.error(`Atenção! O usuário ${data.usuario} já está conferindo este produto.`);
       setSkuEmBipagem(null); setIsScanning(false);
-    });
-    return () => { socket.off('sku_locks_initial'); socket.off('sku_lock_update'); socket.off('sku_locked_error'); };
+    };
+    const onConnect = () => socket.emit('request_sku_locks');
+
+    socket.on('sku_locks_initial', onLocksInitial);
+    socket.on('sku_lock_update', onLockUpdate);
+    socket.on('sku_locked_error', onLockedError);
+    socket.on('connect', onConnect);
+    socket.emit('request_sku_locks'); // puxa o estado atual mesmo se o socket já estava conectado
+
+    return () => {
+      socket.off('sku_locks_initial', onLocksInitial);
+      socket.off('sku_lock_update', onLockUpdate);
+      socket.off('sku_locked_error', onLockedError);
+      socket.off('connect', onConnect);
+      if (skuTravadoRef.current != null) {
+        socket.emit('unlock_sku', { skuId: lockKey(skuTravadoRef.current) });
+        skuTravadoRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const carregarDashboard = async () => {
@@ -296,11 +339,16 @@ export default function GestorEnviosFull() {
   };
 
   const handleAbrirProduto = (item: InboundSKU) => {
-    if (lockedSkus[item.id] && lockedSkus[item.id] !== getUsuarioLogado()) {
-      return toast.error(`Atenção! O usuário ${lockedSkus[item.id]} já está conferindo este produto agora mesmo.`);
+    if (!socket.connected) {
+      return toast.error('Sem conexão em tempo real. Recarregue a página antes de bipar.');
     }
-    
-    socket.emit('lock_sku', { skuId: item.id, usuario: getUsuarioLogado() });
+    const dono = lockedSkus[lockKey(item.id)];
+    if (dono && dono !== getUsuarioLogado()) {
+      return toast.error(`${dono} já está conferindo este produto agora mesmo.`);
+    }
+
+    socket.emit('lock_sku', { skuId: lockKey(item.id), usuario: getUsuarioLogado() });
+    skuTravadoRef.current = item.id;
 
     setSkuEmBipagem(item);
     
@@ -322,7 +370,10 @@ export default function GestorEnviosFull() {
   };
 
   const fecharModoBipagem = () => {
-    if (skuEmBipagem) socket.emit('unlock_sku', { skuId: skuEmBipagem.id });
+    if (skuTravadoRef.current != null) {
+      socket.emit('unlock_sku', { skuId: lockKey(skuTravadoRef.current) });
+      skuTravadoRef.current = null;
+    }
     setSkuEmBipagem(null);
     setIsScanning(false);
     setModoTravado(false);
@@ -468,9 +519,9 @@ export default function GestorEnviosFull() {
   };
 
   const HeaderGlobal = ({ showClose = true, onClose = () => navigate('/') }) => (
-    <div className="p-4 border-b border-gray-100 bg-white sticky top-0 z-10 flex items-center justify-between min-h-[80px]">
+    <div className="p-4 border-b border-[var(--border-color)] bg-[var(--bg-panel)] sticky top-0 z-10 flex items-center justify-between min-h-[80px]">
       {showClose ? (
-        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-full transition shadow-sm border border-gray-100">
+        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] bg-[var(--bg-main)] hover:bg-[var(--border-color)] rounded-full transition shadow-sm border border-[var(--border-color)]">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
         </button>
       ) : <div className="w-10 h-10"></div>}
@@ -478,7 +529,7 @@ export default function GestorEnviosFull() {
         <span className="text-[#00a650] italic font-black text-[24px] leading-none tracking-tight flex items-center">
           <svg className="w-5 h-5 mr-0.5 fill-[#00a650] stroke-[#00a650]" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg> FULL
         </span>
-        <span className="font-bold text-slate-800 text-base uppercase tracking-widest mt-0.5">Gestor de Envios</span>
+        <span className="font-bold text-[var(--text-main)] text-base uppercase tracking-widest mt-0.5">Gestor de Envios</span>
       </div>
       <div className="w-10 h-10"></div>
     </div>
@@ -517,32 +568,38 @@ export default function GestorEnviosFull() {
 
   const todosSkusConcluidosNaTela = skus.length > 0 && skus.every(s => s.quantidadeBipada >= s.quantidadeTotal);
 
+  // Paginação (6 por página) da lista "Envios Recentes" — volta à página 1 ao filtrar
+  useEffect(() => { setPagina(1); }, [termoBusca, filtros, dataInicio, dataFim]);
+  const totalPaginas = Math.max(1, Math.ceil(inboundsFiltrados.length / POR_PAGINA));
+  const paginaSegura = Math.min(pagina, totalPaginas);
+  const inboundsPagina = inboundsFiltrados.slice((paginaSegura - 1) * POR_PAGINA, paginaSegura * POR_PAGINA);
+
   return (
-    <div className="min-h-screen bg-[#F6F8FC] md:p-8 flex items-start justify-center font-sans antialiased relative">
+    <div className="min-h-screen bg-[var(--bg-main)] md:p-8 flex items-start justify-center font-sans antialiased relative">
       
       {/* MODAL DE CONFIRMAÇÃO DE MODO */}
       {modoConfirmModal.isOpen && (
         <div className="fixed inset-0 z-[120] w-screen h-screen flex items-center justify-center bg-slate-900/40 backdrop-blur-[3px] p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="p-4 border-b bg-[#1e293b] flex justify-between items-center text-white">
+          <div className="bg-[var(--bg-panel)] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="p-4 border-b bg-blue-600 flex justify-between items-center text-white">
               <h3 className="font-bold">Confirmação de Modo</h3>
               <button type="button" onClick={() => setModoConfirmModal({ isOpen: false, novoModo: null })} className="hover:opacity-75">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="p-6 text-center">
-              <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              <p className="text-sm text-[var(--text-muted)] mb-6 leading-relaxed">
                 Deseja fixar o modo de bipagem como <strong>{modoConfirmModal.novoModo === 'SERIE' ? 'NÚMERO DE SÉRIE' : 'SKU / EAN'}</strong>?<br/><br/>
-                <span className="text-[#00a650] font-bold">Isso garantirá o padrão na leitura deste item!</span>
+                <span className="text-blue-600 font-bold">Isso garantirá o padrão na leitura deste item!</span>
               </p>
               <div className="flex gap-3 mt-4">
-                <button type="button" onClick={() => setModoConfirmModal({ isOpen: false, novoModo: null })} className="flex-1 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition">Cancelar</button>
+                <button type="button" onClick={() => setModoConfirmModal({ isOpen: false, novoModo: null })} className="flex-1 py-3 text-sm font-bold text-[var(--text-muted)] bg-[var(--bg-main)] hover:bg-[var(--border-color)] rounded-xl transition">Cancelar</button>
                 <button type="button" onClick={() => { 
                     setModoBipagem(modoConfirmModal.novoModo as any); 
                     setModoTravado(true); 
                     setModoConfirmModal({ isOpen: false, novoModo: null }); 
                   }} 
-                  className="flex-1 font-bold py-3 rounded-xl transition shadow-md text-white bg-[#00a650] hover:bg-green-700">Confirmar
+                  className="flex-1 font-bold py-3 rounded-xl transition shadow-md text-white bg-blue-600 hover:bg-blue-700">Confirmar
                 </button>
               </div>
             </div>
@@ -552,16 +609,16 @@ export default function GestorEnviosFull() {
 
       {modalCoord.isOpen && (
         <div className="fixed inset-0 z-[110] w-screen h-screen flex items-center justify-center bg-slate-900/40 backdrop-blur-[3px] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className={`p-4 border-b flex justify-between items-center text-white ${modalCoord.acao === 'EXCLUIR' ? 'bg-red-600' : 'bg-[#00a650]'}`}>
+          <div className="bg-[var(--bg-panel)] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className={`p-4 border-b flex justify-between items-center text-white ${modalCoord.acao === 'EXCLUIR' ? 'bg-red-600' : 'bg-blue-600'}`}>
               <h3 className="font-bold">Confirmação de Ação</h3>
               <button type="button" onClick={() => setModalCoord({ isOpen: false, inboundId: null, acao: null, nomePallet: '' })} className="hover:opacity-75"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
             <form onSubmit={handleAcaoCoordenador} className="p-6 text-center">
-              <p className="text-sm text-gray-600 mb-6 leading-relaxed">Você tem certeza que deseja <strong>{modalCoord.acao === 'EXCLUIR' ? 'APAGAR' : 'DESPACHAR'}</strong> o envio abaixo?<br/><br/><span className="font-bold text-gray-900 text-lg border-b-2 border-gray-200 pb-1">{modalCoord.nomePallet}</span></p>
+              <p className="text-sm text-[var(--text-muted)] mb-6 leading-relaxed">Você tem certeza que deseja <strong>{modalCoord.acao === 'EXCLUIR' ? 'APAGAR' : 'DESPACHAR'}</strong> o envio abaixo?<br/><br/><span className="font-bold text-[var(--text-main)] text-lg border-b-2 border-[var(--border-color)] pb-1">{modalCoord.nomePallet}</span></p>
               <div className="flex gap-3 mt-4">
-                <button type="button" onClick={() => setModalCoord({ isOpen: false, inboundId: null, acao: null, nomePallet: '' })} className="flex-1 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition">Cancelar</button>
-                <button type="submit" className={`flex-1 font-bold py-3 rounded-xl transition shadow-md text-white ${modalCoord.acao === 'EXCLUIR' ? 'bg-red-600 hover:bg-red-700' : 'bg-[#00a650] hover:bg-green-700'}`}>Confirmar</button>
+                <button type="button" onClick={() => setModalCoord({ isOpen: false, inboundId: null, acao: null, nomePallet: '' })} className="flex-1 py-3 text-sm font-bold text-[var(--text-muted)] bg-[var(--bg-main)] hover:bg-[var(--border-color)] rounded-xl transition">Cancelar</button>
+                <button type="submit" className={`flex-1 font-bold py-3 rounded-xl transition shadow-md text-white ${modalCoord.acao === 'EXCLUIR' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>Confirmar</button>
               </div>
             </form>
           </div>
@@ -570,11 +627,11 @@ export default function GestorEnviosFull() {
 
       {showModalMotorista && (
         <div className="fixed inset-0 z-[100] w-screen h-screen flex items-center justify-center bg-slate-900/30 backdrop-blur-[3px] p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
-            <div className="bg-gray-50 p-4 border-b flex justify-between items-center"><h3 className="font-bold">Cadastrar Motorista</h3><button onClick={() => setShowModalMotorista(false)}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div>
+          <div className="bg-[var(--bg-panel)] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="bg-[var(--bg-main)] p-4 border-b flex justify-between items-center"><h3 className="font-bold">Cadastrar Motorista</h3><button onClick={() => setShowModalMotorista(false)}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div>
             <form onSubmit={handleSalvarMotorista} className="p-5">
-              <input type="text" value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} placeholder="Nome Completo" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-[#00a650]" autoFocus/>
-              <button type="submit" className="w-full bg-[#00a650] text-white font-bold py-3 rounded-xl hover:bg-green-700">Salvar</button>
+              <input type="text" value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} placeholder="Nome Completo" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-blue-500" autoFocus/>
+              <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700">Salvar</button>
             </form>
           </div>
         </div>
@@ -582,173 +639,174 @@ export default function GestorEnviosFull() {
 
       {showModalVeiculo && (
         <div className="fixed inset-0 z-[100] w-screen h-screen flex items-center justify-center bg-slate-900/30 backdrop-blur-[3px] p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
-            <div className="bg-gray-50 p-4 border-b flex justify-between items-center"><h3 className="font-bold">Cadastrar Veículo</h3><button onClick={() => setShowModalVeiculo(false)}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div>
+          <div className="bg-[var(--bg-panel)] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="bg-[var(--bg-main)] p-4 border-b flex justify-between items-center"><h3 className="font-bold">Cadastrar Veículo</h3><button onClick={() => setShowModalVeiculo(false)}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div>
             <form onSubmit={handleSalvarVeiculo} className="p-5">
-              <input type="text" value={nomeVeiculo} onChange={(e) => setNomeVeiculo(e.target.value)} placeholder="Modelo / Nome" className="w-full border rounded-lg p-3 text-sm mb-4 focus:ring-2 focus:ring-[#00a650]" autoFocus/>
-              <input type="text" value={placaVeiculo} onChange={(e) => setPlacaVeiculo(e.target.value.toUpperCase())} placeholder="ABC-1234" maxLength={8} className="w-full border rounded-lg p-3 text-sm mb-5 uppercase tracking-widest font-bold focus:ring-2 focus:ring-[#00a650]"/>
-              <button type="submit" className="w-full bg-[#00a650] text-white font-bold py-3 rounded-xl hover:bg-green-700">Salvar</button>
+              <input type="text" value={nomeVeiculo} onChange={(e) => setNomeVeiculo(e.target.value)} placeholder="Modelo / Nome" className="w-full border rounded-lg p-3 text-sm mb-4 focus:ring-2 focus:ring-blue-500" autoFocus/>
+              <input type="text" value={placaVeiculo} onChange={(e) => setPlacaVeiculo(e.target.value.toUpperCase())} placeholder="ABC-1234" maxLength={8} className="w-full border rounded-lg p-3 text-sm mb-5 uppercase tracking-widest font-bold focus:ring-2 focus:ring-blue-500"/>
+              <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700">Salvar</button>
             </form>
           </div>
         </div>
       )}
 
-      <div className="w-full min-h-screen md:min-h-0 md:max-w-2xl bg-white md:rounded-2xl md:shadow-xl border border-gray-200 flex flex-col overflow-hidden transition-all duration-300">
+      <div className="w-full min-h-screen md:min-h-0 md:max-w-2xl bg-[var(--bg-panel)] md:rounded-2xl md:shadow-xl border border-[var(--border-color)] flex flex-col overflow-hidden transition-all duration-300">
         
         {/* ================= TELA 1 ================= */}
         {currentScreen === 1 && (
           <div className="flex flex-col h-full animate-in fade-in duration-300">
-            <div className="p-4 border-b border-gray-100 bg-white sticky top-0 z-10 flex items-center justify-between min-h-[80px]">
+            <div className="p-4 border-b border-[var(--border-color)] bg-[var(--bg-panel)] sticky top-0 z-10 flex items-center justify-between min-h-[80px]">
               <div className="w-10 h-10"></div> 
               <div className="flex-1 flex items-center justify-center gap-2">
                 <span className="text-[#00a650] italic font-black text-[24px] leading-none tracking-tight flex items-center">
                   <svg className="w-5 h-5 mr-0.5 fill-[#00a650] stroke-[#00a650]" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
                   FULL
                 </span>
-                <span className="font-bold text-slate-800 text-base uppercase tracking-widest mt-0.5">Gestor de Envios</span>
+                <span className="font-bold text-[var(--text-main)] text-base uppercase tracking-widest mt-0.5">Gestor de Envios</span>
               </div>
               <div className="w-10 h-10"></div>
             </div>
             
-            <div className="p-5 flex-1 bg-gray-50 flex flex-col overflow-y-auto">
+            <div className="p-5 flex-1 bg-[var(--bg-main)] flex flex-col overflow-y-auto">
               
-              <button onClick={() => setCurrentScreen(2)} className="w-full bg-[#1e293b] text-[#00a650] font-semibold py-4 rounded-xl mb-6 flex items-center justify-center gap-2 transition hover:bg-slate-800 shadow-md">
+              <button onClick={() => setCurrentScreen(2)} className="w-full bg-blue-600 text-white font-semibold py-4 rounded-xl mb-6 flex items-center justify-center gap-2 transition hover:bg-blue-700 shadow-md">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg> Adicionar Novo Envio
               </button>
               
-              <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-3 mt-2">Gerenciamento de Ativos</h3>
+              <h3 className="font-bold text-[var(--text-main)] text-xs uppercase tracking-wider mb-3 mt-2">Gerenciamento de Ativos</h3>
               <div className="grid grid-cols-2 gap-3 mb-4 items-start">
-                <button onClick={() => setShowModalMotorista(true)} className="w-full bg-white border border-[#00a650] text-[#00a650] font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-green-50 transition"><span className="text-lg leading-none">+</span> Motorista</button>
-                <button onClick={() => setShowModalVeiculo(true)} className="w-full bg-white border border-[#00a650] text-[#00a650] font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-green-50 transition"><span className="text-lg leading-none">+</span> Veículo</button>
+                <button onClick={() => setShowModalMotorista(true)} className="w-full bg-[var(--bg-panel)] border border-blue-500 text-blue-600 font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-blue-500/10 transition"><span className="text-lg leading-none">+</span> Motorista</button>
+                <button onClick={() => setShowModalVeiculo(true)} className="w-full bg-[var(--bg-panel)] border border-blue-500 text-blue-600 font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-blue-500/10 transition"><span className="text-lg leading-none">+</span> Veículo</button>
               </div>
               
               <div className="grid grid-cols-2 gap-3 mb-6 items-start">
-                <div className="border border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm h-max">
-                  <button onClick={() => { setShowMotoristasList(!showMotoristasList); setShowVeiculosList(false); }} className="w-full px-3 py-2 flex items-center justify-between bg-white hover:bg-gray-50 transition">
-                    <span className="text-[11px] font-bold text-gray-600 uppercase flex items-center gap-1.5"><svg className="w-4 h-4 text-[#00a650]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg> Motoristas</span>
-                    <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showMotoristasList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+                <div className="border border-[var(--border-color)] bg-[var(--bg-panel)] rounded-lg overflow-hidden shadow-sm h-max">
+                  <button onClick={() => { setShowMotoristasList(!showMotoristasList); setShowVeiculosList(false); }} className="w-full px-3 py-2 flex items-center justify-between bg-[var(--bg-panel)] hover:bg-[var(--bg-main)] transition">
+                    <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase flex items-center gap-1.5"><svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg> Motoristas</span>
+                    <svg className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform ${showMotoristasList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
                   </button>
                   {showMotoristasList && (
-                    <div className="p-2 max-h-48 overflow-y-auto space-y-1 border-t border-gray-100">
-                      {dashboardData.motoristas?.length > 0 ? ( dashboardData.motoristas.map(m => (<div key={m.id} className="text-xs text-gray-700 py-1.5 px-2 hover:bg-gray-50 rounded uppercase font-medium">{m.nome}</div>)) ) : (<div className="text-[10px] text-gray-400 italic p-2 text-center">Vazio</div>)}
+                    <div className="p-2 max-h-48 overflow-y-auto space-y-1 border-t border-[var(--border-color)]">
+                      {dashboardData.motoristas?.length > 0 ? ( dashboardData.motoristas.map(m => (<div key={m.id} className="text-xs text-[var(--text-main)] py-1.5 px-2 hover:bg-[var(--bg-main)] rounded uppercase font-medium">{m.nome}</div>)) ) : (<div className="text-[10px] text-[var(--text-muted)] italic p-2 text-center">Vazio</div>)}
                     </div>
                   )}
                 </div>
 
-                <div className="border border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm h-max">
-                  <button onClick={() => { setShowVeiculosList(!showVeiculosList); setShowMotoristasList(false); }} className="w-full px-3 py-2 flex items-center justify-between bg-white hover:bg-gray-50 transition">
-                    <span className="text-[11px] font-bold text-gray-600 uppercase flex items-center gap-1.5"><svg className="w-4 h-4 text-[#00a650]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg> Veículos</span>
-                    <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showVeiculosList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+                <div className="border border-[var(--border-color)] bg-[var(--bg-panel)] rounded-lg overflow-hidden shadow-sm h-max">
+                  <button onClick={() => { setShowVeiculosList(!showVeiculosList); setShowMotoristasList(false); }} className="w-full px-3 py-2 flex items-center justify-between bg-[var(--bg-panel)] hover:bg-[var(--bg-main)] transition">
+                    <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase flex items-center gap-1.5"><svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg> Veículos</span>
+                    <svg className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform ${showVeiculosList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
                   </button>
                   {showVeiculosList && (
-                    <div className="p-2 max-h-48 overflow-y-auto space-y-1 border-t border-gray-100">
-                      {dashboardData.veiculos?.length > 0 ? ( dashboardData.veiculos.map(v => (<div key={v.id} className="text-xs text-gray-700 py-1.5 px-2 hover:bg-gray-50 rounded uppercase font-medium flex justify-between"><span>{v.modelo}</span><span className="font-bold text-gray-400">{v.placa}</span></div>)) ) : (<div className="text-[10px] text-gray-400 italic p-2 text-center">Vazio</div>)}
+                    <div className="p-2 max-h-48 overflow-y-auto space-y-1 border-t border-[var(--border-color)]">
+                      {dashboardData.veiculos?.length > 0 ? ( dashboardData.veiculos.map(v => (<div key={v.id} className="text-xs text-[var(--text-main)] py-1.5 px-2 hover:bg-[var(--bg-main)] rounded uppercase font-medium flex justify-between"><span>{v.modelo}</span><span className="font-bold text-[var(--text-muted)]">{v.placa}</span></div>)) ) : (<div className="text-[10px] text-[var(--text-muted)] italic p-2 text-center">Vazio</div>)}
                     </div>
                   )}
                 </div>
               </div>
 
               <div className="relative mb-3">
-                <svg className="w-4 h-4 absolute left-3.5 top-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                <input type="text" placeholder="Buscar por Pallet, Motorista, Placa, Série, EAN..." value={termoBusca} onChange={(e) => setTermoBusca(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-[#00a650] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-100 shadow-sm transition placeholder:text-gray-400 font-medium" />
+                <svg className="w-4 h-4 absolute left-3.5 top-3.5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <input type="text" placeholder="Buscar por Pallet, Motorista, Placa, Série, EAN..." value={termoBusca} onChange={(e) => setTermoBusca(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-[var(--bg-panel)] border border-blue-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm transition placeholder:text-[var(--text-muted)] font-medium" />
               </div>
 
               <div className="mb-4 mt-2">
-                <label className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-3 block">Data</label>
-                <div className="flex items-center w-full border border-gray-300 rounded-lg overflow-hidden shadow-sm bg-white">
-                  <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="flex-1 p-2.5 text-sm text-gray-700 focus:outline-none focus:bg-gray-50 transition" />
-                  <div className="bg-gray-100 px-3 py-3 text-sm font-medium text-gray-500 border-x border-gray-300">Até</div>
-                  <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="flex-1 p-2.5 text-sm text-gray-700 focus:outline-none focus:bg-gray-50 transition" />
+                <label className="font-bold text-[var(--text-main)] text-xs uppercase tracking-wider mb-3 block">Data</label>
+                <div className="flex items-center w-full border border-[var(--border-color)] rounded-lg overflow-hidden shadow-sm bg-[var(--bg-panel)]">
+                  <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="flex-1 p-2.5 text-sm text-[var(--text-main)] focus:outline-none focus:bg-[var(--bg-main)] transition" />
+                  <div className="bg-[var(--bg-main)] px-3 py-3 text-sm font-medium text-[var(--text-muted)] border-x border-[var(--border-color)]">Até</div>
+                  <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="flex-1 p-2.5 text-sm text-[var(--text-main)] focus:outline-none focus:bg-[var(--bg-main)] transition" />
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 pb-6">
-                <label className={`flex items-center gap-1.5 cursor-pointer bg-white px-3 py-2 rounded-lg border ${filtros.PENDENTE && filtros.EM_PROCESSO && filtros.CONCLUIDO && filtros.ENVIADO ? 'border-gray-400 text-gray-700' : 'border-gray-200 text-gray-500'} shadow-sm text-xs font-bold transition`}>
+              <div className="flex flex-wrap gap-2 mb-6 border-b border-[var(--border-color)] pb-6">
+                <label className={`flex items-center gap-1.5 cursor-pointer bg-[var(--bg-panel)] px-3 py-2 rounded-lg border ${filtros.PENDENTE && filtros.EM_PROCESSO && filtros.CONCLUIDO && filtros.ENVIADO ? 'border-[var(--text-muted)] text-[var(--text-main)]' : 'border-[var(--border-color)] text-[var(--text-muted)]'} shadow-sm text-xs font-bold transition`}>
                   <input type="checkbox" checked={filtros.PENDENTE && filtros.EM_PROCESSO && filtros.CONCLUIDO && filtros.ENVIADO} onChange={toggleTodos} style={{ accentColor: '#475569' }} className="w-4 h-4 rounded cursor-pointer" /> Marcar Todos
                 </label>
-                <label className={`flex items-center gap-1.5 cursor-pointer bg-white px-3 py-2 rounded-lg border ${filtros.PENDENTE ? 'border-red-500 text-red-600' : 'border-gray-200 text-gray-500'} shadow-sm text-xs font-bold transition`}>
+                <label className={`flex items-center gap-1.5 cursor-pointer bg-[var(--bg-panel)] px-3 py-2 rounded-lg border ${filtros.PENDENTE ? 'border-red-500 text-rose-600' : 'border-[var(--border-color)] text-[var(--text-muted)]'} shadow-sm text-xs font-bold transition`}>
                   <input type="checkbox" checked={filtros.PENDENTE} onChange={() => toggleFiltro('PENDENTE')} style={{ accentColor: '#ef4444' }} className="w-4 h-4 rounded cursor-pointer" />
-                  Envio Importado <span className={`ml-1 text-[13px] font-black ${filtros.PENDENTE ? 'text-red-600' : 'text-gray-500'}`}>{countPendente}</span>
+                  Envio Importado <span className={`ml-1 text-[13px] font-black ${filtros.PENDENTE ? 'text-rose-600' : 'text-[var(--text-muted)]'}`}>{countPendente}</span>
                 </label>
-                <label className={`flex items-center gap-1.5 cursor-pointer bg-white px-3 py-2 rounded-lg border ${filtros.EM_PROCESSO ? 'border-blue-500 text-blue-600' : 'border-gray-200 text-gray-500'} shadow-sm text-xs font-bold transition`}>
+                <label className={`flex items-center gap-1.5 cursor-pointer bg-[var(--bg-panel)] px-3 py-2 rounded-lg border ${filtros.EM_PROCESSO ? 'border-blue-500 text-blue-600' : 'border-[var(--border-color)] text-[var(--text-muted)]'} shadow-sm text-xs font-bold transition`}>
                   <input type="checkbox" checked={filtros.EM_PROCESSO} onChange={() => toggleFiltro('EM_PROCESSO')} style={{ accentColor: '#3b82f6' }} className="w-4 h-4 rounded cursor-pointer" />
-                  Em Processo <span className={`ml-1 text-[13px] font-black ${filtros.EM_PROCESSO ? 'text-blue-600' : 'text-gray-500'}`}>{countProcesso}</span>
+                  Em Processo <span className={`ml-1 text-[13px] font-black ${filtros.EM_PROCESSO ? 'text-blue-600' : 'text-[var(--text-muted)]'}`}>{countProcesso}</span>
                 </label>
-                <label className={`flex items-center gap-1.5 cursor-pointer bg-white px-3 py-2 rounded-lg border ${filtros.CONCLUIDO ? 'border-yellow-400 text-yellow-600' : 'border-gray-200 text-gray-500'} shadow-sm text-xs font-bold transition`}>
+                <label className={`flex items-center gap-1.5 cursor-pointer bg-[var(--bg-panel)] px-3 py-2 rounded-lg border ${filtros.CONCLUIDO ? 'border-yellow-400 text-yellow-600' : 'border-[var(--border-color)] text-[var(--text-muted)]'} shadow-sm text-xs font-bold transition`}>
                   <input type="checkbox" checked={filtros.CONCLUIDO} onChange={() => toggleFiltro('CONCLUIDO')} style={{ accentColor: '#eab308' }} className="w-4 h-4 rounded cursor-pointer" />
-                  Prontos <span className={`ml-1 text-[13px] font-black ${filtros.CONCLUIDO ? 'text-yellow-600' : 'text-gray-500'}`}>{countConcluido}</span>
+                  Prontos <span className={`ml-1 text-[13px] font-black ${filtros.CONCLUIDO ? 'text-yellow-600' : 'text-[var(--text-muted)]'}`}>{countConcluido}</span>
                 </label>
-                <label className={`flex items-center gap-1.5 cursor-pointer bg-white px-3 py-2 rounded-lg border ${filtros.ENVIADO ? 'border-green-500 text-green-600' : 'border-gray-200 text-gray-500'} shadow-sm text-xs font-bold transition`}>
+                <label className={`flex items-center gap-1.5 cursor-pointer bg-[var(--bg-panel)] px-3 py-2 rounded-lg border ${filtros.ENVIADO ? 'border-blue-500 text-blue-600' : 'border-[var(--border-color)] text-[var(--text-muted)]'} shadow-sm text-xs font-bold transition`}>
                   <input type="checkbox" checked={filtros.ENVIADO} onChange={() => toggleFiltro('ENVIADO')} style={{ accentColor: '#22c55e' }} className="w-4 h-4 rounded cursor-pointer" />
-                  Enviados <span className={`ml-1 text-[13px] font-black ${filtros.ENVIADO ? 'text-green-600' : 'text-gray-500'}`}>{countEnviado}</span>
+                  Enviados <span className={`ml-1 text-[13px] font-black ${filtros.ENVIADO ? 'text-blue-600' : 'text-[var(--text-muted)]'}`}>{countEnviado}</span>
                 </label>
               </div>
 
-              <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-4 border-b pb-2">Envios Recentes</h3>
+              <h3 className="font-bold text-[var(--text-main)] text-xs uppercase tracking-wider mb-4 border-b pb-2">Envios Recentes</h3>
               <div className="space-y-4">
-                {inboundsFiltrados.map(inb => {
-                  let corBolinha = 'bg-red-500';
+                {inboundsPagina.map(inb => {
+                  let corBolinha = 'bg-rose-500';
                   let textoStatus = 'Envio Importado';
-                  let statusClasses = 'text-red-700 bg-red-50 border-red-100';
-                  
-                  if (inb.status === 'EM_PROCESSO') { corBolinha = 'bg-blue-500'; textoStatus = 'Em processo de bipagem'; statusClasses = 'text-blue-700 bg-blue-50 border-blue-100'; }
-                  else if (inb.status === 'CONCLUIDO') { corBolinha = 'bg-yellow-500'; textoStatus = 'Prontos para envio'; statusClasses = 'text-yellow-700 bg-yellow-50 border-yellow-100'; } 
-                  else if (inb.status === 'ENVIADO') { corBolinha = 'bg-[#00a650]'; textoStatus = 'Produtos enviados'; statusClasses = 'text-green-700 bg-green-50 border-green-100'; }
+                  let statusClasses = 'text-rose-600 bg-rose-500/10 border-rose-500/20';
+
+                  if (inb.status === 'EM_PROCESSO') { corBolinha = 'bg-blue-500'; textoStatus = 'Em processo de bipagem'; statusClasses = 'text-blue-600 bg-blue-500/10 border-blue-500/20'; }
+                  else if (inb.status === 'CONCLUIDO') { corBolinha = 'bg-amber-500'; textoStatus = 'Prontos para envio'; statusClasses = 'text-amber-600 bg-amber-500/10 border-amber-500/20'; }
+                  else if (inb.status === 'ENVIADO') { corBolinha = 'bg-emerald-500'; textoStatus = 'Produtos enviados'; statusClasses = 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20'; }
 
                   const totalEsperado = inb.skus.reduce((a:number, s:any) => a + s.quantidadeTotal, 0);
                   const totalBipado = inb.skus.reduce((a:number, s:any) => a + s.quantidadeBipada, 0);
 
-                  const bloqueiosNestePallet = inb.skus.filter((sku: any) => lockedSkus[sku.id] && lockedSkus[sku.id] !== getUsuarioLogado());
+                  const bloqueiosNestePallet = inb.skus.filter((sku: any) => lockedSkus[lockKey(sku.id)] && lockedSkus[lockKey(sku.id)] !== getUsuarioLogado());
 
                   return (
-                    <div key={inb.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm relative transition hover:shadow-md cursor-pointer" onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; abrirEnvioCompleto(inb); }}>
+                    <div key={inb.id} className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-xl p-4 shadow-sm relative transition hover:shadow-md cursor-pointer" onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; abrirEnvioCompleto(inb); }}>
                       {inb.status !== 'ENVIADO' && (
-                        <button onClick={() => setModalCoord({ isOpen: true, inboundId: inb.id, acao: 'EXCLUIR', nomePallet: inb.nomePallet })} className="absolute top-4 right-4 text-red-300 hover:text-red-600 transition p-1" title="Apagar Envio"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        <button onClick={() => setModalCoord({ isOpen: true, inboundId: inb.id, acao: 'EXCLUIR', nomePallet: inb.nomePallet })} className="absolute top-4 right-4 text-red-300 hover:text-rose-600 transition p-1" title="Apagar Envio"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                       )}
                       {inb.status === 'ENVIADO' && (
-                        <button onClick={(e) => { e.stopPropagation(); handleReimprimir(inb); }} className="absolute top-4 right-4 text-[#00a650] hover:text-green-700 transition p-1.5 bg-green-50 rounded-lg border border-green-200 shadow-sm" title="Reimprimir Relatório"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleReimprimir(inb); }} className="absolute top-4 right-4 text-blue-600 hover:text-blue-700 transition p-1.5 bg-blue-500/10 rounded-lg border border-blue-500/30 shadow-sm" title="Reimprimir Relatório"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></button>
                       )}
 
-                      <h4 className="font-black text-gray-900 text-xl mb-1 pr-12 leading-tight break-words">{inb.nomePallet}</h4>
-                      <div className="flex gap-4 text-xs font-bold text-gray-500 mb-4"><span>SKUs: {inb.skus.length}</span><span>UNIDADES: {totalBipado} / {totalEsperado}</span></div>
+                      <h4 className="font-black text-[var(--text-main)] text-xl mb-1 pr-12 leading-tight break-words">{inb.nomePallet}</h4>
+                      <div className="flex gap-4 text-xs font-bold text-[var(--text-muted)] mb-4"><span>SKUs: {inb.skus.length}</span><span>UNIDADES: {totalBipado} / {totalEsperado}</span></div>
                       
                       <div className="flex items-center justify-between mb-4">
                         <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md border text-[11px] font-bold ${statusClasses}`}><span className={`w-2 h-2 rounded-full ${corBolinha}`}></span>{textoStatus}</div>
                         {bloqueiosNestePallet.length > 0 && (
-                          <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-1 rounded border border-orange-200 animate-pulse">
+                          <div className="text-[10px] text-amber-600 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/30 animate-pulse">
                             ⚠️ {bloqueiosNestePallet.length} em uso
                           </div>
                         )}
                       </div>
 
-                      {(inb.status === 'PENDENTE' || inb.status === 'EM_PROCESSO') && (<button onClick={() => abrirEnvioCompleto(inb)} className="w-full py-2.5 bg-gray-50 border border-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-100 shadow-sm transition">Continuar Bipagem</button>)}
+                      {(inb.status === 'PENDENTE' || inb.status === 'EM_PROCESSO') && (<button onClick={() => abrirEnvioCompleto(inb)} className="w-full py-2.5 bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-main)] font-bold rounded-lg hover:bg-[var(--border-color)] shadow-sm transition">Continuar Bipagem</button>)}
                       {inb.status === 'CONCLUIDO' && (
                         <div className="flex gap-2">
-                           <button onClick={() => setModalCoord({ isOpen: true, inboundId: inb.id, acao: 'ENVIAR', nomePallet: inb.nomePallet })} className="flex-[3] py-2.5 bg-yellow-500 text-white font-bold rounded-lg hover:bg-yellow-600 shadow-md flex items-center justify-center gap-2 transition"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg> ENVIAR</button>
+                           <button onClick={() => setModalCoord({ isOpen: true, inboundId: inb.id, acao: 'ENVIAR', nomePallet: inb.nomePallet })} className="flex-[3] py-2.5 bg-amber-500/100 text-white font-bold rounded-lg hover:bg-yellow-600 shadow-md flex items-center justify-center gap-2 transition"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg> ENVIAR</button>
                         </div>
                       )}
-                      {inb.status === 'ENVIADO' && (<button onClick={() => abrirEnvioCompleto(inb)} className="w-full py-2.5 bg-white border border-gray-200 text-gray-500 font-bold rounded-lg hover:bg-gray-50 shadow-sm transition flex items-center justify-center gap-1 text-[11px] uppercase">VER DETALHES DO ENVIO</button>)}
+                      {inb.status === 'ENVIADO' && (<button onClick={() => abrirEnvioCompleto(inb)} className="w-full py-2.5 bg-[var(--bg-panel)] border border-[var(--border-color)] text-[var(--text-muted)] font-bold rounded-lg hover:bg-[var(--bg-main)] shadow-sm transition flex items-center justify-center gap-1 text-[11px] uppercase">VER DETALHES DO ENVIO</button>)}
                     </div>
                   );
                 })}
-                {inboundsFiltrados.length === 0 && (<div className="text-center text-gray-400 text-sm py-8 font-medium">Nenhum envio atende aos filtros atuais.</div>)}
+                {inboundsFiltrados.length === 0 && (<div className="text-center text-[var(--text-muted)] text-sm py-8 font-medium">Nenhum envio atende aos filtros atuais.</div>)}
               </div>
+              <Paginador pagina={paginaSegura} totalPaginas={totalPaginas} onChange={setPagina} />
             </div>
           </div>
         )}
 
         {/* ================= TELA 2 ================= */}
         {currentScreen === 2 && (
-          <div className="flex flex-col h-full bg-gray-50 animate-in slide-in-from-right-8 duration-300">
+          <div className="flex flex-col h-full bg-[var(--bg-main)] animate-in slide-in-from-right-8 duration-300">
             <HeaderGlobal onClose={() => setCurrentScreen(1)} />
             <div className="p-5 flex-1">
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                <input type="text" value={nomePallet} onChange={(e) => setNomePallet(e.target.value)} placeholder="Identificação do Pallet" className="w-full border border-gray-300 rounded-xl p-3.5 bg-gray-50 text-sm mb-6" />
+              <div className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm">
+                <input type="text" value={nomePallet} onChange={(e) => setNomePallet(e.target.value)} placeholder="Identificação do Pallet" className="w-full border border-[var(--border-color)] rounded-xl p-3.5 bg-[var(--bg-main)] text-sm mb-6" />
                 <input type="file" accept=".txt" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center mb-8 cursor-pointer hover:bg-gray-50 transition">
-                  <span className="text-sm font-semibold text-gray-600">{selectedFile ? selectedFile.name : 'Anexar Inbound (TXT)'}</span>
+                <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-[var(--border-color)] rounded-xl p-6 flex flex-col items-center mb-8 cursor-pointer hover:bg-[var(--bg-main)] transition">
+                  <span className="text-sm font-semibold text-[var(--text-muted)]">{selectedFile ? selectedFile.name : 'Anexar Inbound (TXT)'}</span>
                 </div>
-                <button onClick={handleProcessarNovo} disabled={isProcessing} className="w-full text-white bg-[#00a650] font-bold py-4 rounded-xl shadow-md transition hover:bg-green-700 active:scale-[0.98]">Processar</button>
+                <button onClick={handleProcessarNovo} disabled={isProcessing} className="w-full text-white bg-blue-600 font-bold py-4 rounded-xl shadow-md transition hover:bg-blue-700 active:scale-[0.98]">Processar</button>
               </div>
             </div>
           </div>
@@ -756,11 +814,11 @@ export default function GestorEnviosFull() {
 
         {/* ================= TELA 3 ================= */}
         {currentScreen === 3 && inboundData && (
-          <div className="flex flex-col h-full bg-gray-50 animate-in duration-300">
+          <div className="flex flex-col h-full bg-[var(--bg-main)] animate-in duration-300">
             {skuEmBipagem ? (
-               <div className="p-4 border-b border-gray-100 bg-white sticky top-0 z-10 flex flex-col items-start min-h-[80px]">
+               <div className="p-4 border-b border-[var(--border-color)] bg-[var(--bg-panel)] sticky top-0 z-10 flex flex-col items-start min-h-[80px]">
                  <div className="flex w-full justify-between items-center mb-3">
-                   <button onClick={fecharModoBipagem} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-full transition shadow-sm border border-gray-100">
+                   <button onClick={fecharModoBipagem} className="w-10 h-10 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] bg-[var(--bg-main)] hover:bg-[var(--border-color)] rounded-full transition shadow-sm border border-[var(--border-color)]">
                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"/></svg>
                    </button>
                    <div className="flex-1 flex items-center justify-center gap-2">
@@ -768,7 +826,7 @@ export default function GestorEnviosFull() {
                        <svg className="w-5 h-5 mr-0.5 fill-[#00a650] stroke-[#00a650]" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
                        FULL
                      </span>
-                     <span className="font-bold text-slate-800 text-base uppercase tracking-widest mt-0.5">Gestor de Envios</span>
+                     <span className="font-bold text-[var(--text-main)] text-base uppercase tracking-widest mt-0.5">Gestor de Envios</span>
                    </div>
                    <div className="w-10"></div>
                  </div>
@@ -779,50 +837,50 @@ export default function GestorEnviosFull() {
             
             {!skuEmBipagem && (
               <>
-                <div className="bg-slate-800 p-6 text-white shadow-inner">
-                  <div className="font-black text-2xl tracking-wide">
+                <div className="bg-[var(--bg-panel)] border-b border-[var(--border-color)] p-6">
+                  <div className="font-black text-2xl tracking-wide text-[var(--text-main)]">
                     {inboundData.nome}
-                    <span className="block text-[10px] text-gray-400 font-medium uppercase tracking-widest mt-1">Importado por: {inboundData.usuarioImportador || 'Sistema'}</span>
+                    <span className="block text-[10px] text-[var(--text-muted)] font-medium uppercase tracking-widest mt-1">Importado por: {inboundData.usuarioImportador || 'Sistema'}</span>
                   </div>
-                  <div className="text-base text-slate-300 mt-2 font-medium flex gap-4">
-                    <span><strong className="text-white">SKUs:</strong> {inboundData.totalSku}</span>
-                    <span><strong className="text-white">Unidades:</strong> {inboundData.totalUnidades}</span>
+                  <div className="text-base text-[var(--text-muted)] mt-2 font-medium flex gap-4">
+                    <span><strong className="text-[var(--text-main)]">SKUs:</strong> {inboundData.totalSku}</span>
+                    <span><strong className="text-[var(--text-main)]">Unidades:</strong> {inboundData.totalUnidades}</span>
                   </div>
                 </div>
 
                 {todosSkusConcluidosNaTela && inboundData.status !== 'ENVIADO' && (
-                  <div className="bg-white p-4 border-b border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
+                  <div className="bg-[var(--bg-panel)] p-4 border-b border-[var(--border-color)] shadow-sm flex flex-col md:flex-row gap-4 items-end">
                      <div className="flex-1 w-full">
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Motorista da Carga</label>
-                        <select value={motoristaSelecionado} onChange={(e) => setMotoristaSelecionado(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#00a650] bg-gray-50">
+                        <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1.5">Motorista da Carga</label>
+                        <select value={motoristaSelecionado} onChange={(e) => setMotoristaSelecionado(e.target.value)} className="w-full border border-[var(--border-color)] rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 bg-[var(--bg-main)]">
                           <option value="">-- Selecione um Motorista --</option>
                           {dashboardData.motoristas?.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                         </select>
                      </div>
                      <div className="flex-1 w-full">
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Veículo de Transporte</label>
-                        <select value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#00a650] bg-gray-50">
+                        <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1.5">Veículo de Transporte</label>
+                        <select value={veiculoSelecionado} onChange={(e) => setVeiculoSelecionado(e.target.value)} className="w-full border border-[var(--border-color)] rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 bg-[var(--bg-main)]">
                           <option value="">-- Selecione um Veículo --</option>
                           {dashboardData.veiculos?.map(v => <option key={v.id} value={v.id}>{v.modelo} ({v.placa})</option>)}
                         </select>
                      </div>
-                     <button onClick={salvarEdicaoAtivosTela3} className="w-full md:w-auto bg-[#00a650] text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition shadow-sm">
+                     <button onClick={salvarEdicaoAtivosTela3} className="w-full md:w-auto bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition shadow-sm">
                         Salvar Alterações
                      </button>
                   </div>
                 )}
 
                 {inboundData.status === 'ENVIADO' && (
-                  <div className="bg-white p-4 border-b border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
+                  <div className="bg-[var(--bg-panel)] p-4 border-b border-[var(--border-color)] shadow-sm flex flex-col md:flex-row gap-4 items-end">
                      <div className="flex-1 w-full">
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Motorista da Carga</label>
-                        <select value={motoristaSelecionado} disabled className="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-100 text-gray-500 cursor-not-allowed">
+                        <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1.5">Motorista da Carga</label>
+                        <select value={motoristaSelecionado} disabled className="w-full border border-[var(--border-color)] rounded-lg p-3 text-sm bg-[var(--bg-main)] text-[var(--text-muted)] cursor-not-allowed">
                           <option>{dashboardData.motoristas?.find(m => m.id === Number(motoristaSelecionado))?.nome || '--'}</option>
                         </select>
                      </div>
                      <div className="flex-1 w-full">
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Veículo de Transporte</label>
-                        <select value={veiculoSelecionado} disabled className="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-100 text-gray-500 cursor-not-allowed">
+                        <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1.5">Veículo de Transporte</label>
+                        <select value={veiculoSelecionado} disabled className="w-full border border-[var(--border-color)] rounded-lg p-3 text-sm bg-[var(--bg-main)] text-[var(--text-muted)] cursor-not-allowed">
                           <option>{dashboardData.veiculos?.find(v => v.id === Number(veiculoSelecionado))?.modelo || '--'}</option>
                         </select>
                      </div>
@@ -849,44 +907,49 @@ export default function GestorEnviosFull() {
                 let leiturasArray: any[] = [];
                 try { leiturasArray = typeof item.leituras === 'string' ? JSON.parse(item.leituras as string) : (item.leituras || []); } catch(e){}
 
-                const userNoSku = lockedSkus[item.id];
+                const userNoSku = lockedSkus[lockKey(item.id)];
                 const taBloqueado = userNoSku && userNoSku !== getUsuarioLogado();
 
                 return (
-                  <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-4 relative overflow-hidden transition-all">
-                    {statusReal === 'CONCLUIDO' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#00a650]"></div>}
+                  <div key={item.id} className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-xl p-4 shadow-sm mb-4 relative overflow-hidden transition-all">
+                    {statusReal === 'CONCLUIDO' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
                     <div className="flex justify-between items-start mb-2 pl-2">
                       <div className="flex items-center gap-3 flex-wrap">
-                        <div className="font-black text-gray-900 text-base">SKU {item.sku}</div>
+                        <div className="font-black text-[var(--text-main)] text-base">SKU {item.sku}</div>
                         {codigosMLUnicos.length > 0 && (
-                          <div className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded shadow-sm">
+                          <div className="text-[10px] font-bold text-blue-600 bg-blue-500/10 border border-blue-500/30 px-2 py-0.5 rounded shadow-sm">
                             Cód. ML: {codigosMLUnicos.join(', ')}
                           </div>
+                        )}
+                        {taBloqueado && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> {userNoSku} bipando
+                          </span>
                         )}
                       </div>
                       
                       <div className="flex flex-col items-end">
-                        <div className={`text-sm font-black px-2 py-1 rounded ${statusReal === 'CONCLUIDO' ? 'bg-green-100 text-[#00a650]' : 'bg-gray-100 text-gray-800'}`}>
+                        <div className={`text-sm font-black px-2 py-1 rounded ${statusReal === 'CONCLUIDO' ? 'bg-blue-500/10 text-blue-600' : 'bg-[var(--bg-main)] text-[var(--text-main)]'}`}>
                           {qtdBipadaReal} / {item.quantidadeTotal}
                         </div>
                         {statusReal !== 'CONCLUIDO' && (
-                          <div className="text-[11px] font-bold text-red-500 uppercase mt-1 tracking-wider">
+                          <div className="text-[11px] font-bold text-rose-500 uppercase mt-1 tracking-wider">
                             Falta bipar: {item.quantidadeTotal - qtdBipadaReal}
                           </div>
                         )}
                       </div>
                     </div>
                     
-                    <div className="text-sm font-semibold text-gray-800 leading-snug mt-3 mb-4 p-3 bg-white border border-gray-200 rounded-lg shadow-sm border-l-4 border-l-[#00a650]">
+                    <div className="text-sm font-semibold text-[var(--text-main)] leading-snug mt-3 mb-4 p-3 bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-lg shadow-sm border-l-4 border-l-blue-500">
                       {item.descricao}
                     </div>
 
                     {leiturasArray.length > 0 && (
                       <div className="mt-3 mb-4 pl-2">
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Seriais lidos:</p>
+                        <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5">Seriais lidos:</p>
                         <div className="flex flex-wrap gap-1.5">
                           {leiturasArray.map((l: any) => (
-                            <span key={l.id} className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded border border-gray-200">
+                            <span key={l.id} className="bg-[var(--bg-main)] text-[var(--text-muted)] text-[10px] font-bold px-2 py-1 rounded border border-[var(--border-color)]">
                               {l.codigo}
                             </span>
                           ))}
@@ -895,12 +958,12 @@ export default function GestorEnviosFull() {
                     )}
 
                     {taBloqueado ? (
-                      <div className="w-full py-2.5 bg-orange-50 border border-orange-200 rounded-lg text-sm font-bold text-orange-600 flex items-center justify-center gap-1.5 mt-3">
+                      <div className="w-full py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm font-bold text-amber-600 flex items-center justify-center gap-1.5 mt-3">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg> 
                         Em uso por: {userNoSku}
                       </div>
                     ) : (
-                      <button onClick={() => handleAbrirProduto(item)} className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 transition flex items-center justify-center gap-1.5 mt-3">
+                      <button onClick={() => handleAbrirProduto(item)} className="w-full py-2.5 bg-[var(--bg-main)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-lg text-sm font-bold text-[var(--text-main)] transition flex items-center justify-center gap-1.5 mt-3">
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Abrir Produto
                       </button>
                     )}
@@ -910,24 +973,24 @@ export default function GestorEnviosFull() {
 
               {/* TELA DE BIPAGEM POR PRODUTO */}
               {skuEmBipagem && (
-                <div className={`bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-6 relative transition-all duration-300 ${showSucessoProduto ? 'ring-4 ring-[#00a650] bg-green-50' : ''}`}>
+                <div className={`bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-xl shadow-sm overflow-hidden mb-6 relative transition-all duration-300 ${showSucessoProduto ? 'ring-4 ring-blue-500 bg-blue-500/10' : ''}`}>
                   
                   {showSucessoProduto && (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm animate-in fade-in">
-                      <div className="w-16 h-16 bg-[#00a650] text-white rounded-full flex items-center justify-center mb-2 shadow-lg animate-bounce">
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[var(--bg-panel)]/90 backdrop-blur-sm animate-in fade-in">
+                      <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mb-2 shadow-lg animate-bounce">
                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
                       </div>
-                      <span className="font-black text-[#00a650] text-lg">Produto Concluído!</span>
+                      <span className="font-black text-blue-600 text-lg">Produto Concluído!</span>
                     </div>
                   )}
 
-                  <div className="p-4 border-b border-gray-100 flex flex-col gap-4 bg-white">
+                  <div className="p-4 border-b border-[var(--border-color)] flex flex-col gap-4 bg-[var(--bg-panel)]">
                     <div className="flex-1">
                       <div className="flex justify-between items-start">
                         <div>
-                          <div className="font-black text-gray-900 text-[18px]">SKU: {skuEmBipagem.sku}</div>
+                          <div className="font-black text-[var(--text-main)] text-[18px]">SKU: {skuEmBipagem.sku}</div>
                           {skuEmBipagem.variacoes && skuEmBipagem.variacoes.length > 0 && (
-                            <div className="text-[11px] font-bold text-green-700 mt-1 inline-block border border-green-200 bg-green-50 px-1.5 py-0.5 rounded">
+                            <div className="text-[11px] font-bold text-blue-600 mt-1 inline-block border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 rounded">
                                Cód. ML: {Array.from(new Set(skuEmBipagem.variacoes.map(v => v.codigoML))).filter(ml => ml !== 'N/A').join(', ')}
                             </div>
                           )}
@@ -935,8 +998,8 @@ export default function GestorEnviosFull() {
                         
                         {inboundData?.status === 'ENVIADO' && skuEmBipagem.leituras && skuEmBipagem.leituras.length > 0 && (
                            <div className="text-right">
-                             <div className="text-[9px] font-bold text-gray-400 uppercase">Concluído às</div>
-                             <div className="text-xs font-black text-[#00a650]">
+                             <div className="text-[9px] font-bold text-[var(--text-muted)] uppercase">Concluído às</div>
+                             <div className="text-xs font-black text-blue-600">
                                {(() => {
                                   try {
                                     let leits = typeof skuEmBipagem.leituras === 'string' ? JSON.parse(skuEmBipagem.leituras) : skuEmBipagem.leituras;
@@ -952,39 +1015,39 @@ export default function GestorEnviosFull() {
                         )}
                       </div>
                       
-                      <div className="text-sm font-semibold text-gray-800 leading-snug mt-3 p-3 bg-white border border-gray-200 rounded-lg shadow-sm border-l-4 border-l-[#00a650]">
+                      <div className="text-sm font-semibold text-[var(--text-main)] leading-snug mt-3 p-3 bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-lg shadow-sm border-l-4 border-l-blue-500">
                         {skuEmBipagem.descricao}
                       </div>
                     </div>
                     
                     {inboundData?.status !== 'ENVIADO' ? (
                       <div className="flex gap-3">
-                        <div className="flex-1 text-center bg-red-50 border border-red-200 p-3 rounded-xl shadow-sm flex flex-col justify-center">
-                          <div className="text-[10px] font-black text-red-500 uppercase tracking-widest">Faltam</div>
-                          <div className={`text-3xl font-black leading-none mt-1 ${skuEmBipagem.quantidadeTotal - skuEmBipagem.quantidadeBipada === 0 ? 'text-gray-300' : 'text-red-600'}`}>
+                        <div className="flex-1 text-center bg-rose-500/10 border border-rose-500/30 p-3 rounded-xl shadow-sm flex flex-col justify-center">
+                          <div className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Faltam</div>
+                          <div className={`text-3xl font-black leading-none mt-1 ${skuEmBipagem.quantidadeTotal - skuEmBipagem.quantidadeBipada === 0 ? 'text-[var(--text-muted)]' : 'text-rose-600'}`}>
                             {skuEmBipagem.quantidadeTotal - skuEmBipagem.quantidadeBipada}
                           </div>
                         </div>
-                        <div className="flex-1 text-center bg-green-50 border border-green-200 p-3 rounded-xl shadow-sm flex flex-col justify-center">
-                          <div className="text-[10px] font-black text-[#00a650] uppercase tracking-widest">Bipados</div>
-                          <div className={`text-3xl font-black leading-none mt-1 ${skuEmBipagem.quantidadeBipada >= skuEmBipagem.quantidadeTotal ? 'text-[#00a650]' : 'text-gray-900'}`}>
+                        <div className="flex-1 text-center bg-blue-500/10 border border-blue-500/30 p-3 rounded-xl shadow-sm flex flex-col justify-center">
+                          <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Bipados</div>
+                          <div className={`text-3xl font-black leading-none mt-1 ${skuEmBipagem.quantidadeBipada >= skuEmBipagem.quantidadeTotal ? 'text-blue-600' : 'text-[var(--text-main)]'}`}>
                             {skuEmBipagem.quantidadeBipada}
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="w-full py-4 text-center bg-gray-200 text-gray-500 font-black text-[15px] rounded-xl shadow-inner uppercase tracking-wider">
+                      <div className="w-full py-4 text-center bg-[var(--border-color)] text-[var(--text-muted)] font-black text-[15px] rounded-xl shadow-inner uppercase tracking-wider">
                         Envio já despachado
                       </div>
                     )}
                   </div>
                   
                   {inboundData?.status !== 'ENVIADO' && (
-                    <div className="p-5 bg-gray-50">
+                    <div className="p-5 bg-[var(--bg-main)]">
                       {!isScanning ? (
                         <button 
                           onClick={handleIniciarBipagem} 
-                          className="w-full py-4 bg-[#00a650] text-white font-bold text-[15px] rounded-xl shadow-md hover:bg-green-700 transition active:scale-[0.98]"
+                          className="w-full py-4 bg-blue-600 text-white font-bold text-[15px] rounded-xl shadow-md hover:bg-blue-700 transition active:scale-[0.98]"
                         >
                           Iniciar Bipagem
                         </button>
@@ -993,17 +1056,17 @@ export default function GestorEnviosFull() {
                           
                           {!modoTravado ? (
                             <div className="mb-4">
-                              <p className="text-center text-xs font-bold text-gray-500 uppercase mb-2">Selecione o modo de bipagem:</p>
-                              <div className="flex gap-2 p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm">
+                              <p className="text-center text-xs font-bold text-[var(--text-muted)] uppercase mb-2">Selecione o modo de bipagem:</p>
+                              <div className="flex gap-2 p-1.5 bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-lg shadow-sm">
                                 <button 
                                   onClick={() => handleConfirmarModo('SKU_EAN')} 
-                                  className="flex-1 py-4 text-xs font-bold rounded-lg transition bg-white border-2 border-gray-200 hover:border-[#00a650] hover:text-[#00a650] text-gray-600 shadow-sm uppercase tracking-wider"
+                                  className="flex-1 py-4 text-xs font-bold rounded-lg transition bg-[var(--bg-panel)] border-2 border-[var(--border-color)] hover:border-blue-500 hover:text-blue-600 text-[var(--text-muted)] shadow-sm uppercase tracking-wider"
                                 >
                                   SKU / EAN
                                 </button>
                                 <button 
                                   onClick={() => handleConfirmarModo('SERIE')} 
-                                  className="flex-1 py-4 text-xs font-bold rounded-lg transition bg-white border-2 border-gray-200 hover:border-[#00a650] hover:text-[#00a650] text-gray-600 shadow-sm uppercase tracking-wider"
+                                  className="flex-1 py-4 text-xs font-bold rounded-lg transition bg-[var(--bg-panel)] border-2 border-[var(--border-color)] hover:border-blue-500 hover:text-blue-600 text-[var(--text-muted)] shadow-sm uppercase tracking-wider"
                                 >
                                   Número de Série
                                 </button>
@@ -1013,8 +1076,8 @@ export default function GestorEnviosFull() {
                             <div className="animate-in fade-in zoom-in-95 duration-200">
                               <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
-                                  <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#00a650]"></span></span>
-                                  <span className="text-xs font-bold text-[#00a650]">Leitor Ativo ({modoBipagem === 'SERIE' ? 'Série' : 'SKU/EAN'})</span>
+                                  <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span></span>
+                                  <span className="text-xs font-bold text-blue-600">Leitor Ativo ({modoBipagem === 'SERIE' ? 'Série' : 'SKU/EAN'})</span>
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
@@ -1024,7 +1087,7 @@ export default function GestorEnviosFull() {
                                       setTecladoLiberado(!tecladoLiberado);
                                       if (!tecladoLiberado) setTimeout(() => inputBipagemRef.current?.focus(), 100);
                                     }} 
-                                    className={`flex items-center gap-1.5 text-[10px] font-bold uppercase px-2.5 py-1.5 rounded-md transition-colors border ${tecladoLiberado ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-inner' : 'bg-slate-100 text-[#64748b] border-transparent hover:bg-slate-200'}`}
+                                    className={`flex items-center gap-1.5 text-[10px] font-bold uppercase px-2.5 py-1.5 rounded-md transition-colors border ${tecladoLiberado ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-inner' : 'bg-[var(--bg-main)] text-[var(--text-muted)] border-transparent hover:bg-[var(--border-color)]'}`}
                                   >
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       {tecladoLiberado ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />}
@@ -1032,7 +1095,7 @@ export default function GestorEnviosFull() {
                                     Teclado
                                   </button>
 
-                                  <button onClick={() => setModoConfirmModal({ isOpen: true, novoModo: modoBipagem === 'SERIE' ? 'SKU_EAN' : 'SERIE' })} className="text-[10px] font-bold text-[#64748b] hover:text-slate-800 uppercase bg-slate-200 px-3 py-1.5 rounded-md transition-colors">Trocar Modo</button>
+                                  <button onClick={() => setModoConfirmModal({ isOpen: true, novoModo: modoBipagem === 'SERIE' ? 'SKU_EAN' : 'SERIE' })} className="text-[10px] font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] uppercase bg-[var(--border-color)] px-3 py-1.5 rounded-md transition-colors">Trocar Modo</button>
                                 </div>
                               </div>
 
@@ -1064,7 +1127,7 @@ export default function GestorEnviosFull() {
                                       ? (!mascaraSerie ? "Bipe o 1º Serial para definir o padrão..." : "Bipe o próximo Serial...") 
                                       : "Bipar código..."
                                   } 
-                                  className="w-full border-2 border-[#00a650] rounded-xl p-4 text-center font-bold text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100 transition shadow-inner bg-white placeholder:text-gray-400 placeholder:font-medium" 
+                                  className="w-full border-2 border-blue-500 rounded-xl p-4 text-center font-bold text-[var(--text-main)] focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition shadow-inner bg-[var(--bg-panel)] placeholder:text-[var(--text-muted)] placeholder:font-medium" 
                                 />
                                 <button type="submit" className="hidden"></button>
                               </form>
@@ -1077,28 +1140,28 @@ export default function GestorEnviosFull() {
                   )}
 
                   {skuEmBipagem.leituras && skuEmBipagem.leituras.length > 0 && (
-                    <div className="p-4 bg-gray-50 border-t border-gray-200">
-                       <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Histórico de Bipagem</h4>
+                    <div className="p-4 bg-[var(--bg-main)] border-t border-[var(--border-color)]">
+                       <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Histórico de Bipagem</h4>
                       <ul className="space-y-1.5 max-h-32 overflow-y-auto pr-2">
                         {(() => {
                            let leiturasArray = [];
                            try { leiturasArray = typeof skuEmBipagem.leituras === 'string' ? JSON.parse(skuEmBipagem.leituras) : (skuEmBipagem.leituras || []); } catch(e){}
                            
                            return [...leiturasArray].reverse().map((l: any) => (
-                             <li key={l.id} className="flex justify-between items-center bg-white p-2 rounded-lg shadow-sm border border-gray-200">
+                             <li key={l.id} className="flex justify-between items-center bg-[var(--bg-panel)] p-2 rounded-lg shadow-sm border border-[var(--border-color)]">
                                <div className="flex flex-col">
                                  <div className="flex items-center gap-2">
-                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${l.tipo === 'SERIE' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-[#00a650]'}`}>{l.tipo === 'SERIE' ? 'SÉRIE' : 'SKU/EAN'}</span>
-                                   <span className="text-sm font-bold text-gray-800">{l.codigo}</span>
+                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${l.tipo === 'SERIE' ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/10 text-blue-600'}`}>{l.tipo === 'SERIE' ? 'SÉRIE' : 'SKU/EAN'}</span>
+                                   <span className="text-sm font-bold text-[var(--text-main)]">{l.codigo}</span>
                                  </div>
-                                 <span className="text-[9px] text-gray-400 mt-1 font-medium ml-1 flex items-center gap-1">
+                                 <span className="text-[9px] text-[var(--text-muted)] mt-1 font-medium ml-1 flex items-center gap-1">
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                     Bipado por: {l.usuarioNome || 'Operador'}
                                  </span>
                                </div>
                                
                                {inboundData?.status !== 'ENVIADO' && (
-                                 <button type="button" onClick={() => handleRemoverLeitura(l.id)} className="text-gray-300 hover:text-red-500 p-2 transition">
+                                 <button type="button" onClick={() => handleRemoverLeitura(l.id)} className="text-[var(--text-muted)] hover:text-rose-500 p-2 transition">
                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                  </button>
                                )}

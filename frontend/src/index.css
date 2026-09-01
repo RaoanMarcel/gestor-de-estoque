@@ -4,7 +4,7 @@
    🚀 TRANSIÇÃO SUAVE DE TEMAS (Delay)
    ========================================= */
 *, ::before, ::after {
-  transition-property: background-color, border-color, color, fill, stroke, width, max-width, opacity, margin, padding;
+  transition-property: background-color, border-color, color, fill, stroke, width, max-width, opacity, transform, margin, padding;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 300ms;
 }
@@ -27,6 +27,16 @@
   --text-main: #1e293b;
   --text-muted: #64748b;
   --border-color: #e2e8f0;
+
+  /* Tokens semânticos (usados nas telas alinhadas ao tema, ex.: Recebimento) */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(37, 99, 235, 0.10);
+  --success: #16a34a;
+  --success-soft: rgba(22, 163, 74, 0.10);
+  --danger: #e11d48;
+  --danger-soft: rgba(225, 29, 72, 0.10);
 }
 
 :root[data-theme="midnight"] {
@@ -44,6 +54,15 @@
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --border-color: #334155;
+
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(59, 130, 246, 0.14);
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.14);
+  --danger: #f43f5e;
+  --danger-soft: rgba(244, 63, 94, 0.14);
 }
 
 :root[data-theme="coffee"] {
@@ -61,6 +80,15 @@
   --text-main: #3E2723;
   --text-muted: #8D6E63;
   --border-color: #D7CCC8;
+
+  --accent: #795548;
+  --accent-hover: #5D4037;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(121, 85, 72, 0.12);
+  --success: #16a34a;
+  --success-soft: rgba(22, 163, 74, 0.10);
+  --danger: #e11d48;
+  --danger-soft: rgba(225, 29, 72, 0.10);
 }
 
 /* =========================================

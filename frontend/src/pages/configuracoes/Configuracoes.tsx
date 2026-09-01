@@ -50,6 +50,14 @@ const MODULOS_SISTEMA = [
     ]
   },
   {
+    grupo: 'RECEBIMENTO DE MERCADORIA',
+    itens: [
+      { id: 'receb_view', titulo: 'Acessar Recebimento de Mercadoria', tag: 'recebimento:view' },
+      { id: 'receb_manage', titulo: 'Agendar e importar XML de NF-e', tag: 'recebimento:manage' },
+      { id: 'receb_conf', titulo: 'Realizar conferência (bipagem)', tag: 'recebimento:conferencia' },
+    ]
+  },
+  {
     grupo: 'GESTÃO DE ACESSOS',
     itens: [
       { id: 'gerenciar_usuarios', titulo: 'Gerenciar usuários e operadores', tag: 'acessos:usuarios' },

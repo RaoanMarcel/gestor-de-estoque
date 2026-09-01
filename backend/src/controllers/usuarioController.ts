@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs'; 
-
-const prisma = new PrismaClient();
+import { prisma, prismaUnscoped } from '../lib/prisma.js';
+import { getAuth } from '../lib/auth.js';
+import bcrypt from 'bcryptjs';
 
 export const listarUsuarios = async (req: Request, res: Response) => {
   try {
@@ -32,7 +31,8 @@ export const criarUsuario = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Username e senha são obrigatórios.' });
     }
 
-    const usuarioExistente = await prisma.usuario.findUnique({ where: { username } });
+    // username é globalmente único — checagem cross-tenant (prismaUnscoped).
+    const usuarioExistente = await prismaUnscoped.usuario.findUnique({ where: { username } });
     if (usuarioExistente) {
       return res.status(400).json({ error: 'Usuário já existe.' });
     }
@@ -44,8 +44,9 @@ export const criarUsuario = async (req: Request, res: Response) => {
       data: {
         username,
         senha: senhaHash,
-        precisaMudarSenha: true, 
-        cargoId: cargoId ? Number(cargoId) : null
+        precisaMudarSenha: true,
+        cargoId: cargoId ? Number(cargoId) : null,
+        tenantId: getAuth(req)!.tenantId,
       },
       select: { id: true, username: true, cargoId: true, createdAt: true }
     });

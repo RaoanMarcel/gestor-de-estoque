@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 import ExcelJS from 'exceljs';
-
-const prisma = new PrismaClient();
 
 export const exportarHistoricoExcel = async (req: Request, res: Response): Promise<Response | void> => {
   try {
@@ -20,7 +18,7 @@ export const exportarHistoricoExcel = async (req: Request, res: Response): Promi
       orderBy: { createdAt: 'desc' }
     });
 
-    const palletInfo = await prisma.pallet.findUnique({
+    const palletInfo = await prisma.pallet.findFirst({
       where: { numero: String(palletAlvo) },
       select: { descricao: true }
     });

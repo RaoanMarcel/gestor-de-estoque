@@ -1,7 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 export const buscarHistoricoItem = async (req: Request, res: Response): Promise<Response | void> => {
   const { codigoItem } = req.params; 

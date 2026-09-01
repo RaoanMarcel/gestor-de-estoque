@@ -1,8 +1,7 @@
 // src/controllers/cargoController.ts
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
+import { getAuth } from '../lib/auth.js';
 
 export const listarCargosEUsuarios = async (req: Request, res: Response) => {
   try {
@@ -32,7 +31,7 @@ export const criarCargo = async (req: Request, res: Response) => {
     if (!nome) return res.status(400).json({ error: 'Nome do cargo é obrigatório.' });
 
     const cargo = await prisma.cargo.create({
-      data: { nome: nome.toUpperCase(), permissoes: [] }
+      data: { nome: nome.toUpperCase(), permissoes: [], tenantId: getAuth(req)!.tenantId }
     });
     res.status(201).json(cargo);
   } catch (error) {

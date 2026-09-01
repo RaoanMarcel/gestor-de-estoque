@@ -2,14 +2,16 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
-import { PrismaClient } from '@prisma/client';
+import { prismaUnscoped } from './lib/prisma.js';
 import palletRoutes from './routes/palletRoutes.js';
 import { authController } from './controllers/authController.js';
 import { autenticarToken } from './middlewares/authMiddleware.js';
 import { SocketService } from './services/SocketService.js';
-import inboundRoutes from './routes/inboundRoutes.js'; 
+import inboundRoutes from './routes/inboundRoutes.js';
 import usuarioRoute from './routes/usuarioRoute.js';
-import cargoRoutes from './routes/cargoRoutes.js'; 
+import cargoRoutes from './routes/cargoRoutes.js';
+import recebimentoRoutes from './routes/recebimentoRoutes.js';
+import superadminRoutes from './routes/superadminRoutes.js';
 
 // 🚀 IMPORTAÇÃO DO NOVO SERVIÇO DE VIGILÂNCIA DO BANCO
 import { KeepAliveService } from './services/KeepAliveService.js';
@@ -22,7 +24,7 @@ const httpServer = createServer(app);
 
 SocketService.getInstance().init(httpServer);
 
-const prisma = new PrismaClient();
+const prisma = prismaUnscoped;
 const PORT = Number(process.env.PORT) || 3001;
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 
@@ -70,6 +72,8 @@ app.post('/api/auth/alterar-senha-autenticado', autenticarToken, authController.
 app.use('/api', palletRoutes);
 app.use('/api/inbounds', inboundRoutes);
 app.use('/api/cargos', cargoRoutes);
+app.use('/api/recebimentos', recebimentoRoutes);
+app.use('/api/superadmin', superadminRoutes);
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor ativo na porta ${PORT} | Versão: ${APP_VERSION}`);
