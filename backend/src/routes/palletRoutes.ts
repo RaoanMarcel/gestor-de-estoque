@@ -1,33 +1,37 @@
 import { Router } from 'express';
-import { 
-  criarPallet, buscarPalletPorIdentificador, listarPallets, biparItem, 
-  transferirUm, transferirEmLote, enviarParaRMA, excluirPallet, biparItemEmLote, lancarPalletNovo 
+import {
+  criarPallet, buscarPalletPorIdentificador, listarPallets, biparItem,
+  transferirUm, transferirEmLote, enviarParaRMA, excluirPallet, biparItemEmLote, lancarPalletNovo
 } from '../controllers/palletController.js';
 
 import { exportarHistoricoExcel, exportarRelatorioRMA, exportarRelatorioGeralItens } from '../controllers/excelController.js';
 
-import { buscarHistoricoItem } from '../controllers/historicoController.js'; 
-import { autenticarToken } from '../middlewares/authMiddleware.js'; 
+import { buscarHistoricoItem } from '../controllers/historicoController.js';
+import { autenticarToken, somenteTenant } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
-router.post('/pallets', autenticarToken, criarPallet);
-router.get('/pallets', autenticarToken, listarPallets);
-router.get('/pallets/:identificador', autenticarToken, buscarPalletPorIdentificador);
+// Este router é montado em `/api` (sem prefixo próprio), então NÃO usar `router.use()`
+// — ele pegaria todo `/api/*`, inclusive `/api/superadmin`. Middleware por rota.
+const guard = [autenticarToken, somenteTenant];
 
-router.get('/historico/exportar-rma', autenticarToken, exportarRelatorioRMA);
-router.post('/historico/exportar', autenticarToken, exportarHistoricoExcel);
-router.get('/historico/exportar-geral', autenticarToken, exportarRelatorioGeralItens); 
+router.post('/pallets', guard, criarPallet);
+router.get('/pallets', guard, listarPallets);
+router.get('/pallets/:identificador', guard, buscarPalletPorIdentificador);
 
-router.post('/pallets/lancar-novo', autenticarToken, lancarPalletNovo);
+router.get('/historico/exportar-rma', guard, exportarRelatorioRMA);
+router.post('/historico/exportar', guard, exportarHistoricoExcel);
+router.get('/historico/exportar-geral', guard, exportarRelatorioGeralItens);
 
-router.get('/historico/:codigoItem', autenticarToken, buscarHistoricoItem);
+router.post('/pallets/lancar-novo', guard, lancarPalletNovo);
 
-router.post('/pallets/bipar', autenticarToken, biparItem);
-router.post('/pallets/enviar-rma', autenticarToken, enviarParaRMA);
-router.put('/pallets/transferir', autenticarToken, transferirUm);
-router.put('/pallets/transferir-lote', autenticarToken, transferirEmLote);
-router.delete('/pallets/:identificador', autenticarToken, excluirPallet);
-router.post('/pallets/bipar-lote', autenticarToken, biparItemEmLote);
+router.get('/historico/:codigoItem', guard, buscarHistoricoItem);
+
+router.post('/pallets/bipar', guard, biparItem);
+router.post('/pallets/enviar-rma', guard, enviarParaRMA);
+router.put('/pallets/transferir', guard, transferirUm);
+router.put('/pallets/transferir-lote', guard, transferirEmLote);
+router.delete('/pallets/:identificador', guard, excluirPallet);
+router.post('/pallets/bipar-lote', guard, biparItemEmLote);
 
 export default router;

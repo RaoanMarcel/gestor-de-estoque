@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { listarUsuarios, criarUsuario, excluirUsuario } from '../controllers/usuarioController.js';
-import { autenticarToken } from '../middlewares/authMiddleware.js';
+import { autenticarToken, somenteTenant } from '../middlewares/authMiddleware.js';
 import { atualizarCargoUsuario } from '../controllers/usuarioController.js';
 
 const router = Router();
 
-router.use(autenticarToken);
+router.use(autenticarToken, somenteTenant);
 
 router.get('/', listarUsuarios);
 router.post('/', criarUsuario);

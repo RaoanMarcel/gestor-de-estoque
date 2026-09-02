@@ -7,24 +7,27 @@ import {
   atualizarConferencia,
   acaoRecebimento,
 } from '../controllers/recebimentoController.js';
-import { autenticarToken } from '../middlewares/authMiddleware.js';
+import { autenticarToken, somenteTenant } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Todas as rotas de recebimento exigem autenticação + conta vinculada a uma empresa.
+router.use(autenticarToken, somenteTenant);
+
 // Lista todos os recebimentos para a tela inicial
-router.get('/dashboard', autenticarToken, listarDashboard);
+router.get('/dashboard', listarDashboard);
 
 // Agenda a entrega de uma NF (sem XML ainda)
-router.post('/agendar', autenticarToken, agendarRecebimento);
+router.post('/agendar', agendarRecebimento);
 
 // Importa o XML da NF-e (cria um recebimento novo ou preenche um agendamento)
-router.post('/importar-xml', autenticarToken, upload.single('xml'), importarXml);
+router.post('/importar-xml', upload.single('xml'), importarXml);
 
 // Salva o progresso da conferência (bipagem) dos itens
-router.put('/:id/conferencia', autenticarToken, atualizarConferencia);
+router.put('/:id/conferencia', atualizarConferencia);
 
 // Excluir / Finalizar recebimento
-router.post('/:id/acao', autenticarToken, acaoRecebimento);
+router.post('/:id/acao', acaoRecebimento);
 
 export default router;

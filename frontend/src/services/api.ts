@@ -30,13 +30,22 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Se o back-end gritar "401 Não Autorizado" (Sessão Expirada ou Duplicada)
-    if (error.response && error.response.status === 401) {
-      // Evita loop infinito se o usuário já estiver na tela de login
-      if (window.location.pathname !== '/login') {
+    const status = error.response?.status;
+    const code = error.response?.data?.code;
+
+    if (window.location.pathname !== '/login') {
+      // 401: sessão expirada ou aberta em outra máquina.
+      if (status === 401) {
         console.warn('⚠️ Sessão expirada ou acessada em outro local. Deslogando...');
-        localStorage.clear(); // Apaga o token e os dados da memória
-        window.location.href = '/login'; // Chuta para o login instantaneamente
+        localStorage.clear();
+        window.location.href = '/login';
+      }
+      // 403 + TENANT_SUSPENSO: o acesso da empresa foi suspenso no meio da sessão.
+      else if (status === 403 && code === 'TENANT_SUSPENSO') {
+        console.warn('⚠️ Acesso da empresa suspenso. Deslogando...');
+        localStorage.clear();
+        alert('O acesso da sua empresa foi suspenso. Fale com o suporte.');
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);

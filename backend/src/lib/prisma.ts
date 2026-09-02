@@ -63,9 +63,20 @@ export const prisma = base.$extends({
       async $allOperations({ model, operation, args, query }) {
         const ctx = getTenantContext();
 
-        // Fora de request autenticado, super-admin, ou model sem tenant → sem escopo.
-        if (!ctx || ctx.isSuperAdmin || ctx.tenantId == null || (model && MODELOS_SEM_TENANT.has(model))) {
-          return query(args);
+        // Fora de request autenticado (login, seed, cron): sem contexto → sem escopo.
+        if (!ctx) return query(args);
+
+        // `Tenant` é o único model sem coluna tenantId.
+        if (model && MODELOS_SEM_TENANT.has(model)) return query(args);
+
+        // Conta de plataforma (super-admin sem empresa) NÃO acessa dados de tenant por este
+        // client. As rotas de /superadmin usam `prismaUnscoped`. Se cair aqui, é bug de rota
+        // — melhor barrar do que vazar dados de todas as empresas.
+        if (ctx.isSuperAdmin || ctx.tenantId == null) {
+          throw new Error(
+            `[tenant] acesso a "${model}.${operation}" sem empresa no contexto. ` +
+            `Rotas de plataforma devem usar prismaUnscoped.`
+          );
         }
 
         const tenantId = ctx.tenantId;

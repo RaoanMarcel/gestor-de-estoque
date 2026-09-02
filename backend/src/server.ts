@@ -60,8 +60,7 @@ app.get('/api/status', (req: Request, res: Response) => {
 const publicAuthRouter = express.Router();
 publicAuthRouter.post('/login', authController.login);
 publicAuthRouter.post('/refresh', authController.refreshToken); 
-publicAuthRouter.post('/alterar-senha', authController.alterarSenha); 
-publicAuthRouter.post('/admin/cadastrar', authController.cadastrarUsuario);
+publicAuthRouter.post('/alterar-senha', authController.alterarSenha);
 
 app.use('/api/auth', publicAuthRouter);
 app.use('/api/usuarios', usuarioRoute);
