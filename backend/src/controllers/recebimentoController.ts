@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { getAuth } from '../lib/auth.js';
+import { getAuth, requireTenantId } from '../lib/auth.js';
 import { parseNfeXml } from '../services/nfeParser.js';
 
 const STATUS_RESOLVIDO = ['CONFERIDO', 'DISPENSADO'];
@@ -31,7 +31,7 @@ const calcularStatusRecebimento = (statusAtual: string, itens: any[]): string =>
 };
 
 const getUsuarioId = (req: Request): number | null => getAuth(req)?.id ?? null;
-const getTid = (req: Request): number => getAuth(req)!.tenantId;
+const getTid = (req: Request): number => requireTenantId(req);
 
 export const listarDashboard = async (_req: Request, res: Response) => {
   try {

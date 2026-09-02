@@ -15,7 +15,7 @@ interface LoginResponse {
   username: string;
   cargo?: string;
   permissoes?: string[];
-  tenantNome?: string;
+  tenantNome?: string | null;
   isSuperAdmin?: boolean;
 }
 

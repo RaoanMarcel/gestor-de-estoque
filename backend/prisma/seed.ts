@@ -17,10 +17,13 @@ const PERMISSOES_ADMIN = [
 ]
 
 async function main() {
+  // A empresa que já usa o sistema hoje nasce com todos os módulos disponíveis.
+  const MODULOS_TENANT_PRINCIPAL = ['malha', 'estoque', 'rma', 'full', 'recebimento', 'reports', 'acessos']
+
   const tenant = await prisma.tenant.upsert({
     where: { slug: TENANT_SLUG },
     update: {},
-    create: { nome: TENANT_NOME, slug: TENANT_SLUG },
+    create: { nome: TENANT_NOME, slug: TENANT_SLUG, modulos: MODULOS_TENANT_PRINCIPAL },
   })
 
   const cargoAdmin = await prisma.cargo.upsert({
@@ -49,13 +52,13 @@ async function main() {
   const senhaSuper = await bcrypt.hash(process.env.SEED_SUPERADMIN_SENHA || 'super123', 10)
   const superadmin = await prisma.usuario.upsert({
     where: { username: 'superadmin' },
-    update: { isSuperAdmin: true, senha: senhaSuper, precisaMudarSenha: false, sessaoToken: null, tenantId: tenant.id },
+    update: { isSuperAdmin: true, senha: senhaSuper, precisaMudarSenha: false, sessaoToken: null, tenantId: null, cargoId: null },
     create: {
       username: 'superadmin',
       senha: senhaSuper,
       precisaMudarSenha: false,
       isSuperAdmin: true,
-      tenantId: tenant.id,
+      tenantId: null,
     },
   })
 

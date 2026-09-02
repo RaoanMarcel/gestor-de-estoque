@@ -12,7 +12,8 @@ export interface TokenPayload {
   id: number;
   username: string;
   sessaoToken: string;
-  tenantId: number;
+  /** `null` apenas para a conta de super-admin (plataforma / break-glass). */
+  tenantId: number | null;
   isSuperAdmin: boolean;
 }
 
@@ -68,7 +69,7 @@ export const authController = {
         cargo: usuario.cargo?.nome || '',
         permissoes: usuario.cargo?.permissoes || [],
         tenantId: usuario.tenantId,
-        tenantNome: usuario.tenant?.nome || '',
+        tenantNome: usuario.tenant?.nome ?? null,
         isSuperAdmin: usuario.isSuperAdmin,
       });
     } catch (error: unknown) {

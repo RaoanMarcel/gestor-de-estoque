@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma, prismaUnscoped } from '../lib/prisma.js';
-import { getAuth } from '../lib/auth.js';
+import { requireTenantId } from '../lib/auth.js';
 import bcrypt from 'bcryptjs';
 
 export const listarUsuarios = async (req: Request, res: Response) => {
@@ -46,7 +46,7 @@ export const criarUsuario = async (req: Request, res: Response) => {
         senha: senhaHash,
         precisaMudarSenha: true,
         cargoId: cargoId ? Number(cargoId) : null,
-        tenantId: getAuth(req)!.tenantId,
+        tenantId: requireTenantId(req),
       },
       select: { id: true, username: true, cargoId: true, createdAt: true }
     });

@@ -91,3 +91,38 @@ curl -X POST https://<api>/api/superadmin/tenants \
 ## Rollback
 
 `pg_restore --clean --if-exists -d "<DATABASE_URL>" backup_pre_multitenant.dump`
+
+---
+
+# 0003 + 0004 — super-admin sem empresa + módulos por empresa
+
+Ambas aditivas (`DROP NOT NULL` e `ADD COLUMN` com default). Aplicadas em produção em
+2026-09-02. Backup em `bkp_superadmin_20260902."Usuario"` / `."Tenant"`.
+
+```sql
+-- backup
+CREATE SCHEMA "bkp_superadmin_20260902";
+CREATE TABLE "bkp_superadmin_20260902"."Usuario" AS TABLE public."Usuario";
+CREATE TABLE "bkp_superadmin_20260902"."Tenant"  AS TABLE public."Tenant";
+
+BEGIN;
+ALTER TABLE "Usuario" ALTER COLUMN "tenantId" DROP NOT NULL;              -- 0003
+UPDATE "Usuario" SET "tenantId" = NULL, "cargoId" = NULL WHERE "isSuperAdmin" = true;
+ALTER TABLE "Tenant" ADD COLUMN "modulos" TEXT[] NOT NULL DEFAULT ARRAY[]::text[];  -- 0004
+UPDATE "Tenant"
+   SET "modulos" = ARRAY['malha','estoque','rma','full','recebimento','reports','acessos']
+ WHERE "modulos" = '{}';
+COMMIT;
+```
+Depois: `prisma migrate resolve --applied 0003_usuario_tenant_nullable` e `0004_tenant_modulos`.
+
+Verificação (esperado): `Usuario` = 14 linhas; `superadmin.tenantId` = NULL;
+0 usuários comuns sem tenant; Pro4ce com 13 usuários e 7 módulos.
+
+Rollback (só estas duas, sem restaurar o dump inteiro):
+```sql
+UPDATE "Usuario" u SET "tenantId" = b."tenantId", "cargoId" = b."cargoId"
+  FROM "bkp_superadmin_20260902"."Usuario" b WHERE b.id = u.id AND u."isSuperAdmin" = true;
+ALTER TABLE "Tenant" DROP COLUMN "modulos";
+ALTER TABLE "Usuario" ALTER COLUMN "tenantId" SET NOT NULL;
+```

@@ -9,7 +9,8 @@ export interface TokenPayload {
   id: number;
   username: string;
   sessaoToken: string;
-  tenantId: number;
+  /** `null` apenas para a conta de super-admin (plataforma / break-glass). */
+  tenantId: number | null;
   isSuperAdmin: boolean;
 }
 

@@ -12,6 +12,7 @@ model Tenant {
   nome      String
   slug      String   @unique
   status    String   @default("ATIVO") // ATIVO | SUSPENSO
+  modulos   String[] @default([])      // módulos contratados no plano (ver src/lib/modulos.ts)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -105,8 +106,9 @@ model Usuario {
   cargoId            Int?
   cargo              Cargo?   @relation(fields: [cargoId], references: [id], onDelete: SetNull)
 
-  tenantId           Int
-  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+  // nulo apenas para a conta de super-admin (plataforma / break-glass) — ver src/lib/auth.ts
+  tenantId           Int?
+  tenant             Tenant?  @relation(fields: [tenantId], references: [id])
 
   createdAt          DateTime @default(now())
   historicos         HistoricoMovimentacao[]

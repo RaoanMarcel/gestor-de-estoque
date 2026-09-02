@@ -224,7 +224,11 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
                   </span>
                 )}
               </div>
-              {tenantNome && (
+              {isSuperAdmin ? (
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-blue-400/80">
+                  Plataforma
+                </span>
+              ) : tenantNome && (
                 <span className="shrink-0 max-w-[42%] text-[10px] font-medium text-[var(--sidebar-text)] opacity-60 truncate">
                   {tenantNome}
                 </span>

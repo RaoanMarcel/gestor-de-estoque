@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { getAuth } from '../lib/auth.js';
+import { getAuth, requireTenantId } from '../lib/auth.js';
 import { SocketService } from '../services/SocketService.js';
 import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
@@ -43,7 +43,7 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
   const auth = getAuth(req);
   const usuarioLogadoId = auth?.id;
   const usernameLogado = auth?.username || 'Sistema';
-  const tid = auth!.tenantId;
+  const tid = requireTenantId(req);
 
   try {
     const pallet = await prisma.pallet.findFirst({ where: { numero: numeroPallet } });
@@ -245,7 +245,7 @@ export const transferirUm = async (req: Request, res: Response): Promise<Respons
     const auth = getAuth(req);
     const usuarioLogadoId = auth?.id;
     const usernameLogado = auth?.username || 'Sistema';
-    const tid = auth!.tenantId;
+    const tid = requireTenantId(req);
 
     if (!codigoItem || !numeroPalletDestino) {
       return res.status(400).json({ error: 'Dados obrigatórios ausentes.' });
@@ -317,7 +317,7 @@ export const transferirEmLote = async (req: Request, res: Response): Promise<Res
     const { codigosItens, numeroPalletDestino } = req.body;
     const auth = getAuth(req);
     const usuarioLogadoId = auth?.id;
-    const tid = auth!.tenantId;
+    const tid = requireTenantId(req);
 
     if (!codigosItens || codigosItens.length === 0 || !numeroPalletDestino) {
       return res.status(400).json({ error: 'Dados ausentes.' });
@@ -371,7 +371,7 @@ export const enviarParaRMA = async (req: Request, res: Response): Promise<Respon
   try {
     const { codigosItens, numeroPalletOrigem } = req.body;
     const auth = getAuth(req);
-    const tid = auth!.tenantId;
+    const tid = requireTenantId(req);
     if (!codigosItens || codigosItens.length === 0) return res.status(400).json({ error: 'Nenhum item selecionado.' });
 
     const primeiroItem = await prisma.produtoPallet.findFirst({ where: { codigoItem: String(codigosItens[0]) }, include: { pallet: true } });
@@ -402,7 +402,7 @@ export const excluirPallet = async (req: Request, res: Response): Promise<Respon
   try {
     const { identificador } = req.params;
     const auth = getAuth(req);
-    const tid = auth!.tenantId;
+    const tid = requireTenantId(req);
     const isNumeric = !isNaN(Number(identificador));
 
     const palletNoBanco = await prisma.pallet.findFirst({
@@ -443,7 +443,7 @@ export const excluirPallet = async (req: Request, res: Response): Promise<Respon
 export const criarPallet = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { numero, rua, estrutura, nivel, tipo, descricao } = req.body;
-    const tid = getAuth(req)!.tenantId;
+    const tid = requireTenantId(req);
     if (!numero) return res.status(400).json({ error: 'O número do pallet é obrigatório!' });
 
     const novoPallet = await prisma.pallet.create({
@@ -494,7 +494,7 @@ export const biparItemEmLote = async (req: Request, res: Response): Promise<Resp
   const { palletId, codigosItens, acao } = req.body;
   const numeroPallet = String(palletId);
   const auth = getAuth(req);
-  const tid = auth!.tenantId;
+  const tid = requireTenantId(req);
 
   if (!codigosItens || codigosItens.length === 0) return res.status(400).json({ error: 'Nenhum item enviado.' });
 
@@ -533,7 +533,7 @@ export const lancarPalletNovo = async (req: Request, res: Response): Promise<Res
     const { palletId, senha } = req.body;
     const auth = getAuth(req);
     const usuarioId = auth?.id;
-    const tid = auth!.tenantId;
+    const tid = requireTenantId(req);
 
     if (!palletId || !senha) {
       return res.status(400).json({ error: 'Identificador do pallet e senha do operador são obrigatórios.' });

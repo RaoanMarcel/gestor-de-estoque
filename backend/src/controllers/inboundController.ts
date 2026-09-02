@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { getAuth } from '../lib/auth.js';
+import { getAuth, requireTenantId } from '../lib/auth.js';
 import ExcelJS from 'exceljs';
 import { getMascaraPorSku } from './maskController.js'; // 🚀 IMPORTANDO O ARQUIVO DE MÁSCARAS
 
@@ -15,7 +15,7 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
     const arquivoTxt = (req as any).file;
     const auth = getAuth(req);
     const usuarioId = auth?.id ?? null;
-    const tid = auth!.tenantId;
+    const tid = requireTenantId(req);
 
     if (!arquivoTxt || !arquivoTxt.buffer) return res.status(400).json({ error: 'Nenhum arquivo TXT foi enviado.' });
 
@@ -101,7 +101,7 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
 export const cadastrarMotorista = async (req: Request, res: Response) => {
   try {
     const { nome } = req.body;
-    const tid = getAuth(req)!.tenantId;
+    const tid = requireTenantId(req);
     if (!nome) return res.status(400).json({ error: 'O nome do motorista é obrigatório.' });
     const existe = await prisma.motorista.findFirst({ where: { nome: { equals: nome.trim(), mode: 'insensitive' } } });
     if (existe) return res.status(400).json({ error: 'Este motorista já está cadastrado no sistema.' });
@@ -113,7 +113,7 @@ export const cadastrarMotorista = async (req: Request, res: Response) => {
 export const cadastrarVeiculo = async (req: Request, res: Response) => {
   try {
     const { modelo, placa } = req.body;
-    const tid = getAuth(req)!.tenantId;
+    const tid = requireTenantId(req);
     if (!modelo || !placa) return res.status(400).json({ error: 'Modelo e placa são obrigatórios.' });
     const placaLimpa = placa.trim().toUpperCase();
     const existe = await prisma.veiculo.findFirst({ where: { placa: placaLimpa } });

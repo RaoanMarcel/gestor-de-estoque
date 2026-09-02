@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prismaUnscoped } from '../lib/prisma.js';
-import { getAuth } from '../lib/auth.js';
+import { MODULOS, MODULOS_PADRAO, sanitizarModulos } from '../lib/modulos.js';
 
 // Conjunto completo de permissões — usado no cargo ADMIN do primeiro usuário de um tenant.
 export const PERMISSOES_ADMIN = [
@@ -16,6 +16,11 @@ export const PERMISSOES_ADMIN = [
 const slugify = (s: string) =>
   s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+
+/** Catálogo de módulos — o front usa para montar rótulos e o seletor. */
+export const listarModulos = (_req: Request, res: Response) => {
+  return res.json({ modulos: MODULOS });
+};
 
 export const listarTenants = async (_req: Request, res: Response) => {
   try {
@@ -39,6 +44,13 @@ export const criarTenant = async (req: Request, res: Response) => {
     const slugFinal = slugify(slug || nome);
     if (!slugFinal) return res.status(400).json({ error: 'Slug inválido.' });
 
+    let modulos = MODULOS_PADRAO;
+    if (req.body.modulos !== undefined) {
+      const limpos = sanitizarModulos(req.body.modulos);
+      if (!limpos) return res.status(400).json({ error: 'Lista de módulos inválida.' });
+      modulos = limpos;
+    }
+
     const slugEmUso = await prismaUnscoped.tenant.findUnique({ where: { slug: slugFinal } });
     if (slugEmUso) return res.status(409).json({ error: 'Já existe um tenant com esse slug.' });
 
@@ -51,6 +63,7 @@ export const criarTenant = async (req: Request, res: Response) => {
       data: {
         nome: String(nome).trim(),
         slug: slugFinal,
+        modulos,
         cargos: {
           create: { nome: 'ADMIN', permissoes: PERMISSOES_ADMIN },
         },
@@ -69,7 +82,7 @@ export const criarTenant = async (req: Request, res: Response) => {
       select: { id: true, username: true },
     });
 
-    return res.status(201).json({ mensagem: 'Tenant criado.', tenant: { id: tenant.id, nome: tenant.nome, slug: tenant.slug }, admin });
+    return res.status(201).json({ mensagem: 'Tenant criado.', tenant: { id: tenant.id, nome: tenant.nome, slug: tenant.slug, modulos: tenant.modulos }, admin });
   } catch (error) {
     console.error('[ERRO - POST /superadmin/tenants]:', error);
     return res.status(500).json({ error: 'Erro ao criar tenant.' });
@@ -81,7 +94,7 @@ export const atualizarTenant = async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const { nome, status } = req.body;
 
-    const data: { nome?: string; status?: string } = {};
+    const data: { nome?: string; status?: string; modulos?: string[] } = {};
     if (nome !== undefined) {
       if (!String(nome).trim()) return res.status(400).json({ error: 'Nome inválido.' });
       data.nome = String(nome).trim();
@@ -91,9 +104,14 @@ export const atualizarTenant = async (req: Request, res: Response) => {
       if (status === 'SUSPENSO') return res.status(400).json({ error: 'Suspender empresa não é permitido por aqui.' });
       data.status = status;
     }
+    if (req.body.modulos !== undefined) {
+      const limpos = sanitizarModulos(req.body.modulos);
+      if (!limpos) return res.status(400).json({ error: 'Lista de módulos inválida.' });
+      data.modulos = limpos;
+    }
     if (Object.keys(data).length === 0) return res.status(400).json({ error: 'Nada para atualizar.' });
 
-    const tenant = await prismaUnscoped.tenant.update({ where: { id }, data, select: { id: true, nome: true, slug: true, status: true } });
+    const tenant = await prismaUnscoped.tenant.update({ where: { id }, data, select: { id: true, nome: true, slug: true, status: true, modulos: true } });
     return res.json({ mensagem: 'Empresa atualizada.', tenant });
   } catch (error) {
     console.error('[ERRO - PATCH /superadmin/tenants/:id]:', error);
@@ -101,24 +119,26 @@ export const atualizarTenant = async (req: Request, res: Response) => {
   }
 };
 
-export const listarUsuariosGlobais = async (_req: Request, res: Response) => {
+export const listarUsuariosDoTenant = async (req: Request, res: Response) => {
   try {
+    const tenantId = Number(req.params.id);
+    if (!tenantId) return res.status(400).json({ error: 'Empresa inválida.' });
+
     const usuarios = await prismaUnscoped.usuario.findMany({
-      orderBy: [{ tenantId: 'asc' }, { username: 'asc' }],
+      where: { tenantId },
+      orderBy: { username: 'asc' },
       select: {
         id: true,
         username: true,
-        isSuperAdmin: true,
         precisaMudarSenha: true,
         createdAt: true,
-        tenant: { select: { id: true, nome: true, slug: true } },
         cargo: { select: { nome: true } },
       },
     });
     return res.json({ usuarios });
   } catch (error) {
-    console.error('[ERRO - GET /superadmin/usuarios]:', error);
-    return res.status(500).json({ error: 'Erro ao listar usuários.' });
+    console.error('[ERRO - GET /superadmin/tenants/:id/usuarios]:', error);
+    return res.status(500).json({ error: 'Erro ao listar usuários da empresa.' });
   }
 };
 
@@ -150,5 +170,23 @@ export const adicionarUsuarioNoTenant = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[ERRO - POST /superadmin/tenants/:id/usuarios]:', error);
     return res.status(500).json({ error: 'Erro ao criar usuário.' });
+  }
+};
+
+export const removerUsuarioDoTenant = async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number(req.params.id);
+    const usuarioId = Number(req.params.usuarioId);
+
+    const alvo = await prismaUnscoped.usuario.findUnique({ where: { id: usuarioId }, select: { tenantId: true, isSuperAdmin: true } });
+    if (!alvo || alvo.isSuperAdmin || alvo.tenantId !== tenantId) {
+      return res.status(404).json({ error: 'Usuário não encontrado nessa empresa.' });
+    }
+
+    await prismaUnscoped.usuario.delete({ where: { id: usuarioId } });
+    return res.json({ mensagem: 'Usuário removido.' });
+  } catch (error) {
+    console.error('[ERRO - DELETE /superadmin/tenants/:id/usuarios/:usuarioId]:', error);
+    return res.status(500).json({ error: 'Erro ao remover usuário.' });
   }
 };
