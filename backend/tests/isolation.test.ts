@@ -1,12 +1,10 @@
 /**
- * Teste de isolamento multitenant.
+ * Teste de isolamento multitenant — as duas camadas:
+ *   (a) extension da aplicação injeta tenantId  → sempre roda
+ *   (b) RLS do Postgres recusa no banco          → roda quando FORCE RLS está ativo
  *
- * Prova que a extension do Prisma (`src/lib/prisma.ts`) + o contexto de tenant
- * (`src/lib/tenantContext.ts`) impedem uma empresa de ler/escrever dados de outra.
- *
- * SEGURANÇA: só cria e apaga tenants com slug começando em `__isotest_`. Nunca
- * toca em dado real — pode rodar contra o banco de produção. Ainda assim, se você
- * tiver um `TEST_DATABASE_URL`, ele é usado no lugar do `DATABASE_URL`.
+ * SEGURANÇA: só cria e apaga tenants com slug `__isotest_`. Nunca toca dado real —
+ * pode rodar contra produção. Usa `TEST_DATABASE_URL` se existir, senão `DATABASE_URL`.
  *
  *   npm test
  */
@@ -18,14 +16,23 @@ import dotenv from 'dotenv';
 dotenv.config();
 if (process.env.TEST_DATABASE_URL) process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
-const { prisma, prismaUnscoped } = await import('../src/lib/prisma.js');
+const { prisma, prismaUnscoped, disconnectAll } = await import('../src/lib/prisma.js');
 const { runWithTenant } = await import('../src/lib/tenantContext.js');
 
 const SLUG_PREFIX = '__isotest_';
-
-/** Contexto de request "de mentira" para um tenant comum. */
 const ctxTenant = (tenantId: number) => ({ tenantId, isSuperAdmin: false, usuarioId: null, username: 'iso' });
 const ctxSuperAdmin = { tenantId: null, isSuperAdmin: true, usuarioId: null, username: 'iso-sa' };
+
+async function rlsForcado(): Promise<boolean> {
+  const r = await prismaUnscoped.$queryRawUnsafe<{ forced: boolean; priv: boolean }[]>(`
+    SELECT
+      (SELECT relforcerowsecurity FROM pg_class
+        WHERE relname = 'Pallet' AND relnamespace = 'public'::regnamespace) AS forced,
+      (SELECT bool_or(rolsuper OR rolbypassrls) FROM pg_roles WHERE rolname = current_user) AS priv
+  `);
+  // RLS só é observável se o FORCE está ligado E o papel atual não é super/bypass.
+  return r[0]?.forced === true && r[0]?.priv === false;
+}
 
 async function criarTenantDeTeste(nome: string) {
   return prismaUnscoped.tenant.create({
@@ -35,14 +42,11 @@ async function criarTenantDeTeste(nome: string) {
 
 async function apagarTenantsDeTeste() {
   const alvos = await prismaUnscoped.tenant.findMany({
-    where: { slug: { startsWith: SLUG_PREFIX } },
-    select: { id: true },
+    where: { slug: { startsWith: SLUG_PREFIX } }, select: { id: true },
   });
   const ids = alvos.map((t) => t.id);
   if (ids.length === 0) return;
-
   const where = { tenantId: { in: ids } };
-  // ordem segura de FK (filhos antes dos pais)
   await prismaUnscoped.produtoPallet.deleteMany({ where });
   await prismaUnscoped.historicoMovimentacao.deleteMany({ where });
   await prismaUnscoped.inboundSku.deleteMany({ where });
@@ -60,17 +64,25 @@ async function apagarTenantsDeTeste() {
 
 let tenantA: number;
 let tenantB: number;
+let forcado = false;
 
 before(async () => {
   await apagarTenantsDeTeste();
   tenantA = (await criarTenantDeTeste('ISO A')).id;
   tenantB = (await criarTenantDeTeste('ISO B')).id;
+  forcado = await rlsForcado();
+  if (!forcado) {
+    console.warn('\n⚠️  FORCE ROW LEVEL SECURITY não está ativo (migração 0006). ' +
+      'Os casos "nível-banco" vão ser pulados.\n');
+  }
 });
 
 after(async () => {
   await apagarTenantsDeTeste();
-  await prismaUnscoped.$disconnect();
+  await disconnectAll();
 });
+
+// ---------- camada da aplicação (sempre) ----------
 
 test('create no contexto A grava tenantId = A', async () => {
   const p = await runWithTenant(ctxTenant(tenantA), async () =>
@@ -98,10 +110,10 @@ test('A não consegue ler um pallet de B pelo id', async () => {
   assert.equal(visto, null);
 });
 
-test('contexto de super-admin não acessa dados de tenant (lança)', async () => {
+test('contexto de super-admin não acessa `prisma` (lança)', async () => {
   await assert.rejects(
     () => runWithTenant(ctxSuperAdmin, async () => prisma.pallet.findMany()),
-    /sem empresa no contexto/,
+    /conta de plataforma|sem empresa/,
   );
 });
 
@@ -137,4 +149,40 @@ test('dois contextos concorrentes não vazam um pro outro', async () => {
   const realB = await prismaUnscoped.pallet.count({ where: { tenantId: tenantB } });
   assert.equal(ca, realA);
   assert.equal(cb, realB);
+});
+
+// ---------- nível do banco (só com FORCE RLS) ----------
+
+test('RLS: query crua no contexto A conta só os pallets de A', async (t) => {
+  if (!forcado) return t.skip('FORCE RLS inativo');
+  const total = await prismaUnscoped.pallet.count({ where: { tenantId: { in: [tenantA, tenantB] } } });
+  const [{ n }] = await runWithTenant(ctxTenant(tenantA), async () =>
+    prisma.$queryRawUnsafe<{ n: bigint }[]>(
+      `SELECT count(*)::int AS n FROM "Pallet" WHERE "tenantId" IN (${tenantA}, ${tenantB})`,
+    ),
+  );
+  const soA = await prismaUnscoped.pallet.count({ where: { tenantId: tenantA } });
+  assert.equal(Number(n), soA);
+  assert.ok(Number(n) < total, 'query crua enxergou pallets de B — RLS não filtrou');
+});
+
+test('RLS: prismaUnscoped (bypass) enxerga A e B', async (t) => {
+  if (!forcado) return t.skip('FORCE RLS inativo');
+  const ambos = await prismaUnscoped.pallet.findMany({
+    where: { tenantId: { in: [tenantA, tenantB] } }, select: { tenantId: true },
+  });
+  assert.ok(ambos.some((p) => p.tenantId === tenantA));
+  assert.ok(ambos.some((p) => p.tenantId === tenantB));
+});
+
+test('RLS: INSERT no contexto A com tenantId de B é recusado', async (t) => {
+  if (!forcado) return t.skip('FORCE RLS inativo');
+  await assert.rejects(() =>
+    runWithTenant(ctxTenant(tenantA), async () =>
+      prisma.$executeRawUnsafe(
+        `INSERT INTO "Pallet" ("numero","tenantId","createdAt","updatedAt")
+         VALUES ('ISO-HACK', ${tenantB}, now(), now())`,
+      ),
+    ),
+  );
 });

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../lib/prisma.js';
+import { prismaUnscoped } from '../lib/prisma.js';
 import { getAuth } from '../lib/auth.js';
 import { runWithTenant } from '../lib/tenantContext.js';
 
@@ -31,7 +31,7 @@ export const autenticarToken = async (req: Request, res: Response, next: NextFun
     const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
 
     // Validação de sessão única + tenant. `bypassRls` porque ainda não há contexto.
-    const usuarioDb = await prisma.usuario.findUnique({
+    const usuarioDb = await prismaUnscoped.usuario.findUnique({
       where: { id: decoded.id },
       select: {
         sessaoToken: true,

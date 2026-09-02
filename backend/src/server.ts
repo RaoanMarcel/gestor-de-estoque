@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
-import { prismaUnscoped } from './lib/prisma.js';
+import { disconnectAll } from './lib/prisma.js';
 import palletRoutes from './routes/palletRoutes.js';
 import { authController } from './controllers/authController.js';
 import { autenticarToken } from './middlewares/authMiddleware.js';
@@ -24,7 +24,6 @@ const httpServer = createServer(app);
 
 SocketService.getInstance().init(httpServer);
 
-const prisma = prismaUnscoped;
 const PORT = Number(process.env.PORT) || 3001;
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 
@@ -84,7 +83,7 @@ httpServer.listen(PORT, '0.0.0.0', () => {
 const gracefulShutdown = async () => {
   // 🚀 DESLIGA O CRON JOB ANTES DE DERRUBAR O SERVIDOR
   KeepAliveService.stop();
-  await prisma.$disconnect();
+  await disconnectAll();
   process.exit(0);
 };
 

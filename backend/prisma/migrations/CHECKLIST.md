@@ -126,3 +126,30 @@ UPDATE "Usuario" u SET "tenantId" = b."tenantId", "cargoId" = b."cargoId"
 ALTER TABLE "Tenant" DROP COLUMN "modulos";
 ALTER TABLE "Usuario" ALTER COLUMN "tenantId" SET NOT NULL;
 ```
+
+---
+
+# 0005 + 0006 — RLS (Row Level Security)
+
+Segunda camada de isolamento. `0005` liga RLS + políticas (dormente — o dono das tabelas
+ignora). `0006` aplica `FORCE` e aí a política vale pra todo mundo. Só DDL, nenhum dado é
+tocado. Rollback do `0006` é instantâneo (`NO FORCE`).
+
+**ORDEM OBRIGATÓRIA** (o código novo precisa estar rodando antes do RLS valer):
+
+1. **Subir o código para `main`** e esperar o deploy do Render terminar. O código novo usa
+   um pool por empresa com o GUC `app.current_tenant` na conexão + `prismaUnscoped` com
+   `app.rls_bypass=on`. Sem RLS ainda, é inócuo.
+2. Backup: `CREATE SCHEMA bkp_rls_AAAAMMDD; CREATE TABLE bkp_rls_AAAAMMDD."Pallet" AS TABLE public."Pallet";`
+   (basta uma tabela como testemunha — nada é alterado).
+3. Aplicar `0005` (`prisma db execute --file .../0005_rls_enable/migration.sql`).
+   Conferir: app continua **normal** (login, listar pallets, bipagem). RLS ainda dormente.
+4. Aplicar `0006`. Conferir de novo os mesmos fluxos + o console do super-admin.
+   Se algo quebrar: `ALTER TABLE ... NO FORCE ROW LEVEL SECURITY` nas 12 tabelas → volta ao
+   estado do passo 3 na hora.
+5. `prisma migrate resolve --applied 0005_rls_enable` e `0006_rls_force`.
+6. `cd backend && npm test` (local, agora com RLS forçado) → os 3 casos "nível-banco"
+   passam.
+
+**Migração futura com DML** (INSERT/UPDATE/DELETE em tabela de tenant): a 1ª linha do `.sql`
+tem que ser `SET LOCAL "app.rls_bypass" = 'on';`.

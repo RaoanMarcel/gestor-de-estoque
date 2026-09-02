@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { prisma, prismaUnscoped } from '../lib/prisma.js';
+import { prismaUnscoped } from '../lib/prisma.js';
 import { getAuth } from '../lib/auth.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
@@ -26,7 +26,7 @@ export const authController = {
         return res.status(400).json({ error: 'Usuário e senha são obrigatórios' });
       }
 
-      const usuario = await prisma.usuario.findUnique({
+      const usuario = await prismaUnscoped.usuario.findUnique({
         where: { username },
         include: { cargo: true, tenant: { select: { nome: true, status: true } } },
       });
@@ -45,7 +45,7 @@ export const authController = {
       }
 
       const sessaoToken = crypto.randomUUID();
-      await prisma.usuario.update({
+      await prismaUnscoped.usuario.update({
         where: { id: usuario.id },
         data: { sessaoToken },
       });
@@ -84,7 +84,7 @@ export const authController = {
       if (!refreshToken) return res.status(401).json({ error: 'Refresh token ausente' });
 
       const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as { id: number; sessaoToken: string };
-      const usuario = await prisma.usuario.findUnique({ where: { id: decoded.id } });
+      const usuario = await prismaUnscoped.usuario.findUnique({ where: { id: decoded.id } });
 
       if (!usuario || usuario.sessaoToken !== decoded.sessaoToken) {
         return res.status(401).json({ error: 'Sessão encerrada ou usuário inválido' });

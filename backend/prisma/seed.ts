@@ -1,7 +1,21 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
+// O seed roda fora de request e precisa mexer em todas as empresas → RLS desligado
+// via GUC na conexão (ver src/lib/prisma.ts). Sem o bypass, o FORCE RLS (migração 0006)
+// bloquearia os upserts.
+function urlComBypass(): string {
+  const base = process.env.DATABASE_URL
+  if (!base) throw new Error('DATABASE_URL não definida')
+  const [semQuery, query = ''] = base.split('?')
+  const params = new URLSearchParams(query)
+  params.delete('options')
+  const partes = [...params].map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+  partes.push(`options=${encodeURIComponent('-c app.rls_bypass=on')}`)
+  return `${semQuery}?${partes.join('&')}`
+}
+
+const prisma = new PrismaClient({ datasources: { db: { url: urlComBypass() } } })
 
 // Nome do tenant principal (a empresa que já usa o sistema hoje).
 const TENANT_NOME = process.env.SEED_TENANT_NOME || 'Empresa Principal'

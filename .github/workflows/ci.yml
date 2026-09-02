@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # app_ci é NÃO-superusuário de propósito: FORCE ROW LEVEL SECURITY só vale
+      # para não-superusuários, então é ele quem realmente exercita o RLS.
+      DATABASE_URL: postgresql://app_ci:app_ci@localhost:5432/estoque_ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cria o banco e o papel app_ci
+        run: |
+          export PGPASSWORD=postgres
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE app_ci LOGIN PASSWORD 'app_ci' CREATEDB;
+          CREATE DATABASE estoque_ci OWNER app_ci;
+          SQL
+
+      - name: Instala dependências (backend)
+        working-directory: backend
+        run: npm ci
+
+      - name: Aplica as migrações
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Gera o Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Typecheck (backend)
+        working-directory: backend
+        run: npx tsc --noEmit
+
+      - name: Teste de isolamento (RLS forçado)
+        working-directory: backend
+        run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instala dependências (frontend)
+        working-directory: frontend
+        run: npm ci
+      - name: Build (frontend)
+        working-directory: frontend
+        run: npm run build
