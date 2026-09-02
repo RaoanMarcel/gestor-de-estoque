@@ -118,6 +118,22 @@ export default function SuperAdmin() {
     }
   };
 
+  const alternarStatus = async (t: Tenant) => {
+    const novo = t.status === 'ATIVO' ? 'SUSPENSO' : 'ATIVO';
+    const acao = novo === 'SUSPENSO' ? 'suspender' : 'reativar';
+    if (!confirm(`Deseja ${acao} a empresa "${t.nome}"?` +
+      (novo === 'SUSPENSO' ? ' Os usuários dela perdem o acesso na hora.' : ''))) return;
+    try {
+      const r = await api(`/superadmin/tenants/${t.id}`, { method: 'PATCH', body: JSON.stringify({ status: novo }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      toast.success(novo === 'SUSPENSO' ? 'Empresa suspensa.' : 'Empresa reativada.');
+      carregar();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao mudar o status.');
+    }
+  };
+
   const abrirUsuarios = async (id: number) => {
     if (expandido === id) { setExpandido(null); return; }
     setExpandido(id);
@@ -278,7 +294,14 @@ export default function SuperAdmin() {
                                 <button onClick={() => setEditandoId(null)} className="text-xs text-[var(--text-muted)]">cancelar</button>
                               </div>
                             ) : (
-                              <span className="font-semibold">{t.nome}</span>
+                              <span className="inline-flex items-center gap-2">
+                                <span className="font-semibold">{t.nome}</span>
+                                {t.status === 'SUSPENSO' && (
+                                  <span className="text-[9px] font-bold uppercase text-rose-600 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded">
+                                    suspensa
+                                  </span>
+                                )}
+                              </span>
                             )}
                           </td>
                           <td className="p-3 font-mono text-xs text-[var(--text-muted)]">{t.slug}</td>
@@ -298,6 +321,12 @@ export default function SuperAdmin() {
                           <td className="p-3" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end gap-3 text-xs font-bold">
                               <button onClick={() => { setEditandoId(t.id); setNomeEdit(t.nome); }} className="text-blue-600 hover:underline">Renomear</button>
+                              <button
+                                onClick={() => alternarStatus(t)}
+                                className={`hover:underline ${t.status === 'ATIVO' ? 'text-rose-500' : 'text-emerald-600'}`}
+                              >
+                                {t.status === 'ATIVO' ? 'Suspender' : 'Reativar'}
+                              </button>
                             </div>
                           </td>
                         </tr>

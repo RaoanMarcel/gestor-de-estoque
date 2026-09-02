@@ -8,13 +8,13 @@ import {
   finalizarInbound,
   acaoCoordenador,
 } from '../controllers/inboundController.js';
-import { autenticarToken, somenteTenant } from '../middlewares/authMiddleware.js';
+import { autenticarToken, somenteTenant, exigirModulo } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Todas as rotas de inbound exigem autenticação + conta de empresa (o tenant vem do token).
-router.use(autenticarToken, somenteTenant);
+// Inbound é o fluxo do Mercado Full — exige auth + conta de empresa + o módulo "full".
+router.use(autenticarToken, somenteTenant, exigirModulo('full'));
 
 router.post('/upload', upload.single('inboundPdf'), processarInboundPdf);
 router.post('/motoristas', cadastrarMotorista);

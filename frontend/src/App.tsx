@@ -25,8 +25,18 @@ const limparSessao = () => {
   localStorage.removeItem('wms_cargo');
   localStorage.removeItem('wms_permissoes');
   localStorage.removeItem('wms_tenant');
+  localStorage.removeItem('wms_modulos');
   localStorage.removeItem('wms_superadmin');
 };
+
+/** Módulos contratados pela empresa do usuário logado (do login, em localStorage). */
+function modulosDaEmpresa(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem('wms_modulos') || '[]');
+  } catch {
+    return [];
+  }
+}
 
 const { fetch: originalFetch } = window;
 window.fetch = async (...args) => {
@@ -64,10 +74,13 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
 
   const permissoesSalvas = localStorage.getItem('wms_permissoes');
   const permissoes: string[] = permissoesSalvas ? JSON.parse(permissoesSalvas) : [];
+  const modulos: string[] = modulosDaEmpresa();
 
-  const podeVerArmazem = permissoes.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'));
-  const podeVerFull = permissoes.some(p => p.startsWith('full'));
-  const podeVerRecebimento = permissoes.some(p => p.startsWith('recebimento'));
+  // Item visível = a empresa contratou o módulo E o cargo tem a permissão.
+  const podeVerArmazem = (modulos.includes('malha') || modulos.includes('estoque') || modulos.includes('reports'))
+    && permissoes.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'));
+  const podeVerFull = modulos.includes('full') && permissoes.some(p => p.startsWith('full'));
+  const podeVerRecebimento = modulos.includes('recebimento') && permissoes.some(p => p.startsWith('recebimento'));
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -342,15 +355,21 @@ function SuperAdminRoute() {
   return <SuperAdmin />;
 }
 
-function RouteGuard({ permissoesObrigatorias, children }: { permissoesObrigatorias: string[], children: JSX.Element }) {
+function RouteGuard({ permissoesObrigatorias, modulosObrigatorios, children }: {
+  permissoesObrigatorias: string[],
+  modulosObrigatorios?: string[],
+  children: JSX.Element,
+}) {
   const permissoesSalvas = localStorage.getItem('wms_permissoes');
   const permissoes: string[] = permissoesSalvas ? JSON.parse(permissoesSalvas) : [];
+  const modulos = modulosDaEmpresa();
 
-  const temAcesso = permissoes.some(p => permissoesObrigatorias.some(obrigatoria => p.startsWith(obrigatoria)));
+  const temPermissao = permissoes.some(p => permissoesObrigatorias.some(obrigatoria => p.startsWith(obrigatoria)));
+  const temModulo = !modulosObrigatorios || modulosObrigatorios.some(m => modulos.includes(m));
 
-  if (!temAcesso) {
-    if (permissoes.some(x => x.startsWith('full'))) return <Navigate to="/mercado-full" replace />;
-    return <Navigate to="/configuracoes" replace />; 
+  if (!temPermissao || !temModulo) {
+    if (modulos.includes('full') && permissoes.some(x => x.startsWith('full'))) return <Navigate to="/mercado-full" replace />;
+    return <Navigate to="/configuracoes" replace />;
   }
 
   return children;
@@ -367,25 +386,25 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 
                 <Route path="/" element={
-                  <RouteGuard permissoesObrigatorias={['malha', 'estoque', 'reports']}>
+                  <RouteGuard permissoesObrigatorias={['malha', 'estoque', 'reports']} modulosObrigatorios={['malha', 'estoque', 'reports']}>
                     <Home />
                   </RouteGuard>
                 } />
 
                 <Route path="/pallet/:id" element={
-                  <RouteGuard permissoesObrigatorias={['malha', 'estoque']}>
+                  <RouteGuard permissoesObrigatorias={['malha', 'estoque']} modulosObrigatorios={['malha', 'estoque']}>
                     <PalletInterface />
                   </RouteGuard>
                 } />
 
                 <Route path="/mercado-full" element={
-                  <RouteGuard permissoesObrigatorias={['full']}>
+                  <RouteGuard permissoesObrigatorias={['full']} modulosObrigatorios={['full']}>
                     <GestorEnviosFull />
                   </RouteGuard>
                 } />
 
                 <Route path="/recebimento" element={
-                  <RouteGuard permissoesObrigatorias={['recebimento']}>
+                  <RouteGuard permissoesObrigatorias={['recebimento']} modulosObrigatorios={['recebimento']}>
                     <RecebimentoMercadoria />
                   </RouteGuard>
                 } />

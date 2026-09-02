@@ -14,6 +14,8 @@ export interface TenantContext {
   isSuperAdmin: boolean;
   usuarioId?: number | null;
   username?: string | null;
+  /** módulos contratados pela empresa (lido fresco do banco a cada request). */
+  modulos?: string[];
 }
 
 const storage = new AsyncLocalStorage<TenantContext>();

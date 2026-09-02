@@ -101,7 +101,6 @@ export const atualizarTenant = async (req: Request, res: Response) => {
     }
     if (status !== undefined) {
       if (!['ATIVO', 'SUSPENSO'].includes(status)) return res.status(400).json({ error: 'status inválido.' });
-      if (status === 'SUSPENSO') return res.status(400).json({ error: 'Suspender empresa não é permitido por aqui.' });
       data.status = status;
     }
     if (req.body.modulos !== undefined) {

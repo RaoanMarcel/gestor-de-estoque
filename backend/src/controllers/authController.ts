@@ -28,7 +28,7 @@ export const authController = {
 
       const usuario = await prismaUnscoped.usuario.findUnique({
         where: { username },
-        include: { cargo: true, tenant: { select: { nome: true, status: true } } },
+        include: { cargo: true, tenant: { select: { nome: true, status: true, modulos: true } } },
       });
 
       if (!usuario) {
@@ -70,6 +70,7 @@ export const authController = {
         permissoes: usuario.cargo?.permissoes || [],
         tenantId: usuario.tenantId,
         tenantNome: usuario.tenant?.nome ?? null,
+        modulos: usuario.tenant?.modulos ?? [],
         isSuperAdmin: usuario.isSuperAdmin,
       });
     } catch (error: unknown) {

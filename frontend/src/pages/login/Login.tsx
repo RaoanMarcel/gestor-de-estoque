@@ -16,6 +16,7 @@ interface LoginResponse {
   cargo?: string;
   permissoes?: string[];
   tenantNome?: string | null;
+  modulos?: string[];
   isSuperAdmin?: boolean;
 }
 
@@ -72,14 +73,20 @@ export default function Login() {
       localStorage.setItem('wms_cargo', data.cargo || '');
       localStorage.setItem('wms_permissoes', JSON.stringify(data.permissoes || []));
       localStorage.setItem('wms_tenant', data.tenantNome || '');
+      localStorage.setItem('wms_modulos', JSON.stringify(data.modulos || []));
       localStorage.setItem('wms_superadmin', data.isSuperAdmin ? 'true' : '');
 
       const perms = data.permissoes || [];
+      const mods = data.modulos || [];
+      const podeArmazem = ['malha', 'estoque', 'reports'].some(m => mods.includes(m))
+        && perms.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'));
+      const podeFull = mods.includes('full') && perms.some(p => p.startsWith('full'));
+
       if (data.isSuperAdmin) {
         navigate('/superadmin');
-      } else if (perms.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'))) {
+      } else if (podeArmazem) {
         navigate('/');
-      } else if (perms.some(p => p.startsWith('full'))) {
+      } else if (podeFull) {
         navigate('/mercado-full');
       } else {
         navigate('/configuracoes');

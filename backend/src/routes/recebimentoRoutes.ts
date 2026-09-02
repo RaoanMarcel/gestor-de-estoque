@@ -7,13 +7,13 @@ import {
   atualizarConferencia,
   acaoRecebimento,
 } from '../controllers/recebimentoController.js';
-import { autenticarToken, somenteTenant } from '../middlewares/authMiddleware.js';
+import { autenticarToken, somenteTenant, exigirModulo } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Todas as rotas de recebimento exigem autenticação + conta vinculada a uma empresa.
-router.use(autenticarToken, somenteTenant);
+// Todas as rotas exigem auth + conta de empresa + o módulo "recebimento".
+router.use(autenticarToken, somenteTenant, exigirModulo('recebimento'));
 
 // Lista todos os recebimentos para a tela inicial
 router.get('/dashboard', listarDashboard);

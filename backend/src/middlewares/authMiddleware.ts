@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prismaUnscoped } from '../lib/prisma.js';
 import { getAuth } from '../lib/auth.js';
-import { runWithTenant } from '../lib/tenantContext.js';
+import { runWithTenant, getTenantContext } from '../lib/tenantContext.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -37,7 +37,7 @@ export const autenticarToken = async (req: Request, res: Response, next: NextFun
         sessaoToken: true,
         tenantId: true,
         isSuperAdmin: true,
-        tenant: { select: { status: true } },
+        tenant: { select: { status: true, modulos: true } },
       },
     });
 
@@ -72,6 +72,7 @@ export const autenticarToken = async (req: Request, res: Response, next: NextFun
         isSuperAdmin: payload.isSuperAdmin,
         usuarioId: payload.id,
         username: payload.username,
+        modulos: usuarioDb.tenant?.modulos ?? [],
       },
       () => next()
     );
@@ -90,6 +91,21 @@ export const somenteTenant = (req: Request, res: Response, next: NextFunction) =
   if (!auth || auth.isSuperAdmin || auth.tenantId == null) {
     return res.status(403).json({
       error: 'Esta é uma rota de operação. Acesse com uma conta vinculada a uma empresa.',
+    });
+  }
+  next();
+};
+
+/**
+ * Bloqueia a rota se a empresa não tem o módulo `chave` no plano. Use depois de
+ * `autenticarToken` (+ `somenteTenant`). Os módulos vêm frescos do banco a cada request.
+ */
+export const exigirModulo = (chave: string) => (req: Request, res: Response, next: NextFunction) => {
+  const modulos = getTenantContext()?.modulos ?? [];
+  if (!modulos.includes(chave)) {
+    return res.status(403).json({
+      code: 'MODULO_NAO_CONTRATADO',
+      error: `O módulo "${chave}" não está no plano da sua empresa.`,
     });
   }
   next();
