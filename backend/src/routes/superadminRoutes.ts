@@ -9,6 +9,7 @@ import {
   listarUsuariosDoTenant,
   adicionarUsuarioNoTenant,
   removerUsuarioDoTenant,
+  notificarPlataforma,
 } from '../controllers/superadminController.js';
 
 const router = Router();
@@ -27,6 +28,8 @@ router.get('/modulos', listarModulos);
 router.get('/tenants', listarTenants);
 router.post('/tenants', criarTenant);
 router.patch('/tenants/:id', atualizarTenant);
+
+router.post('/notificar', notificarPlataforma);
 
 router.get('/tenants/:id/usuarios', listarUsuariosDoTenant);
 router.post('/tenants/:id/usuarios', adicionarUsuarioNoTenant);

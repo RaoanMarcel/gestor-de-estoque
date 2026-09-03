@@ -27,6 +27,7 @@ const PERMISSOES_ADMIN = [
   'reports:export', 'reports:trace',
   'full:view', 'full:manage',
   'recebimento:view', 'recebimento:manage', 'recebimento:conferencia',
+  'config:regras-email',
   'acessos:usuarios', 'acessos:cargos',
 ]
 

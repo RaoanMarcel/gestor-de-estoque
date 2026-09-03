@@ -11,6 +11,8 @@ import inboundRoutes from './routes/inboundRoutes.js';
 import usuarioRoute from './routes/usuarioRoute.js';
 import cargoRoutes from './routes/cargoRoutes.js';
 import recebimentoRoutes from './routes/recebimentoRoutes.js';
+import rmaRoutes from './routes/rmaRoutes.js';
+import notificacaoRoutes from './routes/notificacaoRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
 
 // 🚀 IMPORTAÇÃO DO NOVO SERVIÇO DE VIGILÂNCIA DO BANCO
@@ -71,6 +73,8 @@ app.use('/api', palletRoutes);
 app.use('/api/inbounds', inboundRoutes);
 app.use('/api/cargos', cargoRoutes);
 app.use('/api/recebimentos', recebimentoRoutes);
+app.use('/api/rma', rmaRoutes);
+app.use('/api/notificacoes', notificacaoRoutes);
 app.use('/api/superadmin', superadminRoutes);
 
 httpServer.listen(PORT, '0.0.0.0', () => {

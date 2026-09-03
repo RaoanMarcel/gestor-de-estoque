@@ -12,22 +12,27 @@ model Tenant {
   nome      String
   slug      String   @unique
   status    String   @default("ATIVO") // ATIVO | SUSPENSO
-  modulos   String[] @default([])      // módulos contratados no plano (ver src/lib/modulos.ts)
+  modulos   String[] @default([]) // módulos contratados no plano (ver src/lib/modulos.ts)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pallets       Pallet[]
-  produtos      ProdutoPallet[]
-  historicos    HistoricoMovimentacao[]
-  cargos        Cargo[]
-  usuarios      Usuario[]
-  contadores    Contador[]
-  motoristas    Motorista[]
-  veiculos      Veiculo[]
-  inbounds      InboundFull[]
-  inboundSkus   InboundSku[]
-  recebimentos  Recebimento[]
+  pallets          Pallet[]
+  produtos         ProdutoPallet[]
+  historicos       HistoricoMovimentacao[]
+  cargos           Cargo[]
+  usuarios         Usuario[]
+  contadores       Contador[]
+  motoristas       Motorista[]
+  veiculos         Veiculo[]
+  inbounds         InboundFull[]
+  inboundSkus      InboundSku[]
+  recebimentos     Recebimento[]
   recebimentoItens RecebimentoItem[]
+  rmas             Rma[]
+  rmaItens         RmaItem[]
+  rmaNotas         RmaNota[]
+  rmaAnotacoes     RmaAnotacao[]
+  rmaFornecedores  RmaFornecedor[]
 }
 
 model Pallet {
@@ -41,9 +46,10 @@ model Pallet {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   produtos  ProdutoPallet[]
+  rmas      Rma[]
 
-  tenantId  Int
-  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, numero])
 }
@@ -55,11 +61,17 @@ model ProdutoPallet {
   bipadoEm   DateTime @default(now())
   pallet     Pallet   @relation(fields: [palletId], references: [id], onDelete: Cascade)
 
-  usuarioId  Int?
-  usuario    Usuario? @relation(fields: [usuarioId], references: [id])
+  // capturados quando o item entra num RMA (nulos no fluxo de triagem normal)
+  numeroSerie String?
+  ean         String?
 
-  tenantId   Int
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  usuarioId Int?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+
+  rmaItem RmaItem?
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, codigoItem])
 }
@@ -77,8 +89,8 @@ model HistoricoMovimentacao {
   bipadoEm       DateTime @default(now())
   createdAt      DateTime @default(now())
 
-  tenantId       Int
-  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 }
 
 model Cargo {
@@ -89,38 +101,40 @@ model Cargo {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  tenantId   Int
-  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, nome])
 }
 
 model Usuario {
-  id                 Int      @id @default(autoincrement())
-  username           String   @unique
-  senha              String
-  precisaMudarSenha  Boolean  @default(true)
-  sessaoToken        String?
-  isSuperAdmin       Boolean  @default(false)
+  id                Int     @id @default(autoincrement())
+  username          String  @unique
+  senha             String
+  precisaMudarSenha Boolean @default(true)
+  sessaoToken       String?
+  isSuperAdmin      Boolean @default(false)
 
-  cargoId            Int?
-  cargo              Cargo?   @relation(fields: [cargoId], references: [id], onDelete: SetNull)
+  cargoId Int?
+  cargo   Cargo? @relation(fields: [cargoId], references: [id], onDelete: SetNull)
 
   // nulo apenas para a conta de super-admin (plataforma / break-glass) — ver src/lib/auth.ts
-  tenantId           Int?
-  tenant             Tenant?  @relation(fields: [tenantId], references: [id])
+  tenantId Int?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
 
-  createdAt          DateTime @default(now())
-  historicos         HistoricoMovimentacao[]
-  inbounds           InboundFull[]
-  produtosBipados    ProdutoPallet[]
-  recebimentos       Recebimento[]
+  createdAt       DateTime                @default(now())
+  historicos      HistoricoMovimentacao[]
+  inbounds        InboundFull[]
+  produtosBipados ProdutoPallet[]
+  recebimentos    Recebimento[]
+  rmasAbertos     Rma[]
+  rmaAnotacoes    RmaAnotacao[]
 }
 
 model Contador {
-  id       Int    @id @default(autoincrement())
-  chave    String
-  valor    Int    @default(0)
+  id    Int    @id @default(autoincrement())
+  chave String
+  valor Int    @default(0)
 
   tenantId Int
   tenant   Tenant @relation(fields: [tenantId], references: [id])
@@ -135,8 +149,8 @@ model Motorista {
   updatedAt DateTime      @updatedAt
   inbounds  InboundFull[]
 
-  tenantId  Int
-  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 }
 
 model Veiculo {
@@ -147,34 +161,34 @@ model Veiculo {
   updatedAt DateTime      @updatedAt
   inbounds  InboundFull[]
 
-  tenantId  Int
-  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, placa])
 }
 
 model InboundFull {
-  id          Int          @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   numeroFrete String?
   nomePallet  String
-  status      String       @default("PENDENTE")
+  status      String  @default("PENDENTE")
 
-  usuarioId   Int?
-  usuario     Usuario?     @relation(fields: [usuarioId], references: [id])
+  usuarioId Int?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
 
   motoristaId Int?
-  motorista   Motorista?   @relation(fields: [motoristaId], references: [id])
+  motorista   Motorista? @relation(fields: [motoristaId], references: [id])
 
-  veiculoId   Int?
-  veiculo     Veiculo?     @relation(fields: [veiculoId], references: [id])
+  veiculoId Int?
+  veiculo   Veiculo? @relation(fields: [veiculoId], references: [id])
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  skus        InboundSku[]
+  skus InboundSku[]
 
-  tenantId    Int
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 }
 
 model InboundSku {
@@ -188,17 +202,17 @@ model InboundSku {
   status           String      @default("PENDENTE")
   variacoes        Json?
 
-  leituras         Json?
+  leituras Json?
 
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenantId         Int
-  tenant           Tenant      @relation(fields: [tenantId], references: [id])
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 }
 
 model Recebimento {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   identificacao  String
   numeroNota     String?
   serieNota      String?
@@ -209,48 +223,184 @@ model Recebimento {
   dataEmissao    DateTime?
   dataAgendada   DateTime?
   observacao     String?
-  status         String   @default("AGENDADO")
+  status         String    @default("AGENDADO")
   xmlOriginal    String?
 
-  usuarioId      Int?
-  usuario        Usuario? @relation(fields: [usuarioId], references: [id])
+  usuarioId Int?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  itens          RecebimentoItem[]
+  itens RecebimentoItem[]
 
-  tenantId       Int
-  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, chaveAcesso])
 }
 
 model RecebimentoItem {
-  id                  Int         @id @default(autoincrement())
-  recebimentoId       Int
-  recebimento         Recebimento @relation(fields: [recebimentoId], references: [id], onDelete: Cascade)
+  id            Int         @id @default(autoincrement())
+  recebimentoId Int
+  recebimento   Recebimento @relation(fields: [recebimentoId], references: [id], onDelete: Cascade)
 
-  numItem             Int
-  codigoProduto       String
-  ean                 String?
-  eanTributavel       String?
-  descricao           String
-  ncm                 String?
-  cfop                String?
-  unidade             String?
-  quantidade          Float
-  valorUnitario       Float?
-  valorTotal          Float?
+  numItem       Int
+  codigoProduto String
+  ean           String?
+  eanTributavel String?
+  descricao     String
+  ncm           String?
+  cfop          String?
+  unidade       String?
+  quantidade    Float
+  valorUnitario Float?
+  valorTotal    Float?
 
-  precisaConferencia  Boolean     @default(true)
-  quantidadeConferida Float       @default(0)
-  status              String      @default("PENDENTE")
+  precisaConferencia  Boolean @default(true)
+  quantidadeConferida Float   @default(0)
+  status              String  @default("PENDENTE")
   leituras            Json?
 
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenantId            Int
-  tenant              Tenant      @relation(fields: [tenantId], references: [id])
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ============================================================
+//  RMA — Retorno de Mercadoria Autorizada
+// ============================================================
+
+model Rma {
+  id              Int     @id @default(autoincrement())
+  numero          String // "RMA-0078"
+  fornecedor      String // snapshot do nome (mantido mesmo se o pré-cadastro mudar)
+  fornecedorCnpj  String?
+  fornecedorEmail String? // snapshot do e-mail do pré-cadastro na abertura
+  // ABERTO | AGUARDANDO_RETORNO | EM_CONFERENCIA | FINALIZADO | CANCELADO
+  status          String  @default("ABERTO")
+  canhoto         String?
+  demo            Boolean @default(false) // RMA de demonstração — itens virtuais, pode reiniciar
+
+  // pré-cadastro local de fornecedor (nome + e-mail), só para o módulo RMA
+  fornecedorRefId Int?
+  fornecedorRef   RmaFornecedor? @relation(fields: [fornecedorRefId], references: [id])
+
+  // pallet dedicado deste RMA (tipo = "RMA")
+  palletId Int?
+  pallet   Pallet? @relation(fields: [palletId], references: [id])
+
+  abertoPorId Int?
+  abertoPor   Usuario? @relation(fields: [abertoPorId], references: [id])
+
+  finalizadoEm DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  itens     RmaItem[]
+  notas     RmaNota[]
+  anotacoes RmaAnotacao[]
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, numero])
+  @@index([tenantId, status])
+  @@index([tenantId, fornecedorRefId])
+}
+
+/// Pré-cadastro leve de fornecedor, exclusivo do módulo RMA (o cadastro
+/// completo de fornecedor vive em outra tela). Só nome + e-mail por enquanto.
+model RmaFornecedor {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rmas Rma[]
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, nome])
+  @@index([tenantId])
+}
+
+model RmaItem {
+  id    Int @id @default(autoincrement())
+  rmaId Int
+  rma   Rma @relation(fields: [rmaId], references: [id], onDelete: Cascade)
+
+  // a unidade física — fica no pallet do RMA enquanto o lote está aberto
+  produtoPalletId Int?           @unique
+  produtoPallet   ProdutoPallet? @relation(fields: [produtoPalletId], references: [id])
+
+  codigoTriagem     String // snapshot do codigoItem
+  identificador     String? // nº de série ou EAN
+  tipoIdentificador String? // SERIE | EAN
+  produtoNome       String?
+  produtoCodigo     String?
+  origemPalletId    Int? // pallet de onde o item veio (p/ devolver no cancelamento)
+
+  // PENDENTE | TROCA | CREDITO | DESCARTE
+  desfecho      String  @default("PENDENTE")
+  retornoSerie  String? // nova série quando é TROCA
+  retornoNotaId Int? // qual RmaNota de retorno trouxe
+
+  // preenchido no finalizar (só p/ TROCA): TRIAGEM | FANTASMA_NOVO
+  destinoEstoque  String?
+  destinoPalletId Int?
+
+  resolvidoEm DateTime?
+  createdAt   DateTime  @default(now())
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, rmaId])
+}
+
+model RmaNota {
+  id    Int @id @default(autoincrement())
+  rmaId Int
+  rma   Rma @relation(fields: [rmaId], references: [id], onDelete: Cascade)
+
+  direcao     String // ENTRADA | SAIDA
+  tipo        String // REMESSA | DEVOLUCAO | RETORNO | OUTRA
+  numero      String?
+  serie       String?
+  chaveAcesso String?
+  natureza    String? // natOp do XML
+  dataEmissao DateTime?
+  statusNota  String?
+  xmlOriginal String?
+  itens       Json? // linhas da nota: [{ descricao, codigo, quantidade }]
+
+  createdAt DateTime @default(now())
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, chaveAcesso])
+  @@index([tenantId, rmaId])
+}
+
+model RmaAnotacao {
+  id    Int @id @default(autoincrement())
+  rmaId Int
+  rma   Rma @relation(fields: [rmaId], references: [id], onDelete: Cascade)
+
+  usuarioId Int?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+
+  texto     String
+  createdAt DateTime @default(now())
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, rmaId])
 }

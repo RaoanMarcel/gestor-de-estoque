@@ -47,6 +47,11 @@ async function apagarTenantsDeTeste() {
   const ids = alvos.map((t) => t.id);
   if (ids.length === 0) return;
   const where = { tenantId: { in: ids } };
+  await prismaUnscoped.rmaAnotacao.deleteMany({ where });
+  await prismaUnscoped.rmaNota.deleteMany({ where });
+  await prismaUnscoped.rmaItem.deleteMany({ where });
+  await prismaUnscoped.rma.deleteMany({ where });
+  await prismaUnscoped.rmaFornecedor.deleteMany({ where });
   await prismaUnscoped.produtoPallet.deleteMany({ where });
   await prismaUnscoped.historicoMovimentacao.deleteMany({ where });
   await prismaUnscoped.inboundSku.deleteMany({ where });
@@ -108,6 +113,22 @@ test('A não consegue ler um pallet de B pelo id', async () => {
     prisma.pallet.findFirst({ where: { id: doB.id } }),
   );
   assert.equal(visto, null);
+});
+
+test('RMA de A não é visível no contexto de B', async () => {
+  const rma = await runWithTenant(ctxTenant(tenantA), async () =>
+    prisma.rma.create({ data: { numero: 'RMA-ISO-1', fornecedor: 'ACME' } as any }),
+  );
+  const noB = await runWithTenant(ctxTenant(tenantB), async () => prisma.rma.findFirst({ where: { id: rma.id } }));
+  assert.equal(noB, null);
+});
+
+test('pré-cadastro de fornecedor de A não vaza para B', async () => {
+  const f = await runWithTenant(ctxTenant(tenantA), async () =>
+    prisma.rmaFornecedor.create({ data: { nome: 'Fornecedor ISO', email: 'iso@x.com' } as any }),
+  );
+  const noB = await runWithTenant(ctxTenant(tenantB), async () => prisma.rmaFornecedor.findFirst({ where: { id: f.id } }));
+  assert.equal(noB, null);
 });
 
 test('contexto de super-admin não acessa `prisma` (lança)', async () => {

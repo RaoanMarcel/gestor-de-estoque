@@ -51,6 +51,10 @@ export interface RecebimentoCabecalho {
   fornecedorCnpj: string | null;
   valorTotal: number | null;
   dataEmissao: Date | null;
+  /** natOp — texto livre ("Devolução de compra", "Simples remessa", ...) */
+  naturezaOperacao: string | null;
+  /** tpNF — "0" = entrada, "1" = saída */
+  tipoOperacao: string | null;
 }
 
 export interface RecebimentoItemParsed {
@@ -107,6 +111,8 @@ export function parseNfeXml(xml: string): NfeParseResult {
     fornecedorCnpj: toStr(emit.CNPJ) || toStr(emit.CPF),
     valorTotal: toNumber(total.vNF),
     dataEmissao: toDate(ide.dhEmi) || toDate(ide.dEmi),
+    naturezaOperacao: toStr(ide.natOp),
+    tipoOperacao: toStr(ide.tpNF),
   };
 
   const itens: RecebimentoItemParsed[] = asArray<any>(infNFe.det).map((det: any, index: number) => {

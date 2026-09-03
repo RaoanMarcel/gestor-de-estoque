@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { getAuth, requireTenantId } from '../lib/auth.js';
 import { parseNfeXml } from '../services/nfeParser.js';
+import { notificarTenant } from '../lib/notificacoes.js';
 
 const STATUS_RESOLVIDO = ['CONFERIDO', 'DISPENSADO'];
 
@@ -19,7 +20,7 @@ const incluirRelacoes = {
 
 // Recalcula o status do recebimento a partir da situação dos itens
 const calcularStatusRecebimento = (statusAtual: string, itens: any[]): string => {
-  if (statusAtual === 'FINALIZADO' || statusAtual === 'AGENDADO') return statusAtual;
+  if (statusAtual === 'FINALIZADO' || statusAtual === 'AGENDADO' || statusAtual === 'PRE_AGENDADO') return statusAtual;
   if (itens.length === 0) return 'IMPORTADO';
 
   const resolvidos = itens.filter((i) => STATUS_RESOLVIDO.includes(i.status)).length;
@@ -48,9 +49,10 @@ export const listarDashboard = async (_req: Request, res: Response) => {
   }
 };
 
-export const agendarRecebimento = async (req: Request, res: Response) => {
+// Passo 1 — pré-agendamento: cria a "casca" do recebimento (sem data nem NF ainda).
+export const criarRecebimento = async (req: Request, res: Response) => {
   try {
-    const { identificacao, fornecedor, numeroNota, dataAgendada, observacao } = req.body;
+    const { identificacao, fornecedor, observacao } = req.body;
 
     if (!identificacao || !String(identificacao).trim()) {
       return res.status(400).json({ error: 'A identificação do recebimento é obrigatória.' });
@@ -60,19 +62,48 @@ export const agendarRecebimento = async (req: Request, res: Response) => {
       data: {
         identificacao: String(identificacao).trim(),
         fornecedor: fornecedor ? String(fornecedor).trim() : null,
-        numeroNota: numeroNota ? String(numeroNota).trim() : null,
-        dataAgendada: dataAgendada ? new Date(dataAgendada) : null,
         observacao: observacao ? String(observacao).trim() : null,
-        status: 'AGENDADO',
+        status: 'PRE_AGENDADO',
         usuarioId: getUsuarioId(req),
         tenantId: getTid(req),
       },
       include: incluirRelacoes,
     });
 
-    return res.status(201).json({ mensagem: 'Recebimento agendado com sucesso!', recebimento: { ...novo, itens: [] } });
+    return res.status(201).json({ mensagem: 'Pré-agendamento criado!', recebimento: { ...novo, itens: [] } });
   } catch (error) {
-    console.error('[ERRO - POST /recebimentos/agendar]:', error);
+    console.error('[ERRO - POST /recebimentos]:', error);
+    return res.status(500).json({ error: 'Erro interno ao criar o recebimento.' });
+  }
+};
+
+// Passo 2 — agendamento: preenche data prevista / nº da NF / observação e libera a importação.
+export const agendarRecebimento = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { fornecedor, numeroNota, dataAgendada, observacao } = req.body;
+
+    const alvo = await prisma.recebimento.findUnique({ where: { id: Number(id) } });
+    if (!alvo) return res.status(404).json({ error: 'Recebimento não encontrado.' });
+    if (alvo.status !== 'PRE_AGENDADO' && alvo.status !== 'AGENDADO') {
+      return res.status(400).json({ error: 'Este recebimento já passou da etapa de agendamento.' });
+    }
+
+    const recebimento = await prisma.recebimento.update({
+      where: { id: Number(id) },
+      data: {
+        fornecedor: fornecedor !== undefined ? (String(fornecedor).trim() || null) : alvo.fornecedor,
+        numeroNota: numeroNota ? String(numeroNota).trim() : null,
+        dataAgendada: dataAgendada ? new Date(dataAgendada) : null,
+        observacao: observacao !== undefined ? (String(observacao).trim() || null) : alvo.observacao,
+        status: 'AGENDADO',
+      },
+      include: incluirRelacoes,
+    });
+
+    return res.status(200).json({ mensagem: 'Recebimento agendado!', recebimento: { ...recebimento, itens: tratarItens(recebimento.itens) } });
+  } catch (error) {
+    console.error('[ERRO - POST /recebimentos/:id/agendar]:', error);
     return res.status(500).json({ error: 'Erro interno ao agendar o recebimento.' });
   }
 };
@@ -142,7 +173,7 @@ export const importarXml = async (req: Request, res: Response) => {
     if (recebimentoId) {
       const alvo = await prisma.recebimento.findUnique({ where: { id: Number(recebimentoId) } });
       if (!alvo) return res.status(404).json({ error: 'Agendamento não encontrado.' });
-      if (alvo.status !== 'AGENDADO') {
+      if (alvo.status !== 'AGENDADO' && alvo.status !== 'PRE_AGENDADO') {
         return res.status(400).json({ error: 'Este recebimento já possui uma nota importada.' });
       }
 
@@ -167,6 +198,13 @@ export const importarXml = async (req: Request, res: Response) => {
         include: incluirRelacoes,
       });
     }
+
+    notificarTenant(tid, {
+      tipo: 'RECEBIMENTO',
+      titulo: 'Recebimento',
+      texto: `Nova NF importada: ${recebimento.identificacao} (${recebimento.itens.length} itens).`,
+      link: '/recebimento',
+    });
 
     return res.status(201).json({
       mensagem: 'XML importado com sucesso!',

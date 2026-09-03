@@ -152,3 +152,33 @@
 :root[data-radius="soft"] .rounded-lg,
 :root[data-radius="soft"] .rounded-xl,
 :root[data-radius="soft"] .rounded-2xl { border-radius: 1.75rem !important; }
+/* =========================================
+   🔔 SINO DE NOTIFICAÇÃO
+   ========================================= */
+@keyframes sino-tremendo {
+  0%, 82%, 100% { transform: rotate(0); }
+  85% { transform: rotate(13deg); }
+  88% { transform: rotate(-11deg); }
+  91% { transform: rotate(8deg); }
+  94% { transform: rotate(-5deg); }
+  97% { transform: rotate(2deg); }
+}
+@keyframes sino-tocou {
+  0%, 100% { transform: rotate(0); }
+  12% { transform: rotate(17deg); }
+  25% { transform: rotate(-15deg); }
+  40% { transform: rotate(11deg); }
+  55% { transform: rotate(-8deg); }
+  70% { transform: rotate(5deg); }
+  85% { transform: rotate(-2deg); }
+}
+@keyframes balao-entra {
+  from { opacity: 0; transform: translateY(-50%) translateX(14px) scale(.92); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
+}
+.sino-tremendo { animation: sino-tremendo 4s ease-in-out infinite; }
+.sino-tocou    { animation: sino-tocou .85s ease-in-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sino-tremendo, .sino-tocou { animation: none !important; }
+}

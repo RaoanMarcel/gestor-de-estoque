@@ -43,7 +43,7 @@ interface Recebimento {
   dataEmissao: string | null;
   dataAgendada: string | null;
   observacao: string | null;
-  status: 'AGENDADO' | 'IMPORTADO' | 'EM_CONFERENCIA' | 'CONFERIDO' | 'FINALIZADO';
+  status: 'PRE_AGENDADO' | 'AGENDADO' | 'IMPORTADO' | 'EM_CONFERENCIA' | 'CONFERIDO' | 'FINALIZADO';
   createdAt: string;
   usuario?: { username: string } | null;
   itens: RecebimentoItem[];
@@ -62,6 +62,7 @@ type Badge = { label: string; dot: string; classes: string; chip?: string; accen
 const NEUTRO: Badge = { label: 'Pendente', dot: 'bg-slate-400', classes: 'text-[var(--text-muted)] bg-[var(--bg-main)] border-[var(--border-color)]', chip: 'border-[var(--text-muted)] text-[var(--text-main)]', accent: '#64748b' };
 
 const STATUS_INFO: Record<string, Badge> = {
+  PRE_AGENDADO: { label: 'Pré-agendado', dot: 'bg-cyan-500', classes: 'text-cyan-600 bg-cyan-500/10 border-cyan-500/20', chip: 'border-cyan-500 text-cyan-600', accent: '#06b6d4' },
   AGENDADO: { label: 'Agendado', dot: 'bg-purple-500', classes: 'text-purple-500 bg-purple-500/10 border-purple-500/20', chip: 'border-purple-500 text-purple-600', accent: '#a855f7' },
   IMPORTADO: { label: 'NF Importada', dot: 'bg-rose-500', classes: 'text-rose-500 bg-rose-500/10 border-rose-500/20', chip: 'border-rose-500 text-rose-600', accent: '#f43f5e' },
   EM_CONFERENCIA: { label: 'Em conferência', dot: 'bg-blue-500', classes: 'text-blue-500 bg-blue-500/10 border-blue-500/20', chip: 'border-blue-500 text-blue-600', accent: '#3b82f6' },
@@ -136,7 +137,7 @@ function Paginador({ pagina, totalPaginas, onChange }: { pagina: number; totalPa
 export default function RecebimentoMercadoria() {
   const toast = useToast();
 
-  const [currentScreen, setCurrentScreen] = useState<1 | 2 | 3 | 4>(1);
+  const [currentScreen, setCurrentScreen] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
 
   // Filtros da tela 1
@@ -145,12 +146,18 @@ export default function RecebimentoMercadoria() {
   const [dataInicio, setDataInicio] = useState(new Date(dataAtual.getTime() - 30 * 864e5).toISOString().split('T')[0]);
   const [dataFim, setDataFim] = useState(new Date(dataAtual.getTime() + 30 * 864e5).toISOString().split('T')[0]);
   const [filtros, setFiltros] = useState<Record<string, boolean>>({
-    AGENDADO: true, IMPORTADO: true, EM_CONFERENCIA: true, CONFERIDO: true, FINALIZADO: true,
+    PRE_AGENDADO: true, AGENDADO: true, IMPORTADO: true, EM_CONFERENCIA: true, CONFERIDO: true, FINALIZADO: true,
   });
   const [pagina, setPagina] = useState(1);
+  const [visualizacao, setVisualizacao] = useState<'cards' | 'lista'>(
+    () => (localStorage.getItem('receb_view') === 'lista' ? 'lista' : 'cards'),
+  );
+  useEffect(() => { localStorage.setItem('receb_view', visualizacao); }, [visualizacao]);
 
-  // Agendamento (tela 2)
-  const [formAgenda, setFormAgenda] = useState({ identificacao: '', fornecedor: '', numeroNota: '', dataAgendada: '', observacao: '' });
+  // Novo recebimento / pré-agendamento (tela 2)
+  const [formNovo, setFormNovo] = useState({ identificacao: '', fornecedor: '', observacao: '' });
+  // Agendamento — passo 2 (tela 5)
+  const [formAgenda, setFormAgenda] = useState({ id: 0, identificacao: '', fornecedor: '', numeroNota: '', dataAgendada: '', observacao: '' });
   const [isSalvando, setIsSalvando] = useState(false);
 
   // Importação XML (tela 3)
@@ -235,21 +242,51 @@ export default function RecebimentoMercadoria() {
   // ---------------------------------------------------------------
   // AGENDAMENTO
   // ---------------------------------------------------------------
-  const handleAgendar = async (e: React.FormEvent) => {
+  // Passo 1 — cria o pré-agendamento (tela 2)
+  const handleCriarRecebimento = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formAgenda.identificacao.trim()) return toast.error('Informe a identificação do recebimento.');
+    if (!formNovo.identificacao.trim()) return toast.error('Informe a identificação do recebimento.');
     setIsSalvando(true);
     try {
       const token = localStorage.getItem('wms_token');
-      const res = await fetch(`${API_URL}/recebimentos/agendar`, {
+      const res = await fetch(`${API_URL}/recebimentos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(formAgenda),
+        body: JSON.stringify(formNovo),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast.success(data.mensagem);
-      setFormAgenda({ identificacao: '', fornecedor: '', numeroNota: '', dataAgendada: '', observacao: '' });
+      setFormNovo({ identificacao: '', fornecedor: '', observacao: '' });
+      await carregarDashboard();
+      setCurrentScreen(1);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao criar o recebimento.');
+    } finally {
+      setIsSalvando(false);
+    }
+  };
+
+  // Passo 2 — agenda a entrega (tela 5): data prevista / nº NF / observação
+  const handleAgendar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formAgenda.id) return;
+    setIsSalvando(true);
+    try {
+      const token = localStorage.getItem('wms_token');
+      const res = await fetch(`${API_URL}/recebimentos/${formAgenda.id}/agendar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          fornecedor: formAgenda.fornecedor,
+          numeroNota: formAgenda.numeroNota,
+          dataAgendada: formAgenda.dataAgendada,
+          observacao: formAgenda.observacao,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success(data.mensagem);
       await carregarDashboard();
       setCurrentScreen(1);
     } catch (err: any) {
@@ -298,6 +335,18 @@ export default function RecebimentoMercadoria() {
   // CONFERÊNCIA
   // ---------------------------------------------------------------
   const abrirConferencia = (r: Recebimento) => {
+    if (r.status === 'PRE_AGENDADO') {
+      setFormAgenda({
+        id: r.id,
+        identificacao: r.identificacao,
+        fornecedor: r.fornecedor || '',
+        numeroNota: r.numeroNota || '',
+        dataAgendada: r.dataAgendada ? r.dataAgendada.slice(0, 16) : '',
+        observacao: r.observacao || '',
+      });
+      setCurrentScreen(5);
+      return;
+    }
     if (r.status === 'AGENDADO') {
       setVincularId(String(r.id));
       setCurrentScreen(3);
@@ -561,9 +610,9 @@ export default function RecebimentoMercadoria() {
           <PageHeader titulo="Recebimento de Mercadoria" />
 
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            <button onClick={() => setCurrentScreen(2)} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)] text-[var(--text-main)] font-bold text-sm hover:border-blue-500 hover:text-blue-600 transition-colors shadow-sm">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              Agendar Recebimento
+            <button onClick={() => { setFormNovo({ identificacao: '', fornecedor: '', observacao: '' }); setCurrentScreen(2); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)] text-[var(--text-main)] font-bold text-sm hover:border-blue-500 hover:text-blue-600 transition-colors shadow-sm">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" /></svg>
+              Novo Recebimento
             </button>
             <button onClick={() => { setVincularId(''); setCurrentScreen(3); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 ${btnPrimary}`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
@@ -602,42 +651,108 @@ export default function RecebimentoMercadoria() {
             })}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {recebimentosPagina.map((r) => {
-              const info = STATUS_INFO[r.status];
-              const totalItens = r.itens.length;
-              const resolvidos = r.itens.filter(itemResolvido).length;
-              const bloqueios = r.itens.filter((i) => lockedItens[lockKey(i.id)] && lockedItens[lockKey(i.id)] !== getUsuarioLogado());
-              return (
-                <div key={r.id} className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-xl p-4 shadow-sm relative transition-shadow hover:shadow-md cursor-pointer flex flex-col" onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; abrirConferencia(r); }}>
-                  {r.status !== 'FINALIZADO' && (
-                    <button onClick={() => handleExcluir(r.id)} className="absolute top-3 right-3 text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors p-1" title="Excluir">
-                      <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
-                  )}
-                  <h4 className="font-bold text-[var(--text-main)] text-base mb-2 pr-8 leading-snug break-words">{r.identificacao}</h4>
-                  <div className="flex flex-col gap-0.5 text-[11px] font-medium text-[var(--text-muted)] mb-3 flex-1">
-                    {r.fornecedor && <span className="truncate">Forn.: {r.fornecedor}</span>}
-                    {r.numeroNota && <span>NF: {r.numeroNota}{r.serieNota ? `/${r.serieNota}` : ''}</span>}
-                    {totalItens > 0 && <span>Itens conferidos: {resolvidos}/{totalItens}</span>}
-                    {r.valorTotal != null && <span>{fmtMoeda(r.valorTotal)}</span>}
-                    {r.status === 'AGENDADO' && r.dataAgendada && <span>Previsto: {fmtData(r.dataAgendada)}</span>}
-                  </div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-bold ${info.classes}`}>
-                      <span className={`w-2 h-2 rounded-full ${info.dot}`} />{info.label}
+          {recebimentosFiltrados.length > 0 && (
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-bold text-[var(--text-muted)]">
+                {recebimentosFiltrados.length} {recebimentosFiltrados.length === 1 ? 'recebimento' : 'recebimentos'}
+              </span>
+              <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-panel)] p-0.5 shadow-sm">
+                {([
+                  ['cards', 'Blocos', <path key="c" strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 13h6v6h-6z" />],
+                  ['lista', 'Lista', <path key="l" strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />],
+                ] as const).map(([v, titulo, icone]) => (
+                  <button key={v} type="button" onClick={() => setVisualizacao(v)} title={titulo}
+                    className={`p-1.5 rounded-md transition-colors ${visualizacao === v ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">{icone}</svg>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {visualizacao === 'cards' && (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {recebimentosPagina.map((r) => {
+                const info = STATUS_INFO[r.status];
+                const totalItens = r.itens.length;
+                const resolvidos = r.itens.filter(itemResolvido).length;
+                const bloqueios = r.itens.filter((i) => lockedItens[lockKey(i.id)] && lockedItens[lockKey(i.id)] !== getUsuarioLogado());
+                return (
+                  <div key={r.id} className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-xl p-4 shadow-sm relative transition-shadow hover:shadow-md cursor-pointer flex flex-col" onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; abrirConferencia(r); }}>
+                    {r.status !== 'FINALIZADO' && (
+                      <button onClick={() => handleExcluir(r.id)} className="absolute top-3 right-3 text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors p-1" title="Excluir">
+                        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
+                    <h4 className="font-bold text-[var(--text-main)] text-base mb-2 pr-8 leading-snug break-words">{r.identificacao}</h4>
+                    <div className="flex flex-col gap-0.5 text-[11px] font-medium text-[var(--text-muted)] mb-3 flex-1">
+                      {r.fornecedor && <span className="truncate">Forn.: {r.fornecedor}</span>}
+                      {r.numeroNota && <span>NF: {r.numeroNota}{r.serieNota ? `/${r.serieNota}` : ''}</span>}
+                      {totalItens > 0 && <span>Itens conferidos: {resolvidos}/{totalItens}</span>}
+                      {r.valorTotal != null && <span>{fmtMoeda(r.valorTotal)}</span>}
+                      {r.status === 'AGENDADO' && r.dataAgendada && <span>Previsto: {fmtData(r.dataAgendada)}</span>}
+                      {r.status === 'PRE_AGENDADO' && r.observacao && <span className="truncate italic">{r.observacao}</span>}
                     </div>
-                    {bloqueios.length > 0 && (
-                      <div className="text-[10px] text-amber-600 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 animate-pulse whitespace-nowrap">⚠ {bloqueios.length} em uso</div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-bold ${info.classes}`}>
+                        <span className={`w-2 h-2 rounded-full ${info.dot}`} />{info.label}
+                      </div>
+                      {bloqueios.length > 0 && (
+                        <div className="text-[10px] text-amber-600 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 animate-pulse whitespace-nowrap">⚠ {bloqueios.length} em uso</div>
+                      )}
+                    </div>
+                    <button onClick={() => abrirConferencia(r)} className="w-full py-2.5 bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-main)] text-sm font-bold rounded-lg hover:border-blue-500 hover:text-blue-600 transition-colors">
+                      {r.status === 'PRE_AGENDADO' ? 'Agendar Recebimento' : r.status === 'AGENDADO' ? 'Importar XML da NF' : r.status === 'FINALIZADO' ? 'Ver detalhes' : r.status === 'CONFERIDO' ? 'Revisar e finalizar' : 'Conferir mercadoria'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {visualizacao === 'lista' && (
+            <div className="flex flex-col gap-2">
+              {recebimentosPagina.map((r) => {
+                const info = STATUS_INFO[r.status];
+                const totalItens = r.itens.length;
+                const resolvidos = r.itens.filter(itemResolvido).length;
+                const bloqueios = r.itens.filter((i) => lockedItens[lockKey(i.id)] && lockedItens[lockKey(i.id)] !== getUsuarioLogado());
+                const acao = r.status === 'PRE_AGENDADO' ? 'Agendar' : r.status === 'AGENDADO' ? 'Importar XML' : r.status === 'FINALIZADO' ? 'Ver' : r.status === 'CONFERIDO' ? 'Finalizar' : 'Conferir';
+                return (
+                  <div key={r.id} onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; abrirConferencia(r); }}
+                    className="flex items-center gap-3 bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 shadow-sm hover:shadow-md hover:border-blue-500/40 cursor-pointer transition-all">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[var(--text-main)] text-sm truncate">{r.identificacao}</span>
+                        {bloqueios.length > 0 && (
+                          <span className="shrink-0 text-[9px] text-amber-600 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 animate-pulse whitespace-nowrap">⚠ {bloqueios.length}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-medium text-[var(--text-muted)] mt-0.5">
+                        {r.fornecedor && <span className="truncate max-w-[180px]">Forn.: {r.fornecedor}</span>}
+                        {r.numeroNota && <span>NF {r.numeroNota}{r.serieNota ? `/${r.serieNota}` : ''}</span>}
+                        {totalItens > 0 && <span>{resolvidos}/{totalItens} itens</span>}
+                        {r.valorTotal != null && <span>{fmtMoeda(r.valorTotal)}</span>}
+                        {r.status === 'AGENDADO' && r.dataAgendada && <span>Previsto {fmtData(r.dataAgendada)}</span>}
+                      </div>
+                    </div>
+                    <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-bold ${info.classes}`}>
+                      <span className={`w-2 h-2 rounded-full ${info.dot}`} /><span className="hidden sm:inline">{info.label}</span>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); abrirConferencia(r); }}
+                      className="shrink-0 hidden sm:inline-flex px-3 py-1.5 rounded-lg bg-[var(--bg-main)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] hover:border-blue-500 hover:text-blue-600 transition-colors">
+                      {acao}
+                    </button>
+                    {r.status !== 'FINALIZADO' && (
+                      <button onClick={(e) => { e.stopPropagation(); handleExcluir(r.id); }} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors p-1" title="Excluir">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
                     )}
                   </div>
-                  <button onClick={() => abrirConferencia(r)} className="w-full py-2.5 bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-main)] text-sm font-bold rounded-lg hover:border-blue-500 hover:text-blue-600 transition-colors">
-                    {r.status === 'AGENDADO' ? 'Importar XML da NF' : r.status === 'FINALIZADO' ? 'Ver detalhes' : r.status === 'CONFERIDO' ? 'Revisar e finalizar' : 'Conferir mercadoria'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
           {recebimentosFiltrados.length === 0 && (
             <div className="text-center text-[var(--text-muted)] text-sm py-16 font-medium">Nenhum recebimento encontrado.</div>
           )}
@@ -646,15 +761,39 @@ export default function RecebimentoMercadoria() {
         </div>
       )}
 
-      {/* ================= TELA 2 — AGENDAR ================= */}
+      {/* ================= TELA 2 — NOVO RECEBIMENTO (pré-agendamento) ================= */}
       {currentScreen === 2 && (
         <div className="max-w-xl mx-auto animate-in slide-in-from-right-8 duration-300">
-          <PageHeader titulo="Agendar Recebimento" onBack={() => setCurrentScreen(1)} />
-          <form onSubmit={handleAgendar} className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-2xl p-5 md:p-6 shadow-sm space-y-4">
+          <PageHeader titulo="Novo Recebimento" onBack={() => setCurrentScreen(1)} />
+          <form onSubmit={handleCriarRecebimento} className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-2xl p-5 md:p-6 shadow-sm space-y-4">
+            <p className="text-sm text-[var(--text-muted)]">
+              Cria um pré-agendamento. Depois você abre o card e clica em <b className="text-[var(--text-main)]">Agendar Recebimento</b> para marcar a data e o nº da NF, e então importa o XML.
+            </p>
             <div>
               <label className={labelCls}>Identificação *</label>
-              <input type="text" value={formAgenda.identificacao} onChange={(e) => setFormAgenda({ ...formAgenda, identificacao: e.target.value })} placeholder="Ex.: Entrega Fornecedor X - Segunda" className={inputCls} autoFocus />
+              <input type="text" value={formNovo.identificacao} onChange={(e) => setFormNovo({ ...formNovo, identificacao: e.target.value })} placeholder="Ex.: Entrega Fornecedor X - Segunda" className={inputCls} autoFocus />
             </div>
+            <div>
+              <label className={labelCls}>Fornecedor</label>
+              <input type="text" value={formNovo.fornecedor} onChange={(e) => setFormNovo({ ...formNovo, fornecedor: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Observação</label>
+              <textarea value={formNovo.observacao} onChange={(e) => setFormNovo({ ...formNovo, observacao: e.target.value })} rows={3} className={`${inputCls} resize-none`} />
+            </div>
+            <button type="submit" disabled={isSalvando} className={`w-full py-3.5 ${btnPrimary}`}>
+              {isSalvando ? 'Salvando...' : 'Criar pré-agendamento'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ================= TELA 5 — AGENDAR (passo 2) ================= */}
+      {currentScreen === 5 && (
+        <div className="max-w-xl mx-auto animate-in slide-in-from-right-8 duration-300">
+          <PageHeader titulo={`Agendar · ${formAgenda.identificacao}`} onBack={() => setCurrentScreen(1)} />
+          <form onSubmit={handleAgendar} className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-2xl p-5 md:p-6 shadow-sm space-y-4">
+            <p className="text-sm text-[var(--text-muted)]">Marque quando a mercadoria chega e o nº da NF previsto. Depois de salvar, o card libera a <b className="text-[var(--text-main)]">importação do XML</b>.</p>
             <div>
               <label className={labelCls}>Fornecedor</label>
               <input type="text" value={formAgenda.fornecedor} onChange={(e) => setFormAgenda({ ...formAgenda, fornecedor: e.target.value })} className={inputCls} />
@@ -683,13 +822,13 @@ export default function RecebimentoMercadoria() {
         <div className="max-w-xl mx-auto animate-in slide-in-from-right-8 duration-300">
           <PageHeader titulo="Importar XML da NF" onBack={() => { setSelectedFile(null); setVincularId(''); setCurrentScreen(1); }} />
           <div className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-2xl p-5 md:p-6 shadow-sm">
-            {recebimentos.some((r) => r.status === 'AGENDADO') && (
+            {recebimentos.some((r) => r.status === 'AGENDADO' || r.status === 'PRE_AGENDADO') && (
               <div className="mb-5">
                 <label className={labelCls}>Vincular a um agendamento (opcional)</label>
                 <select value={vincularId} onChange={(e) => setVincularId(e.target.value)} className={inputCls}>
                   <option value="">— Criar novo recebimento —</option>
-                  {recebimentos.filter((r) => r.status === 'AGENDADO').map((r) => (
-                    <option key={r.id} value={r.id}>{r.identificacao}</option>
+                  {recebimentos.filter((r) => r.status === 'AGENDADO' || r.status === 'PRE_AGENDADO').map((r) => (
+                    <option key={r.id} value={r.id}>{r.identificacao}{r.status === 'PRE_AGENDADO' ? ' (pré-agendado)' : ''}</option>
                   ))}
                 </select>
               </div>

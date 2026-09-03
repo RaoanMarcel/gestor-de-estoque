@@ -54,7 +54,7 @@ export default function PalletHeader({
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-5 border-b border-slate-200 gap-4">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/triagens')}
           title="Voltar para o Galpão"
           className="w-10 h-10 flex items-center justify-center shrink-0 rounded-lg border border-slate-300 bg-white text-slate-500 hover:text-blue-600 hover:border-blue-300 transition-colors shadow-sm"
         >
@@ -63,7 +63,7 @@ export default function PalletHeader({
           </svg>
         </button>
         <div className="space-y-1">
-          <button onClick={() => navigate('/')} className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 hover:text-blue-600 transition-colors">
+          <button onClick={() => navigate('/triagens')} className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 hover:text-blue-600 transition-colors">
             Voltar para o Galpão
           </button>
           <div className="flex items-center gap-3">

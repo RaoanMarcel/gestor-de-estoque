@@ -32,7 +32,6 @@ const MODULOS_SISTEMA = [
       { id: 'bipar_entrada', titulo: 'Bipar entrada de produtos', tag: 'estoque:in' },
       { id: 'bipar_saida', titulo: 'Bipar saída e exclusões', tag: 'estoque:out' },
       { id: 'transferencia', titulo: 'Transferir itens entre pallets', tag: 'estoque:transfer' },
-      { id: 'rma', titulo: 'Lançar itens para o RMA', tag: 'estoque:rma' },
     ]
   },
   {
@@ -55,6 +54,18 @@ const MODULOS_SISTEMA = [
       { id: 'receb_view', titulo: 'Acessar Recebimento de Mercadoria', tag: 'recebimento:view' },
       { id: 'receb_manage', titulo: 'Agendar e importar XML de NF-e', tag: 'recebimento:manage' },
       { id: 'receb_conf', titulo: 'Realizar conferência (bipagem)', tag: 'recebimento:conferencia' },
+    ]
+  },
+  {
+    grupo: 'RMA — RETORNO DE MERCADORIA',
+    itens: [
+      { id: 'rma', titulo: 'Acessar e gerenciar RMAs', tag: 'estoque:rma' },
+    ]
+  },
+  {
+    grupo: 'REGRAS DE E-MAIL',
+    itens: [
+      { id: 'regras_email', titulo: 'Acessar Regras de E-mail', tag: 'config:regras-email' },
     ]
   },
   {
@@ -180,6 +191,7 @@ export default function Configuracoes() {
 
   const podeGerenciarCargos = isDev || permissoesAtuais.includes('acessos:cargos');
   const podeGerenciarUsuarios = isDev || permissoesAtuais.includes('acessos:usuarios');
+  const podeVerRegrasEmail = isDev || permissoesAtuais.includes('config:regras-email');
 
   useEffect(() => {
     carregarCargos();
@@ -388,7 +400,10 @@ export default function Configuracoes() {
         
         <div className="flex items-center gap-5 border-b border-[var(--border-color)] pb-8">
           <div className="h-16 w-16 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-color)] flex items-center justify-center shadow-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-[var(--text-muted)]"><path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854-.107-1.204l-.527-.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-[var(--text-muted)]">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
           </div>
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-[var(--text-main)]">Configurações</h1>
@@ -468,6 +483,29 @@ export default function Configuracoes() {
             </form>
           </div>
         </section>
+
+        {podeVerRegrasEmail && (
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 border-b border-[var(--border-color)] pb-12">
+            <div className="col-span-1">
+              <h2 className="text-lg font-bold text-[var(--text-main)]">Regras de E-mail</h2>
+              <p className="text-[13px] leading-relaxed font-medium text-[var(--text-muted)] mt-2">Gatilhos e destinatários de e-mail automático (RMA, recebimento, etc.).</p>
+            </div>
+            <div className="col-span-1 lg:col-span-2">
+              <div className="w-full flex items-center justify-between p-5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-panel)] text-left opacity-70">
+                <div className="flex items-center gap-5">
+                  <div className="h-12 w-12 rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-[var(--text-main)] text-[15px]">Regras de E-mail</h3>
+                    <p className="text-[13px] font-medium text-[var(--text-muted)] mt-0.5">Configuração de e-mails automáticos.</p>
+                  </div>
+                </div>
+                <span className="text-[9px] font-bold uppercase tracking-wide text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded shrink-0">Em breve</span>
+              </div>
+            </div>
+          </section>
+        )}
 
         {podeGerenciarCargos && (
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 border-b border-[var(--border-color)] pb-12">

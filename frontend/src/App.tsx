@@ -3,12 +3,15 @@ import { useState, useRef, type JSX } from 'react';
 import { ToastProvider } from './contexts/toastContext';
 import { ThemeProvider } from './contexts/themeContext';
 
+import Dashboard from './pages/dashboard/Dashboard.js';
+import NotificationBell from './components/NotificationBell.js';
 import Home from './pages/home/Home.js';
 import PalletInterface from './pages/Interface/PalletInterface.js';
 import Login from './pages/login/Login.js';
 import ProtectedRoute from './pages/home/components/ProtectedRoute.js';
 import GestorEnviosFull from './pages/mercadoFull/GestorEnviosFull.js';
 import RecebimentoMercadoria from './pages/recebimento/RecebimentoMercadoria.js';
+import Rma from './pages/rma/Rma.js';
 import SuperAdmin from './pages/superadmin/SuperAdmin.js';
 import Configuracoes from './pages/configuracoes/Configuracoes.js';
 
@@ -81,6 +84,7 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
     && permissoes.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'));
   const podeVerFull = modulos.includes('full') && permissoes.some(p => p.startsWith('full'));
   const podeVerRecebimento = modulos.includes('recebimento') && permissoes.some(p => p.startsWith('recebimento'));
+  const podeVerRma = modulos.includes('rma') && permissoes.some(p => p.startsWith('estoque:rma'));
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -150,19 +154,12 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden py-5 px-3 gap-1 scrollbar-hide">
 
-          {podeVerArmazem && (
-            <>
-              <SidebarGroupLabel isOpen={isOpen}>Principal</SidebarGroupLabel>
-              <NavItem to="/" title="Triagens" label="Triagens" isOpen={isOpen} active={isActive('/')} onClick={closeMobileMenu}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                  <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                  <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                  <rect x="14" y="14" width="7" height="7" rx="1.5" />
-                  <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                </svg>
-              </NavItem>
-            </>
-          )}
+          <SidebarGroupLabel isOpen={isOpen}>Geral</SidebarGroupLabel>
+          <NavItem to="/" title="Dashboard" label="Dashboard" isOpen={isOpen} active={isActive('/')} onClick={closeMobileMenu}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.9} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13h8V3H3v10zm10 8h8V11h-8v10zM3 21h8v-6H3v6zM13 3v6h8V3h-8z" />
+            </svg>
+          </NavItem>
 
           {podeVerFull && (
             <>
@@ -183,6 +180,29 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
                 </svg>
               </NavItem>
+            </>
+          )}
+
+          {(podeVerArmazem || podeVerRma) && (
+            <>
+              <SidebarGroupLabel isOpen={isOpen} spaced>Pós-venda</SidebarGroupLabel>
+              {podeVerArmazem && (
+                <NavItem to="/triagens" title="Triagens" label="Triagens" isOpen={isOpen} active={isActive('/triagens')} onClick={closeMobileMenu}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                  </svg>
+                </NavItem>
+              )}
+              {podeVerRma && (
+                <NavItem to="/rma" title="RMA" label="RMA" isOpen={isOpen} active={isActive('/rma')} onClick={closeMobileMenu}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                  </svg>
+                </NavItem>
+              )}
             </>
           )}
 
@@ -261,7 +281,7 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
             <span className="font-bold text-sm uppercase tracking-wide text-[var(--text-main)] truncate">
-                {isActive('/configuracoes') ? 'Configurações' : isActive('/mercado-full') ? 'Gestor Full' : isActive('/recebimento') ? 'Recebimento de Mercadoria' : isActive('/superadmin') ? 'Administração' : 'WMS'}
+                {isActive('/configuracoes') ? 'Configurações' : isActive('/mercado-full') ? 'Gestor Full' : isActive('/recebimento') ? 'Recebimento de Mercadoria' : isActive('/superadmin') ? 'Administração' : isActive('/triagens') ? 'Triagens' : isActive('/rma') ? 'RMA' : isActive('/') ? 'Dashboard' : 'WMS'}
             </span>
           </div>
           <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
@@ -282,6 +302,8 @@ function LayoutComum({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      <NotificationBell />
     </div>
   );
 }
@@ -368,8 +390,7 @@ function RouteGuard({ permissoesObrigatorias, modulosObrigatorios, children }: {
   const temModulo = !modulosObrigatorios || modulosObrigatorios.some(m => modulos.includes(m));
 
   if (!temPermissao || !temModulo) {
-    if (modulos.includes('full') && permissoes.some(x => x.startsWith('full'))) return <Navigate to="/mercado-full" replace />;
-    return <Navigate to="/configuracoes" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return children;
@@ -385,7 +406,9 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route element={<ProtectedRoute />}>
                 
-                <Route path="/" element={
+                <Route path="/" element={<Dashboard />} />
+
+                <Route path="/triagens" element={
                   <RouteGuard permissoesObrigatorias={['malha', 'estoque', 'reports']} modulosObrigatorios={['malha', 'estoque', 'reports']}>
                     <Home />
                   </RouteGuard>
@@ -406,6 +429,12 @@ function App() {
                 <Route path="/recebimento" element={
                   <RouteGuard permissoesObrigatorias={['recebimento']} modulosObrigatorios={['recebimento']}>
                     <RecebimentoMercadoria />
+                  </RouteGuard>
+                } />
+
+                <Route path="/rma" element={
+                  <RouteGuard permissoesObrigatorias={['estoque:rma']} modulosObrigatorios={['rma']}>
+                    <Rma />
                   </RouteGuard>
                 } />
 

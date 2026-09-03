@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prismaUnscoped } from '../lib/prisma.js';
 import { MODULOS, MODULOS_PADRAO, sanitizarModulos } from '../lib/modulos.js';
+import { notificarTenant } from '../lib/notificacoes.js';
 
 // Conjunto completo de permissões — usado no cargo ADMIN do primeiro usuário de um tenant.
 export const PERMISSOES_ADMIN = [
@@ -10,6 +11,7 @@ export const PERMISSOES_ADMIN = [
   'reports:export', 'reports:trace',
   'full:view', 'full:manage',
   'recebimento:view', 'recebimento:manage', 'recebimento:conferencia',
+  'config:regras-email',
   'acessos:usuarios', 'acessos:cargos',
 ];
 
@@ -187,5 +189,30 @@ export const removerUsuarioDoTenant = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[ERRO - DELETE /superadmin/tenants/:id/usuarios/:usuarioId]:', error);
     return res.status(500).json({ error: 'Erro ao remover usuário.' });
+  }
+};
+
+/** Dispara uma notificação (sino) para uma empresa ou para todas as ativas. */
+export const notificarPlataforma = async (req: Request, res: Response) => {
+  try {
+    const titulo = String(req.body?.titulo || 'Aviso da plataforma').trim() || 'Aviso da plataforma';
+    const texto = String(req.body?.texto || '').trim();
+    const tenantId = req.body?.tenantId ? Number(req.body.tenantId) : null;
+    if (!texto) return res.status(400).json({ error: 'Escreva a mensagem do aviso.' });
+
+    let alvos: { id: number }[];
+    if (tenantId) {
+      const t = await prismaUnscoped.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
+      if (!t) return res.status(404).json({ error: 'Empresa não encontrada.' });
+      alvos = [t];
+    } else {
+      alvos = await prismaUnscoped.tenant.findMany({ where: { status: 'ATIVO' }, select: { id: true } });
+    }
+
+    for (const a of alvos) notificarTenant(a.id, { titulo, texto, tipo: 'SISTEMA' });
+    return res.json({ ok: true, enviados: alvos.length });
+  } catch (error) {
+    console.error('[ERRO - POST /superadmin/notificar]:', error);
+    return res.status(500).json({ error: 'Erro ao enviar o aviso.' });
   }
 };

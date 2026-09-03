@@ -101,7 +101,7 @@ export function usePalletLogic() {
     };
 
     const handlePalletRefresh = () => { buscarDadosPallet(); };
-    const handlePalletDeleted = () => { toast.error('Alerta: Pallet excluído da malha.'); navigate('/'); };
+    const handlePalletDeleted = () => { toast.error('Alerta: Pallet excluído da malha.'); navigate('/triagens'); };
     const handlePresenceUpdate = (data: { users: string[] }) => { setActiveUsers(data.users); };
 
     socket.on('pallet:updated', handlePalletUpdated);
@@ -390,13 +390,13 @@ export function usePalletLogic() {
   };
 
   const handleLancarAoRMA = async () => {
-    if (itensParaTransferir.length === 0) return toast.error("Vazio.");
-    const confirmou = await toast.confirm(`Lançar ao RMA?`);
+    if (itensParaTransferir.length === 0) return toast.error("Nenhum item selecionado.");
+    const confirmou = await toast.confirm(`Enviar ${itensParaTransferir.length} un. para o módulo RMA?`);
     if (!confirmou) return;
-    try {
-      await api.post('/pallets/enviar-rma', { codigosItens: itensParaTransferir, numeroPalletOrigem: pallet?.numero });
-      toast.success(`Sucesso!`); setIsModoTransferencia(false); setItensParaTransferir([]); buscarDadosPallet();
-    } catch (error: any) { toast.error(error.response?.data?.error || "Erro."); }
+    const codigos = [...itensParaTransferir];
+    setIsModoTransferencia(false);
+    setItensParaTransferir([]);
+    navigate('/rma', { state: { codigosParaRma: codigos, palletOrigem: pallet?.numero } });
   };
 
   const handleConfirmarDestinoFinal = async (numeroPalletDestino: string) => {

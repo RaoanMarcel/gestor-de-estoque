@@ -76,20 +76,10 @@ export default function Login() {
       localStorage.setItem('wms_modulos', JSON.stringify(data.modulos || []));
       localStorage.setItem('wms_superadmin', data.isSuperAdmin ? 'true' : '');
 
-      const perms = data.permissoes || [];
-      const mods = data.modulos || [];
-      const podeArmazem = ['malha', 'estoque', 'reports'].some(m => mods.includes(m))
-        && perms.some(p => p.startsWith('malha') || p.startsWith('estoque') || p.startsWith('reports'));
-      const podeFull = mods.includes('full') && perms.some(p => p.startsWith('full'));
-
       if (data.isSuperAdmin) {
         navigate('/superadmin');
-      } else if (podeArmazem) {
-        navigate('/');
-      } else if (podeFull) {
-        navigate('/mercado-full');
       } else {
-        navigate('/configuracoes');
+        navigate('/'); // dashboard — disponível para todos
       }
       
     } catch (err) {

@@ -64,6 +64,9 @@ export default function SuperAdmin() {
   const [modulosEdit, setModulosEdit] = useState<string[]>([]);
   const [salvandoModulos, setSalvandoModulos] = useState(false);
 
+  const [aviso, setAviso] = useState({ titulo: 'Atualização', texto: '', tenantId: '' });
+  const [enviandoAviso, setEnviandoAviso] = useState(false);
+
   const carregar = async () => {
     setCarregando(true);
     try {
@@ -214,6 +217,30 @@ export default function SuperAdmin() {
     }
   };
 
+  const enviarAviso = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!aviso.texto.trim()) return toast.error('Escreva a mensagem do aviso.');
+    setEnviandoAviso(true);
+    try {
+      const r = await api('/superadmin/notificar', {
+        method: 'POST',
+        body: JSON.stringify({
+          titulo: aviso.titulo.trim() || 'Aviso da plataforma',
+          texto: aviso.texto.trim(),
+          tenantId: aviso.tenantId ? Number(aviso.tenantId) : undefined,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Falha ao enviar.');
+      toast.success(`Aviso enviado para ${d.enviados} empresa(s).`);
+      setAviso({ titulo: 'Atualização', texto: '', tenantId: '' });
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setEnviandoAviso(false);
+    }
+  };
+
   return (
     <div className="min-h-full bg-[var(--bg-main)] text-[var(--text-main)] p-4 md:p-6 lg:p-8">
       <div className="max-w-5xl mx-auto">
@@ -258,6 +285,24 @@ export default function SuperAdmin() {
                 </div>
               </div>
               <button type="submit" disabled={criandoEmpresa} className={`${btn} mt-4`}>{criandoEmpresa ? 'Criando...' : 'Criar empresa'}</button>
+            </form>
+
+            {/* ---------- aviso / notificação ---------- */}
+            <form onSubmit={enviarAviso} className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-xl p-4 md:p-5 shadow-sm">
+              <h2 className="text-sm font-bold mb-1">Enviar aviso (sino)</h2>
+              <p className="text-xs text-[var(--text-muted)] mb-4">Dispara uma notificação no sino dos usuários. Ex.: aviso de atualização do sistema.</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div><label className={label}>Título</label><input className={input} value={aviso.titulo} onChange={(e) => setAviso({ ...aviso, titulo: e.target.value })} placeholder="Atualização" /></div>
+                <div className="sm:col-span-2"><label className={label}>Mensagem *</label><input className={input} value={aviso.texto} onChange={(e) => setAviso({ ...aviso, texto: e.target.value })} placeholder="Ex.: Nova versão publicada — recarregue a página." /></div>
+                <div>
+                  <label className={label}>Empresa</label>
+                  <select className={input} value={aviso.tenantId} onChange={(e) => setAviso({ ...aviso, tenantId: e.target.value })}>
+                    <option value="">Todas as ativas</option>
+                    {tenants.filter((t) => t.status === 'ATIVO').map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                  </select>
+                </div>
+              </div>
+              <button type="submit" disabled={enviandoAviso || !aviso.texto.trim()} className={`${btn} mt-4`}>{enviandoAviso ? 'Enviando...' : 'Enviar aviso'}</button>
             </form>
 
             {/* ---------- lista de empresas ---------- */}
