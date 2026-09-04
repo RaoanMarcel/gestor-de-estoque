@@ -17,6 +17,7 @@ export const getMascaraPorSku = (sku: string): string | null => {
     '012535': '**********',
     '013227': '********',
     '013691': '********',
+    '009676': '**********',
   };
 
   return regras[sku] || null;
