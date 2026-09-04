@@ -28,7 +28,7 @@ function carregar(): Notif[] {
   }
 }
 function salvar(lista: Notif[]) {
-  try { localStorage.setItem(CHAVE, JSON.stringify(lista.slice(0, MAX))); } catch { /* ignore */ }
+  try { localStorage.setItem(CHAVE, JSON.stringify(lista.slice(0, MAX))); } catch { }
 }
 
 function tempoRelativo(iso: string): string {
@@ -84,7 +84,6 @@ export default function NotificationBell() {
       if (prev.some((x) => x.id === n.id)) return prev;
       return [n, ...prev].slice(0, MAX);
     });
-    // toca o sino + mostra o balão que depois é "sugado" pra dentro
     setTocou(true);
     timers.current.push(setTimeout(() => setTocou(false), 850));
     setBalao({ notif: n, suga: false });
@@ -92,14 +91,12 @@ export default function NotificationBell() {
     timers.current.push(setTimeout(() => setBalao(null), 2800));
   };
 
-  // recebe as notificações em tempo real
   useEffect(() => {
     const onNotif = (raw: any) => chegou.current(raw);
     socket.on('notificacao', onNotif);
     return () => { socket.off('notificacao', onNotif); };
   }, []);
 
-  // detecta nova versão publicada (public/release.json) e avisa no sino
   useEffect(() => {
     let vivo = true;
     const conferir = async () => {
@@ -110,10 +107,9 @@ export default function NotificationBell() {
         const versao = String(rel?.versao || '').trim();
         if (!versao) return;
         const vista = localStorage.getItem(CHAVE_RELEASE);
-        if (vista === versao) return; // já viu esta versão
+        if (vista === versao) return;
         const recente = rel?.data && Date.now() - new Date(rel.data).getTime() < 21 * 864e5;
         localStorage.setItem(CHAVE_RELEASE, versao);
-        // 1ª visita numa versão antiga → registra em silêncio; senão avisa
         if (!vista && !recente) return;
         chegou.current({
           id: `att-${versao}`,
@@ -122,7 +118,7 @@ export default function NotificationBell() {
           texto: `${rel?.notas || 'Nova versão publicada.'} Toque para recarregar.`,
           criadoEm: new Date().toISOString(),
         });
-      } catch { /* ignore */ }
+      } catch { }
     };
     conferir();
     const iv = setInterval(conferir, 3 * 60 * 1000);
@@ -133,7 +129,6 @@ export default function NotificationBell() {
 
   useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
 
-  // fecha o painel ao clicar fora
   useEffect(() => {
     if (!aberto) return;
     const onDoc = (e: MouseEvent) => {
@@ -164,12 +159,11 @@ export default function NotificationBell() {
       const token = localStorage.getItem('wms_token');
       const base = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
       await fetch(`${base}/notificacoes/testar`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-    } catch { /* ignore */ }
+    } catch { }
   };
 
   return (
     <div ref={wrapRef} className="fixed top-3 right-16 md:right-5 z-[70]">
-      {/* balão que "entra" no sino */}
       {balao && (
         <div
           className="absolute right-[calc(100%+10px)] top-1/2 -translate-y-1/2 whitespace-nowrap select-none"

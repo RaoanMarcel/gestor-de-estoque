@@ -49,7 +49,6 @@ export const listarDashboard = async (_req: Request, res: Response) => {
   }
 };
 
-// Passo 1 — pré-agendamento: cria a "casca" do recebimento (sem data nem NF ainda).
 export const criarRecebimento = async (req: Request, res: Response) => {
   try {
     const { identificacao, fornecedor, observacao } = req.body;
@@ -77,7 +76,6 @@ export const criarRecebimento = async (req: Request, res: Response) => {
   }
 };
 
-// Passo 2 — agendamento: preenche data prevista / nº da NF / observação e libera a importação.
 export const agendarRecebimento = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;

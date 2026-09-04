@@ -11,16 +11,13 @@ import {
 
 const tid = (req: Request) => requireTenantId(req);
 
-/** A unidade física volta ao estoque (troca por outra unidade ou conserto da mesma). */
 const ehRetornoAoEstoque = (desfecho: string) => (DESFECHOS_RETORNO as readonly string[]).includes(desfecho);
 
 const serieIgual = (a?: string | null, b?: string | null) =>
   !!a && !!b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
 
-// O banco do Render (Oregon) tem latência alta — o default de 5s estoura fácil.
 const txLongo = <T,>(fn: (tx: any) => Promise<T>) => prisma.$transaction(fn, { timeout: 25000, maxWait: 12000 });
 
-/** Status derivado do estado do RMA (não mexe em FINALIZADO/CANCELADO). */
 function derivarStatus(rma: { status: string }, itens: { desfecho: string }[], notas: { direcao: string }[]): string {
   if (rma.status === RMA_STATUS.FINALIZADO || rma.status === RMA_STATUS.CANCELADO) return rma.status;
   const temResolvido = itens.some((i) => i.desfecho !== DESFECHO.PENDENTE);
@@ -54,7 +51,6 @@ type LinhaNota = { descricao?: string | null; codigo?: string | null; quantidade
 
 type ItemCobertura = { id: number; desfecho?: string; produtoCodigo?: string | null; produtoNome?: string | null };
 
-/** Linhas de todas as notas de ENTRADA (retorno) achatadas. */
 function linhasDeRetorno(notas: { direcao: string; itens?: unknown }[]): LinhaNota[] {
   return notas
     .filter((n) => n.direcao === DIRECAO_NOTA.ENTRADA)
@@ -65,15 +61,8 @@ const normTxt = (s: unknown) => String(s ?? '').trim().toLowerCase();
 const qtdLinha = (l: LinhaNota) => Math.max(1, Math.round(Number(l.quantidade) || 1));
 const chavesProduto = (it: ItemCobertura) => [normTxt(it.produtoCodigo), normTxt(it.produtoNome)].filter(Boolean);
 
-/**
- * "Orçamento" de unidades que a(s) nota(s) de retorno autorizam, por produto
- * (chave = código ou descrição). Quando nenhum item do RMA casa por SKU
- * (etiquetas de triagem sem produto legível), devolve um teto geral por contagem.
- */
 function orcamentoRetorno(itens: ItemCobertura[], notas: { direcao: string; itens?: unknown }[]) {
   const linhas = linhasDeRetorno(notas);
-  // uma linha alimenta UM balde (código, ou descrição se não houver código) —
-  // nunca os dois, senão a mesma unidade seria contada duas vezes
   const porProduto = new Map<string, number>();
   for (const l of linhas) {
     const ch = normTxt(l.codigo) || normTxt(l.descricao);
@@ -88,12 +77,6 @@ function orcamentoRetorno(itens: ItemCobertura[], notas: { direcao: string; iten
   };
 }
 
-/**
- * Marca cada item com `esperadoNoRetorno`: a nota de retorno cobre uma unidade dele.
- * Casa por código/descrição do produto e respeita a quantidade da nota; itens já
- * resolvidos como troca consomem o orçamento primeiro (independe da ordem). Sem SKU
- * legível, cai para a contagem. Só os "esperados" podem ser bipados na conferência.
- */
 function anotarCobertura<T extends ItemCobertura>(
   itens: T[],
   notas: { direcao: string; itens?: unknown }[],
@@ -108,7 +91,6 @@ function anotarCobertura<T extends ItemCobertura>(
 
   const orc = orcamentoRetorno(itens, notas);
   if (!orc.temDetalhe) {
-    // nota(s) de retorno sem detalhe de linha (lançamento manual) — o operador confere tudo
     return itens.map((it) => ({ ...it, esperadoNoRetorno: true }));
   }
 
@@ -126,24 +108,19 @@ function anotarCobertura<T extends ItemCobertura>(
   };
 
   const ordenados = [...itens].sort((a, b) => a.id - b.id);
-  // retornos já registrados (troca/conserto) consomem o orçamento antes dos pendentes
   for (const it of ordenados) if (ehRetornoAoEstoque(it.desfecho || '')) cobre.set(it.id, consome(it));
   for (const it of ordenados) if (!ehRetornoAoEstoque(it.desfecho || '')) cobre.set(it.id, consome(it));
 
   return itens.map((it) => ({ ...it, esperadoNoRetorno: !!cobre.get(it.id) }));
 }
 
-/**
- * Valida um conjunto de bipagens contra o orçamento da nota de retorno: retorna o
- * 1º item alvo que estoura a quantidade autorizada (por produto ou geral), ou null.
- */
 function bipagemForaDoOrcamento(
   itens: (ItemCobertura & { codigoTriagem?: string })[],
   notas: { direcao: string; itens?: unknown }[],
   idsAlvo: number[],
 ): { id: number; codigo: string } | null {
   const orc = orcamentoRetorno(itens, notas);
-  if (!orc.temDetalhe) return null; // nota sem detalhe → operador confere tudo
+  if (!orc.temDetalhe) return null;
 
   const porProduto = new Map(orc.porProduto);
   let geral = orc.geral;
@@ -159,7 +136,6 @@ function bipagemForaDoOrcamento(
   };
 
   const alvo = new Set(idsAlvo);
-  // retornos já registrados (que não estão sendo rebipados) consomem primeiro
   for (const it of itens) if (ehRetornoAoEstoque(it.desfecho || '') && !alvo.has(it.id)) consome(it);
   for (const id of idsAlvo) {
     const it = itens.find((x) => x.id === id);
@@ -169,14 +145,11 @@ function bipagemForaDoOrcamento(
   return null;
 }
 
-/** Detalhe do RMA já com `esperadoNoRetorno` calculado em cada item. */
 async function carregarDetalhe(rmaId: number) {
   const rma = await prisma.rma.findFirst({ where: { id: rmaId }, include: incluirDetalhe });
   if (!rma) return null;
   return { ...rma, itens: anotarCobertura(rma.itens, rma.notas) };
 }
-
-// ---------- listagem ----------
 
 export const listarRmas = async (req: Request, res: Response) => {
   try {
@@ -227,7 +200,6 @@ export const obterRma = async (req: Request, res: Response) => {
   }
 };
 
-/** Pallets de DEFEITO e seus produtos — fonte para "adicionar itens". */
 export const listarFontes = async (_req: Request, res: Response) => {
   try {
     const pallets = await prisma.pallet.findMany({
@@ -242,7 +214,6 @@ export const listarFontes = async (_req: Request, res: Response) => {
   }
 };
 
-/** Pallets de triagem — destino possível no finalizar. */
 export const listarPalletsTriagem = async (_req: Request, res: Response) => {
   try {
     const pallets = await prisma.pallet.findMany({
@@ -256,8 +227,6 @@ export const listarPalletsTriagem = async (_req: Request, res: Response) => {
     return res.status(500).json({ error: 'Erro ao listar pallets.' });
   }
 };
-
-// ---------- pré-cadastro de fornecedor (leve, só do módulo RMA) ----------
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -318,7 +287,6 @@ export const atualizarFornecedor = async (req: Request, res: Response) => {
   }
 };
 
-/** Resolve o fornecedor de um RMA: pelo id do pré-cadastro, ou por nome (cria/reaproveita). */
 async function resolverFornecedor(tx: any, tenantId: number, body: any) {
   const porId = Number(body.fornecedorId);
   if (Number.isFinite(porId) && porId > 0) {
@@ -336,8 +304,6 @@ async function resolverFornecedor(tx: any, tenantId: number, body: any) {
   });
   return { nome: f.nome as string, email: (f.email ?? null) as string | null, refId: f.id as number };
 }
-
-// ---------- criar ----------
 
 export const criarRma = async (req: Request, res: Response) => {
   try {
@@ -372,7 +338,6 @@ export const criarRma = async (req: Request, res: Response) => {
   }
 };
 
-/** Cria (ou devolve) um RMA de demonstração — itens virtuais, pode ser reiniciado. */
 export const criarDemo = async (req: Request, res: Response) => {
   try {
     const t = tid(req);
@@ -400,7 +365,6 @@ export const criarDemo = async (req: Request, res: Response) => {
   }
 };
 
-/** Simula a chegada da nota de retorno (só na demo). */
 export const simularRetorno = async (req: Request, res: Response) => {
   try {
     const t = tid(req);
@@ -418,7 +382,6 @@ export const simularRetorno = async (req: Request, res: Response) => {
   }
 };
 
-/** Reinicia um RMA de demonstração ao estado inicial. */
 export const reiniciarDemo = async (req: Request, res: Response) => {
   try {
     const t = tid(req);
@@ -436,7 +399,6 @@ export const reiniciarDemo = async (req: Request, res: Response) => {
   }
 };
 
-/** Exclui um RMA — só se não tiver itens e não estiver finalizado. */
 export const excluirRma = async (req: Request, res: Response) => {
   try {
     const rmaId = Number(req.params.id);
@@ -456,8 +418,6 @@ export const excluirRma = async (req: Request, res: Response) => {
   }
 };
 
-// ---------- itens ----------
-
 export const adicionarItens = async (req: Request, res: Response) => {
   try {
     const t = tid(req);
@@ -465,7 +425,6 @@ export const adicionarItens = async (req: Request, res: Response) => {
     const rmaId = Number(req.params.id);
     let itens: any[] = Array.isArray(req.body.itens) ? req.body.itens : [];
 
-    // Caminho da bipagem do pallet: recebe códigos de triagem, resolve p/ produtoPalletId.
     if (itens.length === 0 && Array.isArray(req.body.codigosItens) && req.body.codigosItens.length > 0) {
       const encontrados = await prisma.produtoPallet.findMany({
         where: { codigoItem: { in: req.body.codigosItens.map(String) } },
@@ -585,7 +544,6 @@ export const definirDesfecho = async (req: Request, res: Response) => {
     const itemId = Number(req.params.itemId);
     const { desfecho } = req.body;
 
-    // Troca/Conserto só entram pela bipagem na conferência. Aqui só o que "não voltou".
     if (![DESFECHO.CREDITO, DESFECHO.DESCARTE, DESFECHO.PENDENTE].includes(desfecho)) {
       return res.status(400).json({ error: 'Aqui só dá para marcar Crédito ou Descarte. Troca e conserto são pela bipagem do retorno.' });
     }
@@ -624,8 +582,6 @@ export const definirDesfecho = async (req: Request, res: Response) => {
     return res.status(400).json({ error: error?.message || 'Erro ao definir o desfecho.' });
   }
 };
-
-// ---------- notas ----------
 
 export const importarNota = async (req: Request, res: Response) => {
   try {
@@ -717,8 +673,6 @@ export const removerNota = async (req: Request, res: Response) => {
   }
 };
 
-// ---------- confronto ----------
-
 export const confrontarRetorno = async (req: Request, res: Response) => {
   try {
     const rmaId = Number(req.params.id);
@@ -735,7 +689,6 @@ export const confrontarRetorno = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Importe a nota de retorno antes da conferência.' });
     }
 
-    // as bipagens não podem estourar a quantidade autorizada pela nota de retorno
     const idsAlvo = lista.map((b) => Number(b.rmaItemId)).filter((n) => Number.isFinite(n));
     const fora = bipagemForaDoOrcamento(rma.itens, rma.notas, idsAlvo);
     if (fora) {
@@ -747,7 +700,6 @@ export const confrontarRetorno = async (req: Request, res: Response) => {
         const item = await tx.rmaItem.findFirst({ where: { id: Number(b.rmaItemId), rmaId } });
         if (!item) continue;
         const serieVolta = b.novaSerie ? String(b.novaSerie).trim() : null;
-        // mesma série de saída (e era controlado por série) → o fornecedor consertou a MESMA unidade
         const conserto = item.tipoIdentificador === 'SERIE' && serieIgual(serieVolta, item.identificador);
         await tx.rmaItem.update({
           where: { id: item.id },
@@ -776,8 +728,6 @@ export const confrontarRetorno = async (req: Request, res: Response) => {
   }
 };
 
-// ---------- finalizar / cancelar ----------
-
 export const finalizarRma = async (req: Request, res: Response) => {
   try {
     const t = tid(req);
@@ -795,7 +745,6 @@ export const finalizarRma = async (req: Request, res: Response) => {
 
     await txLongo(async (tx) => {
       for (const item of rma.itens) {
-        // a unidade defeituosa saiu fisicamente — remove do pallet do RMA
         if (item.produtoPalletId) {
           await tx.produtoPallet.deleteMany({ where: { id: item.produtoPalletId } });
         }
@@ -806,7 +755,6 @@ export const finalizarRma = async (req: Request, res: Response) => {
           const destino = d.destino === DESTINO_ESTOQUE.TRIAGEM ? DESTINO_ESTOQUE.TRIAGEM : DESTINO_ESTOQUE.FANTASMA_NOVO;
           let palletDestinoId: number | null = null;
 
-          // RMA de demonstração não mexe em estoque — só registra o destino
           if (rma.demo) {
             await tx.rmaItem.update({ where: { id: item.id }, data: { destinoEstoque: destino } });
             continue;
@@ -816,7 +764,6 @@ export const finalizarRma = async (req: Request, res: Response) => {
             const palletId = Number(d.palletId);
             const alvo = await tx.pallet.findFirst({ where: { id: palletId } });
             if (!alvo) throw new Error(`Pallet de triagem inválido para o item ${item.codigoTriagem}.`);
-            // conserto: entra pela série original; troca: pela série da unidade nova (ou um código de retorno)
             const codigo = (item.retornoSerie && item.retornoSerie.trim()) || `RMA-RET-${item.id}`;
             const jaExiste = await tx.produtoPallet.findFirst({ where: { codigoItem: codigo } });
             if (jaExiste) throw new Error(`Já existe um item com o código "${codigo}".`);
@@ -834,7 +781,6 @@ export const finalizarRma = async (req: Request, res: Response) => {
               data: { codigoItem: codigo, codigoAnterior: item.codigoTriagem, acao: ehConserto ? 'RMA_RETORNO_CONSERTO' : 'RMA_RETORNO_TRIAGEM', palletDestino: String(alvo.id), palletOrigem: rma.numero, usuarioId: auth?.id ?? null, tenantId: t } as any,
             });
           } else {
-            // estoque geral — só registro por enquanto (fantasma)
             await tx.historicoMovimentacao.create({
               data: { codigoItem: item.retornoSerie || item.codigoTriagem, codigoAnterior: item.codigoTriagem, acao: ehConserto ? 'RMA_RETORNO_CONSERTO' : 'RMA_RETORNO_NOVO', palletOrigem: rma.numero, usuarioId: auth?.id ?? null, tenantId: t } as any,
             });

@@ -33,7 +33,6 @@ function StatCard({ titulo, valor, sub, emBreve }: { titulo: string; valor: stri
 }
 
 export default function Dashboard() {
-  // "nome.sobrenome" → "Nome" (só o primeiro nome, primeira letra maiúscula)
   const primeiroNome = (() => {
     const bruto = (ls('wms_user') || 'Operador').split(/[.\s@]/)[0];
     return bruto ? bruto.charAt(0).toUpperCase() + bruto.slice(1).toLowerCase() : 'Operador';
@@ -103,7 +102,6 @@ export default function Dashboard() {
           <p className="text-sm text-[var(--text-muted)] mt-1 first-letter:uppercase">{hoje}</p>
         </div>
 
-        {/* Operação */}
         <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-muted)]">Operação hoje</span>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-2.5">
           {podeArmazem && (

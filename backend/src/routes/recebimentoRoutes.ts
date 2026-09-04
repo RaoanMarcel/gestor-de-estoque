@@ -19,10 +19,8 @@ router.use(autenticarToken, somenteTenant, exigirModulo('recebimento'));
 // Lista todos os recebimentos para a tela inicial
 router.get('/dashboard', listarDashboard);
 
-// Passo 1: pré-agendamento (cria a casca do recebimento)
 router.post('/', criarRecebimento);
 
-// Passo 2: agenda a entrega — data prevista / nº NF / observação
 router.post('/:id/agendar', agendarRecebimento);
 
 // Importa o XML da NF-e (cria um recebimento novo ou preenche um agendamento)

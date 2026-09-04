@@ -53,9 +53,6 @@ export const biparItem = async (req: Request, res: Response): Promise<Response |
     const regras = getRegrasPallet(pallet);
 
     if (acao === 'ENTRADA') {
-      const totalAtual = await prisma.produtoPallet.count({ where: { palletId: idInterno } });
-      if (totalAtual >= 140) return res.status(400).json({ error: 'Alerta de Lotação!' });
-
       if (gerarSequencial) {
         const itemGerado = await prisma.$transaction(async (tx) => {
           const codigoFinal = await gerarProximoCodigoSequencial(tx, regras, tid);
@@ -266,9 +263,6 @@ export const transferirUm = async (req: Request, res: Response): Promise<Respons
     if (!palletDestino) {
       return res.status(404).json({ error: `Pallet destino não localizado.` });
     }
-    if (palletDestino.produtos.length >= 140) {
-      return res.status(400).json({ error: `Alerta de Lotação no destino.` });
-    }
 
     const regras = getRegrasPallet(palletDestino);
     const precisaTransformar = regras.isTransformacao && regras.prefixo !== '' && !produtoOrigem.codigoItem.startsWith(regras.prefixo);
@@ -328,9 +322,6 @@ export const transferirEmLote = async (req: Request, res: Response): Promise<Res
 
     const palletDestino = await prisma.pallet.findFirst({ where: { numero: String(numeroPalletDestino) }, include: { produtos: true } });
     if (!palletDestino) return res.status(404).json({ error: `Pallet destino não encontrado.` });
-    if (codigosItens.length > (140 - palletDestino.produtos.length)) {
-      return res.status(400).json({ error: `Espaço insuficiente no destino.` });
-    }
 
     const regras = getRegrasPallet(palletDestino);
     const itensOriginais = await prisma.produtoPallet.findMany({ where: { codigoItem: { in: codigosItens } } });
@@ -366,9 +357,6 @@ export const transferirEmLote = async (req: Request, res: Response): Promise<Res
     return res.status(500).json({ error: 'Erro ao transferir em lote.' });
   }
 };
-
-// `enviarParaRMA` foi removido — o envio ao RMA agora passa pelo módulo RMA
-// (POST /api/rma/:id/itens), que move a unidade para o pallet do RMA em vez de apagá-la.
 
 export const excluirPallet = async (req: Request, res: Response): Promise<Response | void> => {
   try {
@@ -432,8 +420,6 @@ export const criarPallet = async (req: Request, res: Response): Promise<Response
 export const listarPallets = async (_req: Request, res: Response): Promise<Response | void> => {
   try {
     const pallets = await prisma.pallet.findMany({
-      // pallets dedicados de RMA são internos — ficam só no módulo RMA, fora das triagens.
-      // (o `{ tipo: null }` explícito porque `not` no Prisma exclui NULL por três-valores.)
       where: { OR: [{ tipo: { not: 'RMA' } }, { tipo: null }] },
       include: { _count: { select: { produtos: true } }, produtos: { select: { codigoItem: true } } },
     });

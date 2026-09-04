@@ -287,7 +287,6 @@ export default function SuperAdmin() {
               <button type="submit" disabled={criandoEmpresa} className={`${btn} mt-4`}>{criandoEmpresa ? 'Criando...' : 'Criar empresa'}</button>
             </form>
 
-            {/* ---------- aviso / notificação ---------- */}
             <form onSubmit={enviarAviso} className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-xl p-4 md:p-5 shadow-sm">
               <h2 className="text-sm font-bold mb-1">Enviar aviso (sino)</h2>
               <p className="text-xs text-[var(--text-muted)] mb-4">Dispara uma notificação no sino dos usuários. Ex.: aviso de atualização do sistema.</p>

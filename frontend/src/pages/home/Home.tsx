@@ -68,7 +68,7 @@ export default function Home() {
   }, [palletsFiltrados]); 
 
   const totalPallets = palletsFiltrados.length;
-  const palletsOcupados = palletsFiltrados.filter(p => (p._count?.produtos || 0) >= 140).length;
+  const palletsOcupados = palletsFiltrados.filter(p => (p._count?.produtos || 0) > 0).length;
   const palletsVazios = totalPallets - palletsOcupados;
 
   const handleExcluirPalletCard = async (e: MouseEvent, palletId: number, numeroPallet: string) => {

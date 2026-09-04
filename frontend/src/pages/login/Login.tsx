@@ -79,7 +79,7 @@ export default function Login() {
       if (data.isSuperAdmin) {
         navigate('/superadmin');
       } else {
-        navigate('/'); // dashboard — disponível para todos
+        navigate('/');
       }
       
     } catch (err) {

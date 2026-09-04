@@ -4,7 +4,6 @@ import { useToast } from '../../contexts/toastContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// ===================== tipos =====================
 interface RmaItem {
   id: number;
   codigoTriagem: string;
@@ -60,7 +59,6 @@ interface PalletFonte {
 interface PalletTriagem { id: number; numero: string; tipo: string | null; _count: { produtos: number }; }
 interface RmaFornecedor { id: number; nome: string; email: string | null; _count?: { rmas: number }; }
 
-// ===================== helpers de estilo =====================
 const fmt = (v: string | null) => (v ? new Date(v).toLocaleDateString('pt-BR') : '—');
 const fmtDh = (v: string) => new Date(v).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -115,7 +113,6 @@ const Secao = ({ titulo }: { titulo: string }) => (
   </div>
 );
 
-// =====================================================================
 export default function Rma() {
   const toast = useToast();
   const location = useLocation();
@@ -129,7 +126,6 @@ export default function Rma() {
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<string>('');
 
-  // modais
   const [modalNovo, setModalNovo] = useState(false);
   const [modalItens, setModalItens] = useState(false);
   const [modalNota, setModalNota] = useState<'' | 'geral' | 'retorno'>('');
@@ -150,15 +146,13 @@ export default function Rma() {
       setCarregando(false);
     }
   };
-  useEffect(() => { if (tela === 'lista') carregarLista(); /* eslint-disable-next-line */ }, [tela, filtroStatus]);
+  useEffect(() => { if (tela === 'lista') carregarLista(); }, [tela, filtroStatus]);
 
-  // veio da bipagem do pallet com itens selecionados → abre "Novo RMA" já com os itens
   useEffect(() => {
     if (codigosDaBipagem && codigosDaBipagem.length > 0) {
       setModalNovo(true);
       navigate(location.pathname, { replace: true, state: {} });
     }
-    // eslint-disable-next-line
   }, []);
   const [itensPendentesDeAdicao, setItensPendentesDeAdicao] = useState<string[]>(codigosDaBipagem || []);
 
@@ -213,7 +207,6 @@ export default function Rma() {
     return c;
   }, [ativo]);
 
-  // ---------------- LISTA ----------------
   const renderLista = () => (
     <>
       <div className="flex items-start justify-between gap-4">
@@ -308,7 +301,6 @@ export default function Rma() {
     </>
   );
 
-  // ---------------- DETALHE ----------------
   const acaoItem = async (fn: () => Promise<Response>) => {
     try { const d = await jsonOrThrow(await fn()); recarregarAtivo(d.rma); }
     catch (e: any) { toast.error(e.message); }
@@ -319,7 +311,6 @@ export default function Rma() {
     const notasSaida = ativo.notas.filter((n) => n.direcao === 'SAIDA');
     const notasEntrada = ativo.notas.filter((n) => n.direcao === 'ENTRADA');
     const finalizavel = ativo.status !== 'FINALIZADO' && ativo.status !== 'CANCELADO' && contagens.pendente === 0 && contagens.total > 0;
-    // durante a conferência: o que a nota já cobre e aguarda bipagem vs. o que ainda não está em nenhuma nota
     const aguardandoConf = ativo.itens.filter((i) => i.desfecho === 'PENDENTE' && i.esperadoNoRetorno).length;
     const foraDeNota = ativo.itens.filter((i) => i.desfecho === 'PENDENTE' && !i.esperadoNoRetorno).length;
 
@@ -361,7 +352,6 @@ export default function Rma() {
           </div>
         </div>
 
-        {/* resumo */}
         <div className={`${card} p-5 mt-5`}>
           <div className="flex items-end justify-between gap-4 mb-3">
             <div className="flex items-baseline gap-2">
@@ -396,7 +386,6 @@ export default function Rma() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-5 mt-5 items-start">
-          {/* itens */}
           <div className="flex flex-col gap-3">
             <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-muted)]">Itens do RMA · {ativo.itens.length}</span>
             {ativo.itens.length === 0 && <p className="text-sm text-[var(--text-muted)] py-6">Nenhum item ainda. Use "+ Itens".</p>}
@@ -422,7 +411,6 @@ export default function Rma() {
                         <span className="text-[11px] font-bold text-teal-600 mt-0.5">↩ Mesma unidade, consertada{it.retornoSerie ? ` · série ${it.retornoSerie}` : ''}</span>
                       )}
                     </div>
-                    {/* ABERTO: remover. AGUARDANDO_RETORNO: travado. EM_CONFERENCIA: consta na nota → conferência; não consta → desfecho. */}
                     {ativo.status === 'ABERTO' ? (
                       <button onClick={() => acaoItem(() => api(`/rma/${ativo.id}/itens/${it.id}`, { method: 'DELETE' }))}
                         className="shrink-0 text-[var(--text-muted)] hover:text-rose-500 p-1.5" title="Remover — volta pro defeito">
@@ -453,7 +441,6 @@ export default function Rma() {
             })}
           </div>
 
-          {/* sidebar */}
           <div className="flex flex-col gap-4">
             <NotasFiscais
               notas={ativo.notas}
@@ -481,7 +468,6 @@ export default function Rma() {
     );
   };
 
-  // ---------------- CONFRONTO ----------------
   const renderConfronto = () => {
     if (!ativo) return null;
     return <Confronto rma={ativo} onVoltar={() => setTela('detalhe')} onAtualizado={recarregarAtivo} onVincularNota={() => setModalNota('retorno')} />;
@@ -523,7 +509,6 @@ export default function Rma() {
   );
 }
 
-// ===================== subcomponentes =====================
 const pct = (n: number, total: number) => (total ? (n / total) * 100 : 0);
 const StatusPill = ({ status, sm }: { status: Rma['status']; sm?: boolean }) => {
   const i = STATUS_INFO[status];
@@ -718,7 +703,6 @@ function ModalAdicionarItens({ rmaId, onFechar, onAdicionado }: { rmaId: number;
   const carregar = () => api('/rma/fontes').then(jsonOrThrow).then((d) => setPallets(d.pallets || [])).catch((e) => toast.error(e.message));
   useEffect(() => { carregar(); }, []);
 
-  // procura o código bipado nos pallets de defeito
   const resolver = () => {
     const cod = scan.trim();
     if (!cod) return;
@@ -737,7 +721,6 @@ function ModalAdicionarItens({ rmaId, onFechar, onAdicionado }: { rmaId: number;
     setScan('');
   };
 
-  // confirma o item pendente (com a série/EAN) e lança no RMA
   const lancar = async () => {
     if (!pendente) return;
     setSalvando(true);
@@ -762,7 +745,6 @@ function ModalAdicionarItens({ rmaId, onFechar, onAdicionado }: { rmaId: number;
         <h3 className="text-base font-bold mb-1">Adicionar itens ao RMA</h3>
         <p className="text-sm text-[var(--text-muted)] mb-4">Bipe o código do item de <b>DEFEITO</b> — ele é lançado no RMA na hora.</p>
 
-        {/* scanner */}
         <div className="bg-[var(--sidebar-bg)] rounded-xl p-4">
           {!pendente ? (
             <>
@@ -938,7 +920,6 @@ function ModalFinalizar({ rma, onFechar, onFinalizado }: { rma: Rma; onFechar: (
   const [busca, setBusca] = useState('');
   const [alvoPallet, setAlvoPallet] = useState<number | ''>('');
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
-  // itemId → palletId de triagem. Item ausente = vai para o estoque geral.
   const [atribuicoes, setAtribuicoes] = useState<Record<number, number>>({});
   const [salvando, setSalvando] = useState(false);
 
@@ -1051,19 +1032,16 @@ function ModalFinalizar({ rma, onFechar, onFinalizado }: { rma: Rma; onFechar: (
   );
 }
 
-// ---------------- confronto ----------------
 function Confronto({ rma, onVoltar, onAtualizado, onVincularNota }: { rma: Rma; onVoltar: () => void; onAtualizado: (r: Rma) => void; onVincularNota: () => void }) {
   const toast = useToast();
   const notasRetorno = rma.notas.filter((n) => n.direcao === 'ENTRADA');
   const notaRetorno = notasRetorno[0] || null;
   const linhasRetorno = notasRetorno.flatMap((n) => n.itens || []);
   const unidadesNaNota = linhasRetorno.reduce((s, l) => s + (l.quantidade || 0), 0);
-  // só entram na bipagem os itens que constam numa nota de retorno
   const pendentes = rma.itens.filter((i) => i.desfecho === 'PENDENTE' && i.esperadoNoRetorno);
   const foraDaNota = rma.itens.filter((i) => i.desfecho === 'PENDENTE' && !i.esperadoNoRetorno);
   const retornos = rma.itens.filter((i) => DESFECHOS_RETORNO.includes(i.desfecho));
   const esperadosTotal = retornos.length + pendentes.length;
-  // mesma série de saída (e controlado por série) → conserto da mesma unidade; senão troca
   const ehConserto = (it: RmaItem | undefined, serie: string) =>
     !!it && it.tipoIdentificador === 'SERIE' && !!it.identificador &&
     it.identificador.trim().toLowerCase() === serie.trim().toLowerCase();
@@ -1075,10 +1053,8 @@ function Confronto({ rma, onVoltar, onAtualizado, onVincularNota }: { rma: Rma; 
   const bipadoDe = (id: number) => bipagens.find((b) => b.rmaItemId === id)?.novaSerie;
   const pendentesReais = pendentes.filter((p) => !bipadoDe(p.id));
 
-  // ao chegar uma nova nota de retorno (mais itens liberados), já mira o primeiro pendente
   useEffect(() => {
     if (!alvo && pendentesReais.length > 0) setAlvo(pendentesReais[0].id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendentesReais.length]);
 
   const bipar = () => {
