@@ -51,9 +51,7 @@ export interface RecebimentoCabecalho {
   fornecedorCnpj: string | null;
   valorTotal: number | null;
   dataEmissao: Date | null;
-  /** natOp — texto livre ("Devolução de compra", "Simples remessa", ...) */
   naturezaOperacao: string | null;
-  /** tpNF — "0" = entrada, "1" = saída */
   tipoOperacao: string | null;
 }
 

@@ -7,10 +7,6 @@ export interface NotificacaoDados {
   link?: string | null;
 }
 
-/**
- * Empurra uma notificação em tempo real para todos os usuários de um tenant.
- * O front (sino global) escuta o evento `notificacao` do socket.
- */
 export function notificarTenant(tenantId: number | null | undefined, dados: NotificacaoDados) {
   if (!tenantId) return;
   SocketService.getInstance().notificar(tenantId, {

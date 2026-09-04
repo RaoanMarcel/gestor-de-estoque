@@ -6,7 +6,6 @@ import { notificarTenant } from '../lib/notificacoes.js';
 const router = Router();
 router.use(autenticarToken, somenteTenant);
 
-/** Dispara uma notificação de teste para o próprio tenant (para conferir o sino). */
 router.post('/testar', (req: Request, res: Response) => {
   try {
     const tenantId = requireTenantId(req);

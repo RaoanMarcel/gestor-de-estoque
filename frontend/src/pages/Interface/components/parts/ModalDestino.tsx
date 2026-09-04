@@ -31,20 +31,15 @@ export default function ModalDestino({
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[300px] overflow-y-auto pr-1 pt-1">
           {palletsDestino.map((dest) => {
             const lotacaoAtual = dest.produtos?.length || 0;
-            const isDestinoEsgotado = lotacaoAtual >= 140;
 
             return (
               <button
-                key={dest.id} type="button" disabled={isDestinoEsgotado}
+                key={dest.id} type="button"
                 onClick={() => handleConfirmarDestinoFinal(dest.numero)}
-                className={`p-3 rounded-xl border text-center font-mono flex flex-col justify-between h-[76px] transition-all ${
-                  isDestinoEsgotado
-                    ? 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed opacity-50'
-                    : 'bg-white border-slate-200 hover:border-blue-500/40 text-slate-800'
-                }`}
+                className="p-3 rounded-xl border text-center font-mono flex flex-col justify-between h-[76px] transition-all bg-white border-slate-200 hover:border-blue-500/40 text-slate-800"
               >
                 <span className="text-xs font-bold tracking-tight block truncate">📦 {dest.numero}</span>
-                <span className="text-[9px] text-slate-400 font-sans block mt-1">{lotacaoAtual} / 140 un.</span>
+                <span className="text-[9px] text-slate-400 font-sans block mt-1">{lotacaoAtual} un.</span>
               </button>
             );
           })}

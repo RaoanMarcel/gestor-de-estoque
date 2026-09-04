@@ -192,7 +192,6 @@ export const removerUsuarioDoTenant = async (req: Request, res: Response) => {
   }
 };
 
-/** Dispara uma notificação (sino) para uma empresa ou para todas as ativas. */
 export const notificarPlataforma = async (req: Request, res: Response) => {
   try {
     const titulo = String(req.body?.titulo || 'Aviso da plataforma').trim() || 'Aviso da plataforma';

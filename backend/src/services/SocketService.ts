@@ -159,7 +159,6 @@ export class SocketService {
   }
 
   // ---------- API pública (chamada dos controllers) ----------
-  /** Envia uma notificação para todos os sockets do tenant (sino global do front). */
   public notificar(tenantId: number, payload: any) {
     this.emitToGlobal(tenantId, 'notificacao', payload);
   }

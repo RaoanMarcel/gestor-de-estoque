@@ -61,7 +61,6 @@ model ProdutoPallet {
   bipadoEm   DateTime @default(now())
   pallet     Pallet   @relation(fields: [palletId], references: [id], onDelete: Cascade)
 
-  // capturados quando o item entra num RMA (nulos no fluxo de triagem normal)
   numeroSerie String?
   ean         String?
 
@@ -269,26 +268,19 @@ model RecebimentoItem {
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 }
 
-// ============================================================
-//  RMA — Retorno de Mercadoria Autorizada
-// ============================================================
-
 model Rma {
   id              Int     @id @default(autoincrement())
-  numero          String // "RMA-0078"
-  fornecedor      String // snapshot do nome (mantido mesmo se o pré-cadastro mudar)
+  numero          String
+  fornecedor      String
   fornecedorCnpj  String?
-  fornecedorEmail String? // snapshot do e-mail do pré-cadastro na abertura
-  // ABERTO | AGUARDANDO_RETORNO | EM_CONFERENCIA | FINALIZADO | CANCELADO
+  fornecedorEmail String?
   status          String  @default("ABERTO")
   canhoto         String?
-  demo            Boolean @default(false) // RMA de demonstração — itens virtuais, pode reiniciar
+  demo            Boolean @default(false)
 
-  // pré-cadastro local de fornecedor (nome + e-mail), só para o módulo RMA
   fornecedorRefId Int?
   fornecedorRef   RmaFornecedor? @relation(fields: [fornecedorRefId], references: [id])
 
-  // pallet dedicado deste RMA (tipo = "RMA")
   palletId Int?
   pallet   Pallet? @relation(fields: [palletId], references: [id])
 
@@ -311,8 +303,6 @@ model Rma {
   @@index([tenantId, fornecedorRefId])
 }
 
-/// Pré-cadastro leve de fornecedor, exclusivo do módulo RMA (o cadastro
-/// completo de fornecedor vive em outra tela). Só nome + e-mail por enquanto.
 model RmaFornecedor {
   id        Int      @id @default(autoincrement())
   nome      String
@@ -334,23 +324,20 @@ model RmaItem {
   rmaId Int
   rma   Rma @relation(fields: [rmaId], references: [id], onDelete: Cascade)
 
-  // a unidade física — fica no pallet do RMA enquanto o lote está aberto
   produtoPalletId Int?           @unique
   produtoPallet   ProdutoPallet? @relation(fields: [produtoPalletId], references: [id])
 
-  codigoTriagem     String // snapshot do codigoItem
-  identificador     String? // nº de série ou EAN
-  tipoIdentificador String? // SERIE | EAN
+  codigoTriagem     String
+  identificador     String?
+  tipoIdentificador String?
   produtoNome       String?
   produtoCodigo     String?
-  origemPalletId    Int? // pallet de onde o item veio (p/ devolver no cancelamento)
+  origemPalletId    Int?
 
-  // PENDENTE | TROCA | CREDITO | DESCARTE
   desfecho      String  @default("PENDENTE")
-  retornoSerie  String? // nova série quando é TROCA
-  retornoNotaId Int? // qual RmaNota de retorno trouxe
+  retornoSerie  String?
+  retornoNotaId Int?
 
-  // preenchido no finalizar (só p/ TROCA): TRIAGEM | FANTASMA_NOVO
   destinoEstoque  String?
   destinoPalletId Int?
 
@@ -368,16 +355,16 @@ model RmaNota {
   rmaId Int
   rma   Rma @relation(fields: [rmaId], references: [id], onDelete: Cascade)
 
-  direcao     String // ENTRADA | SAIDA
-  tipo        String // REMESSA | DEVOLUCAO | RETORNO | OUTRA
+  direcao     String
+  tipo        String
   numero      String?
   serie       String?
   chaveAcesso String?
-  natureza    String? // natOp do XML
+  natureza    String?
   dataEmissao DateTime?
   statusNota  String?
   xmlOriginal String?
-  itens       Json? // linhas da nota: [{ descricao, codigo, quantidade }]
+  itens       Json?
 
   createdAt DateTime @default(now())
 

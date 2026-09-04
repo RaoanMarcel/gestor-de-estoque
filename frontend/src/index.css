@@ -152,9 +152,7 @@
 :root[data-radius="soft"] .rounded-lg,
 :root[data-radius="soft"] .rounded-xl,
 :root[data-radius="soft"] .rounded-2xl { border-radius: 1.75rem !important; }
-/* =========================================
-   🔔 SINO DE NOTIFICAÇÃO
-   ========================================= */
+
 @keyframes sino-tremendo {
   0%, 82%, 100% { transform: rotate(0); }
   85% { transform: rotate(13deg); }

@@ -154,9 +154,7 @@ export default function RecebimentoMercadoria() {
   );
   useEffect(() => { localStorage.setItem('receb_view', visualizacao); }, [visualizacao]);
 
-  // Novo recebimento / pré-agendamento (tela 2)
   const [formNovo, setFormNovo] = useState({ identificacao: '', fornecedor: '', observacao: '' });
-  // Agendamento — passo 2 (tela 5)
   const [formAgenda, setFormAgenda] = useState({ id: 0, identificacao: '', fornecedor: '', numeroNota: '', dataAgendada: '', observacao: '' });
   const [isSalvando, setIsSalvando] = useState(false);
 
@@ -242,7 +240,6 @@ export default function RecebimentoMercadoria() {
   // ---------------------------------------------------------------
   // AGENDAMENTO
   // ---------------------------------------------------------------
-  // Passo 1 — cria o pré-agendamento (tela 2)
   const handleCriarRecebimento = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNovo.identificacao.trim()) return toast.error('Informe a identificação do recebimento.');
@@ -267,7 +264,6 @@ export default function RecebimentoMercadoria() {
     }
   };
 
-  // Passo 2 — agenda a entrega (tela 5): data prevista / nº NF / observação
   const handleAgendar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAgenda.id) return;
@@ -761,7 +757,6 @@ export default function RecebimentoMercadoria() {
         </div>
       )}
 
-      {/* ================= TELA 2 — NOVO RECEBIMENTO (pré-agendamento) ================= */}
       {currentScreen === 2 && (
         <div className="max-w-xl mx-auto animate-in slide-in-from-right-8 duration-300">
           <PageHeader titulo="Novo Recebimento" onBack={() => setCurrentScreen(1)} />
@@ -788,7 +783,6 @@ export default function RecebimentoMercadoria() {
         </div>
       )}
 
-      {/* ================= TELA 5 — AGENDAR (passo 2) ================= */}
       {currentScreen === 5 && (
         <div className="max-w-xl mx-auto animate-in slide-in-from-right-8 duration-300">
           <PageHeader titulo={`Agendar · ${formAgenda.identificacao}`} onBack={() => setCurrentScreen(1)} />
