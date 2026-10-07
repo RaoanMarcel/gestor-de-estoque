@@ -167,9 +167,7 @@ export default function GestorEnviosFull() {
   const [mascaraNovaSenha, setMascaraNovaSenha] = useState('');
   const [mascaraSenhaAtualTroca, setMascaraSenhaAtualTroca] = useState('');
   const [mascaraNovaSenhaTroca, setMascaraNovaSenhaTroca] = useState('');
-  const [mascarasLista, setMascarasLista] = useState<{ id: number; sku: string; mascara: string }[]>([]);
-  const [novoMascaraSku, setNovoMascaraSku] = useState('');
-  const [novoMascaraValor, setNovoMascaraValor] = useState('');
+  const [mascarasJson, setMascarasJson] = useState('{\n\n}');
   const [mascaraCarregando, setMascaraCarregando] = useState(false);
 
   const [termoBusca, setTermoBusca] = useState('');
@@ -291,13 +289,19 @@ export default function GestorEnviosFull() {
     } catch (err: any) { toast.error(err.message); }
   };
 
+  const formatarMascarasJson = (lista: { sku: string; mascara: string }[]) => {
+    const objeto: Record<string, string> = {};
+    lista.forEach((item) => { objeto[item.sku] = item.mascara; });
+    return JSON.stringify(objeto, null, 2);
+  };
+
   const carregarMascarasLista = async (token: string) => {
     try {
       const wmsToken = localStorage.getItem('wms_token');
       const res = await fetch(`${API_URL}/mascaras`, { headers: { 'Authorization': `Bearer ${wmsToken}`, 'x-mascara-token': token } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setMascarasLista(data.mascaras || []);
+      setMascarasJson(formatarMascarasJson(data.mascaras || []));
     } catch (err: any) { toast.error(err.message); }
   };
 
@@ -349,39 +353,27 @@ export default function GestorEnviosFull() {
     } catch (err: any) { toast.error(err.message); }
   };
 
-  const handleSalvarMascaraItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!novoMascaraSku.trim() || !novoMascaraValor.trim()) return toast.error('Informe o SKU e a máscara.');
+  const handleSincronizarMascaras = async () => {
     if (!mascaraToken) return toast.error('Sessão de máscaras expirada. Informe a senha novamente.');
+    let objeto: Record<string, unknown>;
+    try {
+      objeto = JSON.parse(mascarasJson);
+      if (typeof objeto !== 'object' || Array.isArray(objeto) || objeto === null) throw new Error();
+    } catch {
+      return toast.error('JSON inválido. Confira as chaves, aspas e vírgulas.');
+    }
     try {
       const wmsToken = localStorage.getItem('wms_token');
-      const res = await fetch(`${API_URL}/mascaras`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wmsToken}`, 'x-mascara-token': mascaraToken }, body: JSON.stringify({ sku: novoMascaraSku, mascara: novoMascaraValor }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success(data.mensagem); setNovoMascaraSku(''); setNovoMascaraValor('');
-      await carregarMascarasLista(mascaraToken);
-    } catch (err: any) { toast.error(err.message); }
-  };
-
-  const handleEditarMascaraItem = (item: { sku: string; mascara: string }) => {
-    setNovoMascaraSku(item.sku); setNovoMascaraValor(item.mascara);
-  };
-
-  const handleRemoverMascaraItem = async (sku: string) => {
-    if (!mascaraToken) return toast.error('Sessão de máscaras expirada. Informe a senha novamente.');
-    if (!window.confirm(`Remover a máscara do SKU ${sku}?`)) return;
-    try {
-      const wmsToken = localStorage.getItem('wms_token');
-      const res = await fetch(`${API_URL}/mascaras/${encodeURIComponent(sku)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${wmsToken}`, 'x-mascara-token': mascaraToken } });
+      const res = await fetch(`${API_URL}/mascaras/sincronizar`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wmsToken}`, 'x-mascara-token': mascaraToken }, body: JSON.stringify({ mascaras: objeto }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast.success(data.mensagem);
-      await carregarMascarasLista(mascaraToken);
+      setMascarasJson(formatarMascarasJson(data.mascaras || []));
     } catch (err: any) { toast.error(err.message); }
   };
 
   const fecharModalMascaras = () => {
-    setShowModalMascaras(false); setNovoMascaraSku(''); setNovoMascaraValor('');
+    setShowModalMascaras(false);
     setMascaraSenhaAtualTroca(''); setMascaraNovaSenhaTroca('');
     setMascaraView(mascaraToken ? 'lista' : 'senha');
   };
@@ -794,31 +786,18 @@ export default function GestorEnviosFull() {
             )}
 
             {mascaraView === 'lista' && (
-              <div className="p-5 overflow-y-auto flex-1">
-                <p className="text-xs text-[var(--text-muted)] mb-3 leading-relaxed"><strong>Legenda:</strong> <code># = número</code> · <code>@ = letra</code> · <code>* = letra ou número</code> · qualquer outro caractere é exigido exatamente como escrito (ex: B, R, -).</p>
+              <div className="p-5 overflow-y-auto flex-1 flex flex-col">
+                <p className="text-xs text-[var(--text-muted)] mb-3 leading-relaxed"><strong>Legenda:</strong> <code># = número</code> · <code>@ = letra</code> · <code>* = letra ou número</code> · qualquer outro caractere é exigido exatamente como escrito (ex: B, R, -). Edite o objeto abaixo (um SKU por linha) e salve — quem sumir do texto é removido.</p>
 
-                <form onSubmit={handleSalvarMascaraItem} className="flex flex-col gap-2 mb-4 bg-[var(--bg-main)] p-3 rounded-xl border border-[var(--border-color)]">
-                  <input type="text" value={novoMascaraSku} onChange={(e) => setNovoMascaraSku(e.target.value)} placeholder="SKU" className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500"/>
-                  <input type="text" value={novoMascaraValor} onChange={(e) => setNovoMascaraValor(e.target.value.toUpperCase())} placeholder="Máscara (ex: BR********)" className="w-full border rounded-lg p-2.5 text-sm uppercase tracking-wide focus:ring-2 focus:ring-amber-500"/>
-                  <button type="submit" className="w-full bg-amber-500 text-white font-bold py-2.5 rounded-lg hover:bg-amber-600 text-sm">Salvar máscara</button>
-                </form>
+                <textarea
+                  value={mascarasJson}
+                  onChange={(e) => setMascarasJson(e.target.value)}
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="w-full flex-1 min-h-[280px] bg-slate-950 text-emerald-400 font-mono text-sm leading-relaxed rounded-xl p-4 border border-[var(--border-color)] focus:ring-2 focus:ring-amber-500 resize-y"
+                />
 
-                <div className="flex flex-col gap-2">
-                  {mascarasLista.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-4">Nenhuma máscara cadastrada ainda.</p>}
-                  {mascarasLista.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-2 border border-[var(--border-color)] rounded-lg p-2.5">
-                      <div className="min-w-0">
-                        <p className="font-bold text-sm text-[var(--text-main)] truncate">{item.sku}</p>
-                        <p className="text-xs text-[var(--text-muted)] font-mono truncate">{item.mascara}</p>
-                      </div>
-                      <div className="flex gap-1.5 shrink-0">
-                        <button onClick={() => handleEditarMascaraItem(item)} className="text-xs font-bold text-blue-600 hover:underline px-1.5">Editar</button>
-                        <button onClick={() => handleRemoverMascaraItem(item.sku)} className="text-xs font-bold text-red-600 hover:underline px-1.5">Remover</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
+                <button onClick={handleSincronizarMascaras} className="w-full mt-3 bg-amber-500 text-white font-bold py-2.5 rounded-lg hover:bg-amber-600 text-sm">Salvar máscaras</button>
                 <button onClick={() => setMascaraView('trocarSenha')} className="w-full mt-4 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] underline">Trocar a senha desta tela</button>
               </div>
             )}

@@ -95,36 +95,39 @@ export const listarMascaras = async (_req: Request, res: Response) => {
   }
 };
 
-export const salvarMascara = async (req: Request, res: Response) => {
+/**
+ * Substitui TODO o conjunto de máscaras do tenant pelo objeto enviado
+ * (`{ "SKU": "MÁSCARA", ... }`) — é o editor em formato JSON da tela, então um
+ * SKU que sumiu do texto é removido, e um SKU novo/alterado é gravado.
+ */
+export const sincronizarMascaras = async (req: Request, res: Response) => {
   try {
-    const { sku, mascara } = req.body;
+    const { mascaras } = req.body;
     const tid = requireTenantId(req);
-    if (!sku || !String(sku).trim() || !mascara || !String(mascara).trim()) {
-      return res.status(400).json({ error: 'Informe o SKU e a máscara.' });
+
+    if (!mascaras || typeof mascaras !== 'object' || Array.isArray(mascaras)) {
+      return res.status(400).json({ error: 'Formato inválido. Envie um objeto { "SKU": "MÁSCARA" }.' });
     }
 
-    const skuLimpo = String(sku).trim();
-    const mascaraLimpa = String(mascara).trim();
+    const entradas = Object.entries(mascaras as Record<string, unknown>).map(([sku, mascara]) => ({
+      sku: String(sku).trim(),
+      mascara: typeof mascara === 'string' ? mascara.trim() : '',
+    }));
 
-    const registro = await prisma.mascaraSku.upsert({
-      where: { tenantId_sku: { tenantId: tid, sku: skuLimpo } },
-      update: { mascara: mascaraLimpa },
-      create: { sku: skuLimpo, mascara: mascaraLimpa, tenantId: tid },
-    });
+    for (const { sku, mascara } of entradas) {
+      if (!sku || !mascara) {
+        return res.status(400).json({ error: `Entrada inválida para o SKU "${sku || '(vazio)'}" — SKU e máscara não podem ficar em branco.` });
+      }
+    }
 
-    return res.status(201).json({ mensagem: 'Máscara salva com sucesso!', mascara: registro });
+    await prisma.$transaction([
+      prisma.mascaraSku.deleteMany({}),
+      ...entradas.map(({ sku, mascara }) => prisma.mascaraSku.create({ data: { sku, mascara, tenantId: tid } })),
+    ]);
+
+    const atualizado = await prisma.mascaraSku.findMany({ orderBy: { sku: 'asc' } });
+    return res.json({ mensagem: 'Máscaras salvas com sucesso!', mascaras: atualizado });
   } catch (error: any) {
-    return res.status(error.status || 500).json({ error: error.message || 'Erro ao salvar a máscara.' });
-  }
-};
-
-export const removerMascara = async (req: Request, res: Response) => {
-  try {
-    const sku = String(req.params.sku);
-    const removido = await prisma.mascaraSku.deleteMany({ where: { sku } });
-    if (removido.count === 0) return res.status(404).json({ error: 'Máscara não encontrada.' });
-    return res.json({ mensagem: 'Máscara removida.' });
-  } catch (error) {
-    return res.status(500).json({ error: 'Erro ao remover a máscara.' });
+    return res.status(error.status || 500).json({ error: error.message || 'Erro ao salvar as máscaras.' });
   }
 };

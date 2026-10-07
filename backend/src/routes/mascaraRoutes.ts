@@ -5,8 +5,7 @@ import {
   verificarSenha,
   definirSenha,
   listarMascaras,
-  salvarMascara,
-  removerMascara,
+  sincronizarMascaras,
 } from '../controllers/mascaraAdminController.js';
 
 const router = Router();
@@ -20,7 +19,6 @@ router.post('/senha/verificar', verificarSenha);
 
 // Ler e editar as máscaras exige também a senha extra (ver exigirSenhaMascara).
 router.get('/', exigirSenhaMascara, listarMascaras);
-router.post('/', exigirSenhaMascara, salvarMascara);
-router.delete('/:sku', exigirSenhaMascara, removerMascara);
+router.put('/sincronizar', exigirSenhaMascara, sincronizarMascaras);
 
 export default router;
