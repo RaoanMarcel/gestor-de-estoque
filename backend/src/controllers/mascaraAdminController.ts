@@ -17,20 +17,25 @@ const TIPO_TOKEN_MASCARA = 'mascara_unlock';
  * além do login normal (`autenticarToken`, aplicado antes na mesma rota). É a
  * trava extra: mesmo um usuário logado não mexe nas máscaras sem a senha.
  */
+// IMPORTANTE: nunca usar 401 aqui. O frontend tem um interceptador global
+// (App.tsx) que desloga o usuário da PLATAFORMA INTEIRA em qualquer 401 — é a
+// convenção de "sessão/token expirou". Como a senha de máscaras é uma trava à
+// parte do login, os erros dela usam 403 (que o interceptador ignora, a menos
+// que venha com code "TENANT_SUSPENSO").
 export const exigirSenhaMascara = (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers['x-mascara-token'] as string | undefined;
   if (!token) {
-    return res.status(401).json({ error: 'Informe a senha de máscaras para continuar.' });
+    return res.status(403).json({ error: 'Informe a senha de máscaras para continuar.' });
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { tipo?: string; tenantId?: number };
     const auth = getAuth(req);
     if (decoded.tipo !== TIPO_TOKEN_MASCARA || decoded.tenantId !== auth?.tenantId) {
-      return res.status(401).json({ error: 'Sessão de máscaras inválida.' });
+      return res.status(403).json({ error: 'Sessão de máscaras inválida.' });
     }
     next();
   } catch {
-    return res.status(401).json({ error: 'Sessão de máscaras expirada. Informe a senha novamente.' });
+    return res.status(403).json({ error: 'Sessão de máscaras expirada. Informe a senha novamente.' });
   }
 };
 
@@ -47,7 +52,7 @@ export const verificarSenha = async (req: Request, res: Response) => {
     }
 
     const confere = await bcrypt.compare(senha, tenant.mascarasSenhaHash);
-    if (!confere) return res.status(401).json({ error: 'Senha incorreta.' });
+    if (!confere) return res.status(403).json({ error: 'Senha incorreta.' });
 
     const token = jwt.sign({ tipo: TIPO_TOKEN_MASCARA, tenantId: tid }, JWT_SECRET, { expiresIn: '4h' });
     return res.json({ token });
@@ -69,7 +74,7 @@ export const definirSenha = async (req: Request, res: Response) => {
     if (tenant?.mascarasSenhaHash) {
       if (!senhaAtual) return res.status(400).json({ error: 'Informe a senha atual.' });
       const confere = await bcrypt.compare(senhaAtual, tenant.mascarasSenhaHash);
-      if (!confere) return res.status(401).json({ error: 'Senha atual incorreta.' });
+      if (!confere) return res.status(403).json({ error: 'Senha atual incorreta.' });
     }
 
     const novoHash = await bcrypt.hash(String(novaSenha), 10);

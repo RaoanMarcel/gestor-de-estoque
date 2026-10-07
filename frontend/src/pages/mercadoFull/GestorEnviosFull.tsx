@@ -328,9 +328,10 @@ export default function GestorEnviosFull() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast.success(data.mensagem);
-      setMascaraSenhaInput(mascaraNovaSenha); setMascaraNovaSenha('');
+      const senhaRecemCriada = mascaraNovaSenha;
+      setMascaraNovaSenha('');
       // Já desbloqueia direto com a senha recém-definida, sem pedir de novo.
-      const verifyRes = await fetch(`${API_URL}/mascaras/senha/verificar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wmsToken}` }, body: JSON.stringify({ senha: mascaraSenhaInput }) });
+      const verifyRes = await fetch(`${API_URL}/mascaras/senha/verificar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wmsToken}` }, body: JSON.stringify({ senha: senhaRecemCriada }) });
       const verifyData = await verifyRes.json();
       if (verifyRes.ok) { setMascaraToken(verifyData.token); setMascaraSenhaInput(''); setMascaraView('lista'); await carregarMascarasLista(verifyData.token); }
     } catch (err: any) { toast.error(err.message); } finally { setMascaraCarregando(false); }
@@ -768,7 +769,7 @@ export default function GestorEnviosFull() {
             {mascaraView === 'senha' && (
               <form onSubmit={handleVerificarSenhaMascara} className="p-5">
                 <p className="text-sm text-[var(--text-muted)] mb-4">Esta tela é protegida por uma senha própria, separada do seu login. Informe-a para gerenciar as máscaras.</p>
-                <input type="password" value={mascaraSenhaInput} onChange={(e) => setMascaraSenhaInput(e.target.value)} placeholder="Senha de máscaras" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-amber-500" autoFocus/>
+                <input type="password" autoComplete="off" value={mascaraSenhaInput} onChange={(e) => setMascaraSenhaInput(e.target.value)} placeholder="Senha de máscaras" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-amber-500" autoFocus/>
                 <button type="submit" disabled={mascaraCarregando} className="w-full bg-amber-500 text-white font-bold py-3 rounded-xl hover:bg-amber-600 disabled:opacity-60">Entrar</button>
               </form>
             )}
@@ -776,15 +777,15 @@ export default function GestorEnviosFull() {
             {mascaraView === 'definirSenha' && (
               <form onSubmit={handleDefinirSenhaMascaraInicial} className="p-5">
                 <p className="text-sm text-[var(--text-muted)] mb-4">Nenhuma senha foi definida ainda para esta tela. Crie uma agora (guarde-a e repasse só a quem for cadastrar máscaras).</p>
-                <input type="password" value={mascaraNovaSenha} onChange={(e) => setMascaraNovaSenha(e.target.value)} placeholder="Nova senha (mín. 4 caracteres)" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-amber-500" autoFocus/>
+                <input type="password" autoComplete="off" value={mascaraNovaSenha} onChange={(e) => setMascaraNovaSenha(e.target.value)} placeholder="Nova senha (mín. 4 caracteres)" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-amber-500" autoFocus/>
                 <button type="submit" disabled={mascaraCarregando} className="w-full bg-amber-500 text-white font-bold py-3 rounded-xl hover:bg-amber-600 disabled:opacity-60">Definir senha e entrar</button>
               </form>
             )}
 
             {mascaraView === 'trocarSenha' && (
               <form onSubmit={handleTrocarSenhaMascara} className="p-5">
-                <input type="password" value={mascaraSenhaAtualTroca} onChange={(e) => setMascaraSenhaAtualTroca(e.target.value)} placeholder="Senha atual" className="w-full border rounded-lg p-3 text-sm mb-3 focus:ring-2 focus:ring-amber-500" autoFocus/>
-                <input type="password" value={mascaraNovaSenhaTroca} onChange={(e) => setMascaraNovaSenhaTroca(e.target.value)} placeholder="Nova senha (mín. 4 caracteres)" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-amber-500"/>
+                <input type="password" autoComplete="off" value={mascaraSenhaAtualTroca} onChange={(e) => setMascaraSenhaAtualTroca(e.target.value)} placeholder="Senha atual" className="w-full border rounded-lg p-3 text-sm mb-3 focus:ring-2 focus:ring-amber-500" autoFocus/>
+                <input type="password" autoComplete="off" value={mascaraNovaSenhaTroca} onChange={(e) => setMascaraNovaSenhaTroca(e.target.value)} placeholder="Nova senha (mín. 4 caracteres)" className="w-full border rounded-lg p-3 text-sm mb-5 focus:ring-2 focus:ring-amber-500"/>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setMascaraView('lista')} className="flex-1 py-3 text-sm font-bold text-[var(--text-muted)] bg-[var(--bg-main)] hover:bg-[var(--border-color)] rounded-xl transition">Cancelar</button>
                   <button type="submit" className="flex-1 bg-amber-500 text-white font-bold py-3 rounded-xl hover:bg-amber-600">Trocar senha</button>
