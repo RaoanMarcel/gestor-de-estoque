@@ -16,6 +16,10 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Senha extra (hash bcrypt) que trava a tela de gerenciamento de máscaras de SKU
+  // (ver mascaraAdminController.ts) — independente do login de cada usuário.
+  mascarasSenhaHash String?
+
   pallets          Pallet[]
   produtos         ProdutoPallet[]
   historicos       HistoricoMovimentacao[]
@@ -33,6 +37,7 @@ model Tenant {
   rmaNotas         RmaNota[]
   rmaAnotacoes     RmaAnotacao[]
   rmaFornecedores  RmaFornecedor[]
+  mascarasSku      MascaraSku[]
 }
 
 model Pallet {
@@ -373,6 +378,21 @@ model RmaNota {
 
   @@unique([tenantId, chaveAcesso])
   @@index([tenantId, rmaId])
+}
+
+/// Máscara de bipagem predefinida por SKU (ver backend/src/controllers/maskController.ts).
+/// Cadastrada pelo time do Full na própria tela, sem precisar de deploy.
+model MascaraSku {
+  id        Int      @id @default(autoincrement())
+  sku       String
+  mascara   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, sku])
 }
 
 model RmaAnotacao {

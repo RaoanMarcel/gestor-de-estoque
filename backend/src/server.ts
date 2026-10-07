@@ -14,6 +14,7 @@ import recebimentoRoutes from './routes/recebimentoRoutes.js';
 import rmaRoutes from './routes/rmaRoutes.js';
 import notificacaoRoutes from './routes/notificacaoRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
+import mascaraRoutes from './routes/mascaraRoutes.js';
 
 // 🚀 IMPORTAÇÃO DO NOVO SERVIÇO DE VIGILÂNCIA DO BANCO
 import { KeepAliveService } from './services/KeepAliveService.js';
@@ -76,6 +77,7 @@ app.use('/api/recebimentos', recebimentoRoutes);
 app.use('/api/rma', rmaRoutes);
 app.use('/api/notificacoes', notificacaoRoutes);
 app.use('/api/superadmin', superadminRoutes);
+app.use('/api/mascaras', mascaraRoutes);
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor ativo na porta ${PORT} | Versão: ${APP_VERSION}`);

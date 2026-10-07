@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { getAuth, requireTenantId } from '../lib/auth.js';
 import ExcelJS from 'exceljs';
-import { getMascaraPorSku } from './maskController.js'; // 🚀 IMPORTANDO O ARQUIVO DE MÁSCARAS
+import { carregarMascaras } from './maskController.js'; // 🚀 IMPORTANDO O ARQUIVO DE MÁSCARAS
 
 const decodeZPLText = (text: string) => {
   const urlEncoded = text.replace(/_([0-9A-Fa-f]{2})/g, '%$1');
@@ -86,11 +86,12 @@ export const processarInboundPdf = async (req: Request, res: Response) => {
     });
 
     // 🚀 INJETANDO A MÁSCARA ANTES DE ENVIAR PARA O FRONT
+    const mascaras = await carregarMascaras();
     const inboundTratado = {
       ...novoInbound,
       skus: novoInbound.skus.map((sku: any) => ({
         ...sku,
-        mascaraPredefinida: getMascaraPorSku(sku.sku)
+        mascaraPredefinida: mascaras[sku.sku] || null
       }))
     };
 
@@ -134,12 +135,13 @@ export const listarDashboard = async (req: Request, res: Response) => {
     });
     
     // 🚀 INJETANDO A MÁSCARA NA LISTAGEM
+    const mascaras = await carregarMascaras();
     const inbounds = inboundsDb.map(inb => ({
       ...inb,
       skus: inb.skus.map((sku: any) => ({
         ...sku,
         leituras: typeof sku.leituras === 'string' ? JSON.parse(sku.leituras) : (sku.leituras || []),
-        mascaraPredefinida: getMascaraPorSku(sku.sku)
+        mascaraPredefinida: mascaras[sku.sku] || null
       }))
     }));
 
@@ -197,11 +199,12 @@ export const finalizarInbound = async (req: Request, res: Response) => {
     });
 
     // 🚀 INJETANDO A MÁSCARA NA RESPOSTA DA FINALIZAÇÃO
+    const mascaras = await carregarMascaras();
     const inboundTratado = {
       ...inboundAtualizado,
       skus: inboundAtualizado.skus.map((sku: any) => ({
         ...sku,
-        mascaraPredefinida: getMascaraPorSku(sku.sku)
+        mascaraPredefinida: mascaras[sku.sku] || null
       }))
     };
 
